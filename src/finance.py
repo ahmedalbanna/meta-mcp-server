@@ -2,6 +2,7 @@
 
 from src.config import AD_ACCOUNT_ID, BUSINESS_ID
 from src.helpers import api_call, handle_error, json_dumps, to_dict, write_guard
+from src.throttle import concurrency_limit
 
 BALANCE_FIELDS = [
     "name",
@@ -24,6 +25,7 @@ def register(mcp):
     from facebook_business.adobjects.business import Business
 
     @mcp.tool()
+    @concurrency_limit()
     def get_account_balance() -> str:
         """رصيد الحساب الإعلاني والإنفاق وحد الإنفاق والعملة."""
         try:
@@ -34,16 +36,20 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_account_balance"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_spend_cap() -> str:
         """حدود الإنفاق الحالية للحساب الإعلاني."""
         try:
             account = AdAccount(AD_ACCOUNT_ID)
-            info = account.api_get(fields=["spend_cap", "amount_spent", "balance", "currency"])
+            info = account.api_get(
+                fields=["spend_cap", "amount_spent", "balance", "currency"]
+            )
             return json_dumps(to_dict(info))
         except Exception as e:
             return json_dumps(handle_error(e, "get_spend_cap"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def update_spend_cap(spend_cap: int) -> str:
         """
@@ -54,18 +60,24 @@ def register(mcp):
             account = AdAccount(AD_ACCOUNT_ID)
             params = {"spend_cap": spend_cap} if spend_cap > 0 else {"spend_cap": 0}
             result = account.api_update(params=params)
-            return json_dumps({"success": True, "spend_cap": spend_cap, "result": to_dict(result)})
+            return json_dumps(
+                {"success": True, "spend_cap": spend_cap, "result": to_dict(result)}
+            )
         except Exception as e:
             return json_dumps(handle_error(e, "update_spend_cap"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_transactions(limit: int = 25) -> str:
         """آخر المعاملات المالية للحساب الإعلاني (فواتير/مدفوعات/إضافات)."""
         try:
             data = api_call(
                 "GET",
                 f"{AD_ACCOUNT_ID}/transactions",
-                {"fields": "type,amount,date,status,billing_reference_number", "limit": limit},
+                {
+                    "fields": "type,amount,date,status,billing_reference_number",
+                    "limit": limit,
+                },
             )
             return json_dumps(data)
         except Exception as e:
@@ -77,12 +89,18 @@ def register(mcp):
             )
 
     @mcp.tool()
+    @concurrency_limit()
     def get_payment_methods() -> str:
         """طرق الدفع المرتبطة بالحساب (مصدر التمويل)."""
         try:
             account = AdAccount(AD_ACCOUNT_ID)
             info = account.api_get(
-                fields=["funding_source", "funding_source_details", "extended_credit_invoice_group", "is_prepay_account"]
+                fields=[
+                    "funding_source",
+                    "funding_source_details",
+                    "extended_credit_invoice_group",
+                    "is_prepay_account",
+                ]
             )
             return json_dumps(
                 {
@@ -94,6 +112,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_payment_methods"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_business_info(business_id: str = "") -> str:
         """معلومات Business Manager (الفوترة، اسم النشاط، الحالة)."""
         try:
@@ -113,16 +132,20 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_business_info"))
 
     @mcp.tool()
+    @concurrency_limit()
     def list_account_users() -> str:
         """المستخدمون المرتبطون بالحساب الإعلاني وصلاحياتهم."""
         try:
             account = AdAccount(AD_ACCOUNT_ID)
-            users = account.get_assigned_users(params={"fields": ["name", "role", "tasks", "id"]})
+            users = account.get_assigned_users(
+                params={"fields": ["name", "role", "tasks", "id"]}
+            )
             return json_dumps([to_dict(u) for u in users])
         except Exception as e:
             return json_dumps(handle_error(e, "list_account_users"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def assign_user_to_account(user_id: int, tasks: str = "ADVERTISE,MANAGE") -> str:
         """
@@ -138,6 +161,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "assign_user_to_account"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def remove_user_from_account(user_id: int) -> str:
         """إزالة مستخدم من الحساب الإعلاني."""

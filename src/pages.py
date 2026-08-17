@@ -7,6 +7,7 @@ from src.helpers import (
     to_dict,
     write_guard,
 )
+from src.throttle import concurrency_limit
 
 
 def register(mcp):
@@ -18,6 +19,7 @@ def register(mcp):
         return Page(node_id or PAGE_ID, api=get_page_api())
 
     @mcp.tool()
+    @concurrency_limit()
     def get_page_info(page_id: str = "") -> str:
         """معلومات صفحة فيسبوك (الاسم، عدد المتابعين، التصنيف)."""
         try:
@@ -34,6 +36,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_page_info"))
 
     @mcp.tool()
+    @concurrency_limit()
     def list_page_posts(page_id: str = "", limit: int = 25) -> str:
         """منشورات صفحة فيسبوك."""
         try:
@@ -54,6 +57,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_page_posts"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def publish_page_post(message: str, page_id: str = "") -> str:
         """نشر منشور نصي على صفحة فيسبوك."""
@@ -64,6 +68,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "publish_page_post"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def publish_page_photo(image_url: str, message: str = "", page_id: str = "") -> str:
         """نشر صورة على صفحة فيسبوك (مع نص اختياري)."""
@@ -77,6 +82,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "publish_page_photo"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def schedule_page_post(message: str, scheduled_time: int, page_id: str = "") -> str:
         """
@@ -96,6 +102,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "schedule_page_post"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def update_page_post_caption(post_id: str, message: str) -> str:
         """
@@ -112,6 +119,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "update_page_post_caption"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def delete_page_post(post_id: str) -> str:
         """حذف منشور من صفحة فيسبوك."""
@@ -124,6 +132,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "delete_page_post"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_page_post_insights(
         post_id: str,
         metrics: str = "post_impressions,post_engaged_users,post_reactions_by_type_total,post_comments,post_shares,post_saves",
@@ -140,6 +149,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_page_post_insights"))
 
     @mcp.tool()
+    @concurrency_limit()
     def list_page_post_comments(post_id: str, limit: int = 25) -> str:
         """التعليقات على منشور صفحة فيسبوك."""
         try:
@@ -153,6 +163,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_page_post_comments"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def reply_to_page_comment(comment_id: str, message: str) -> str:
         """الرد على تعليق صفحة فيسبوك."""
@@ -166,6 +177,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "reply_to_page_comment"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def delete_page_comment(comment_id: str) -> str:
         """حذف تعليق من صفحة فيسبوك."""
@@ -178,6 +190,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "delete_page_comment"))
 
     @mcp.tool()
+    @concurrency_limit()
     def list_page_albums(page_id: str = "", limit: int = 25) -> str:
         """ألبومات الصور على صفحة فيسبوك."""
         try:
@@ -192,6 +205,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_page_albums"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_album_photos(album_id: str, limit: int = 25) -> str:
         """صور ألبوم معيّن في صفحة فيسبوك."""
         try:
@@ -208,6 +222,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_album_photos"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def update_page_cover(photo_id: str, page_id: str = "") -> str:
         """تعيين صورة غلاف الصفحة من صورة موجودة في ألبوم."""
@@ -228,6 +243,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "update_page_cover"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_page_insights(
         page_id: str = "",
         period: str = "day",
@@ -268,6 +284,7 @@ def register(mcp):
     # ------------------------------------------------------------------
 
     @mcp.tool()
+    @concurrency_limit()
     def list_page_events(page_id: str = "", limit: int = 25) -> str:
         """الأحداث المرتبطة بصفحة فيسبوك."""
         try:
@@ -292,6 +309,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_page_events"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_page_event(event_id: str) -> str:
         """تفاصيل حدث واحد على الصفحة."""
         try:
@@ -316,6 +334,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_page_event"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def create_page_event(
         name: str,
@@ -350,6 +369,7 @@ def register(mcp):
     # ------------------------------------------------------------------
 
     @mcp.tool()
+    @concurrency_limit()
     def list_page_ratings(page_id: str = "", limit: int = 25) -> str:
         """تقييمات ومراجعات صفحة فيسبوك."""
         try:
@@ -377,6 +397,7 @@ def register(mcp):
     # ------------------------------------------------------------------
 
     @mcp.tool()
+    @concurrency_limit()
     def list_page_roles(page_id: str = "", limit: int = 25) -> str:
         """الأشخاص الذين يديرون الصفحة وأدوارهم ومهامهم."""
         try:
@@ -396,6 +417,7 @@ def register(mcp):
     # ------------------------------------------------------------------
 
     @mcp.tool()
+    @concurrency_limit()
     def get_page_cta(page_id: str = "") -> str:
         """زر الدعوة لاتخاذ إجراء الحالي على الصفحة."""
         try:
@@ -405,6 +427,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_page_cta"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def update_page_cta(cta_type: str, cta_link: str, page_id: str = "") -> str:
         """

@@ -32,11 +32,24 @@ from src import (
 )
 from src.config import validate_config
 from src.helpers import init_meta_api
+from src.throttle import MAX_CONCURRENT
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("meta-mcp")
 
 mcp = FastMCP("meta-marketing-pro")
+
+
+# Log + swallow unhandled tool exceptions so a single bad request can never take
+# down the stdio transport (a crash here previously dropped the whole session).
+def _install_exception_hook() -> None:
+    def hook(etype, value, tb):
+        log.error("استثناء غير معالج داخل خادم MCP: %s: %s", etype.__name__, value)
+        log.debug("traceback:", exc_info=(etype, value, tb))
+
+    import sys
+
+    sys.excepthook = hook
 
 
 def main() -> None:
@@ -48,6 +61,8 @@ def main() -> None:
 
     init_meta_api()
     log.info("تم تهيئة Facebook Ads API")
+    _install_exception_hook()
+    log.info("حد التوازي لطلبات Graph API: %d", MAX_CONCURRENT)
 
     # Register all tool modules
     for module in (

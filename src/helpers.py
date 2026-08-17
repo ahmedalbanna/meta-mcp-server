@@ -18,6 +18,7 @@ from src.config import (
     PAGE_ACCESS_TOKEN,
     PAGE_ID,
 )
+from src.throttle import concurrency_limit
 
 
 def init_meta_api() -> None:
@@ -78,6 +79,7 @@ def get_page_api() -> FacebookAdsApi:
     return _page_api
 
 
+@concurrency_limit()
 def page_api_call(method: str, path: str, params: Optional[dict] = None) -> Any:
     """Perform a raw Graph API call using the page-scoped token."""
     api = get_page_api()
@@ -120,7 +122,9 @@ def handle_error(e: Exception, context: str = "") -> Dict[str, str]:
     return {"error": f"{context}: {e}".strip(": "), "context": context}
 
 
-def paged(getter, fields: List[str], params: Optional[dict] = None, limit: int = 25) -> List[dict]:
+def paged(
+    getter, fields: List[str], params: Optional[dict] = None, limit: int = 25
+) -> List[dict]:
     """DEPRECATED: use src.utils.paginate() (cursor-based, handles raw + SDK edges).
 
     This helper only fetches the first page and ignores pagination cursors.
@@ -135,10 +139,13 @@ def paged(getter, fields: List[str], params: Optional[dict] = None, limit: int =
     return out
 
 
+@concurrency_limit()
 def api_call(method: str, path: str, params: Optional[dict] = None) -> Any:
     """Perform a raw Graph API call and return parsed JSON.
 
     Pass path as a tuple so the SDK prepends the versioned Graph base URL.
+    Wrapped with a global concurrency limit and rate-limit retry so parallel
+    tool invocations cannot overwhelm the Meta Graph API and stall the server.
     """
     api = FacebookAdsApi.get_default_api()
     return api.call(
@@ -161,13 +168,26 @@ def evaluate_guard(
 ) -> tuple:
     """Evaluate write-guardrails. Returns (ok, message)."""
     if not ENABLE_WRITES:
-        return False, "عمليات الكتابة معطلة (FB_ENABLE_WRITES=false). فعّلها في .env ثم أعد تشغيل الخادم."
+        return (
+            False,
+            "عمليات الكتابة معطلة (FB_ENABLE_WRITES=false). فعّلها في .env ثم أعد تشغيل الخادم.",
+        )
     if status == "ACTIVE" and not ADS_ALLOW_ACTIVATE:
         return False, "تفعيل (ACTIVE) معطل (FB_ADS_ALLOW_ACTIVATE=false)."
     if MAX_DAILY_BUDGET and daily_budget and daily_budget > MAX_DAILY_BUDGET:
-        return False, f"الميزانية اليومية ({daily_budget}) تتجاوز الحد المسموح ({MAX_DAILY_BUDGET})."
-    if MAX_LIFETIME_BUDGET and lifetime_budget and lifetime_budget > MAX_LIFETIME_BUDGET:
-        return False, f"الميزانية الإجمالية ({lifetime_budget}) تتجاوز الحد المسموح ({MAX_LIFETIME_BUDGET})."
+        return (
+            False,
+            f"الميزانية اليومية ({daily_budget}) تتجاوز الحد المسموح ({MAX_DAILY_BUDGET}).",
+        )
+    if (
+        MAX_LIFETIME_BUDGET
+        and lifetime_budget
+        and lifetime_budget > MAX_LIFETIME_BUDGET
+    ):
+        return (
+            False,
+            f"الميزانية الإجمالية ({lifetime_budget}) تتجاوز الحد المسموح ({MAX_LIFETIME_BUDGET}).",
+        )
     return True, ""
 
 

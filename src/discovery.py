@@ -6,12 +6,14 @@ Run these first to confirm object ids before wiring FB_PAGE_ID / FB_AD_ACCOUNT_I
 
 from src.config import APP_ID, APP_SECRET, META_ACCESS_TOKEN
 from src.helpers import api_call, handle_error, json_dumps
+from src.throttle import concurrency_limit
 
 
 def register(mcp):
     """Register discovery + config tools."""
 
     @mcp.tool()
+    @concurrency_limit()
     def list_pages(limit: int = 25) -> str:
         """قائمة صفحات فيسبوك التي تديرها الحسابات المرتبطة بالتوكن."""
         try:
@@ -25,6 +27,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_pages"))
 
     @mcp.tool()
+    @concurrency_limit()
     def list_ad_accounts(limit: int = 25) -> str:
         """قائمة الحسابات الإعلانية المتاحة لهذا التوكن."""
         try:
@@ -41,6 +44,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_ad_accounts"))
 
     @mcp.tool()
+    @concurrency_limit()
     def discover_ig_user(page_id: str = "") -> str:
         """
         اكتشاف حساب إنستغرام المرتبط بصفحة فيسبوك.
@@ -57,7 +61,11 @@ def register(mcp):
             pages = api_call("GET", "me/accounts", {"fields": "name,id"})
             out = []
             for p in pages.get("data", []):
-                row = {"page_id": p.get("id"), "page_name": p.get("name"), "instagram": None}
+                row = {
+                    "page_id": p.get("id"),
+                    "page_name": p.get("name"),
+                    "instagram": None,
+                }
                 try:
                     detail = api_call(
                         "GET",
@@ -65,7 +73,10 @@ def register(mcp):
                         {"fields": "instagram_business_account{id,username}"},
                     )
                     ig = detail.get("instagram_business_account") or {}
-                    row["instagram"] = {"id": ig.get("id"), "username": ig.get("username")}
+                    row["instagram"] = {
+                        "id": ig.get("id"),
+                        "username": ig.get("username"),
+                    }
                 except Exception:
                     row["instagram"] = "غير مرتبط أو بدون صلاحية"
                 out.append(row)
@@ -74,6 +85,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "discover_ig_user"))
 
     @mcp.tool()
+    @concurrency_limit()
     def debug_access_token(input_token: str = "") -> str:
         """
         فحص نوع التوكن وصلاحياته وتاريخ انتهائه.
@@ -96,6 +108,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "debug_access_token"))
 
     @mcp.tool()
+    @concurrency_limit()
     def config_status() -> str:
         """حالة الإعداد الحالية (أي معرفات مملوءة في .env) بدون كشف الأسرار."""
         from src.config import (
