@@ -2,6 +2,7 @@ from src.config import AD_ACCOUNT_ID
 from src.utils import normalize_pii
 
 LOOKALIKE_TYPES = ["SIMILARITY", "REACH", "CUSTOM_RATIO"]
+RETENTION_SECONDS_90D = 7776000
 
 
 def register(mcp):
@@ -247,7 +248,7 @@ def register(mcp):
                                     "event_sources": [
                                         {"type": "pixel", "id": source_pixel_id}
                                     ],
-                                    "retention_seconds": 7776000,
+                                    "retention_seconds": RETENTION_SECONDS_90D,
                                     "filter": {"operator": "and", "filters": []},
                                 }
                             ],
@@ -268,7 +269,7 @@ def register(mcp):
                                     "event_sources": [
                                         {"type": "pixel", "id": source_website_url}
                                     ],
-                                    "retention_seconds": 7776000,
+                                    "retention_seconds": RETENTION_SECONDS_90D,
                                     "filter": {
                                         "operator": "and",
                                         "filters": [

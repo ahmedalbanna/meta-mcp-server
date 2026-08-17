@@ -16,5 +16,7 @@ output/
 .DS_Store
 .idea/
 .vscode/
+.ipynb_checkpoints/
+.pytest_cache/
 media/*
 opencode.json

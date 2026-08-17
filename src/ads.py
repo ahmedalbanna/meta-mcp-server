@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 from src.config import AD_ACCOUNT_ID

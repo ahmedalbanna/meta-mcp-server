@@ -16,7 +16,7 @@ from typing import Any, Callable, Dict, List, Optional
 from facebook_business.exceptions import FacebookRequestError
 
 from src.helpers import to_dict
-from src.throttle import RATE_LIMIT_CODES, RATE_LIMIT_SUBCODES
+from src.throttle import RATE_LIMIT_CODES, RATE_LIMIT_SUBCODES, _is_rate_limit
 
 # ---------------------------------------------------------------------------
 # Structured logging with correlation id
@@ -127,15 +127,6 @@ def paginate(
 # ---------------------------------------------------------------------------
 
 # Meta rate-limit + transient error codes worth retrying (from src.throttle)
-
-
-def _is_rate_limit(e: FacebookRequestError) -> bool:
-    try:
-        code = e.api_error_code() or 0
-        subcode = e.api_error_subcode() or 0
-    except Exception:
-        return False
-    return code in RATE_LIMIT_CODES or subcode in RATE_LIMIT_SUBCODES
 
 
 def retry_on_rate_limit(

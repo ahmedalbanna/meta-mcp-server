@@ -5,6 +5,8 @@ from src.config import AD_ACCOUNT_ID
 from src.helpers import handle_error, json_dumps, to_dict, write_guard
 from src.throttle import concurrency_limit
 
+SECONDS_PER_DAY = 86400
+
 
 def register(mcp):
     """Register automated rules (ad rules) tools."""
@@ -120,7 +122,7 @@ def register(mcp):
         """سجل تنفيذ القواعد التلقائية خلال الأيام الأخيرة."""
         try:
             account = AdAccount(AD_ACCOUNT_ID)
-            since = int(time.time()) - days * 86400
+            since = int(time.time()) - days * SECONDS_PER_DAY
             history = account.get_ad_rules_history(
                 params={"start_time": since, "end_time": int(time.time())}
             )

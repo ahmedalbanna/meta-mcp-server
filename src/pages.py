@@ -9,6 +9,8 @@ from src.helpers import (
 )
 from src.throttle import concurrency_limit
 
+SECONDS_PER_DAY = 86400
+
 
 def register(mcp):
     """Register Facebook Page tools (all use the page-scoped token)."""
@@ -254,7 +256,7 @@ def register(mcp):
         try:
             import time
 
-            since = int(time.time()) - days * 86400
+            since = int(time.time()) - days * SECONDS_PER_DAY
             metric_list = [m.strip() for m in metrics.split(",") if m.strip()]
 
             def fetch(metric_group, period_value):

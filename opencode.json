@@ -4,8 +4,8 @@
         "meta-marketing-pro": {
             "type": "local",
             "command": [
-                "/home/zeus/miniconda3/envs/cloudspace/bin/python",
-                "/teamspace/studios/this_studio/meta-mcp-server/server.py"
+                "python",
+                "server.py"
             ],
             "environment": {
                 "FB_ACCESS_TOKEN": "REPLACE_WITH_YOUR_ACCESS_TOKEN",

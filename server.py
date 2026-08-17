@@ -47,8 +47,6 @@ def _install_exception_hook() -> None:
         log.error("استثناء غير معالج داخل خادم MCP: %s: %s", etype.__name__, value)
         log.debug("traceback:", exc_info=(etype, value, tb))
 
-    import sys
-
     sys.excepthook = hook
 
 

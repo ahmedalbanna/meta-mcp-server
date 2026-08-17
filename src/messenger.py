@@ -7,6 +7,8 @@ from src.config import PAGE_ID
 from src.helpers import handle_error, json_dumps, page_api_call, write_guard
 from src.throttle import concurrency_limit
 
+MESSENGER_MAX_TEXT_LENGTH = 2000
+
 CONVERSATION_FIELDS = (
     "id,updated_time,message_count,unread_count,participants,can_reply,last_used_tag"
 )
@@ -81,8 +83,8 @@ def register(mcp):
     def send_messenger_message(recipient_id: str, text: str, page_id: str = "") -> str:
         """إرسال رد عبر Messenger إلى المستخدم الذي بدأ المحادثة."""
         try:
-            if len(text) > 2000:
-                return json_dumps({"error": f"النص طويل جدًا ({len(text)} حرف). الحد الأقصى 2000."})
+            if len(text) > MESSENGER_MAX_TEXT_LENGTH:
+                return json_dumps({"error": f"النص طويل جدًا ({len(text)} حرف). الحد الأقصى {MESSENGER_MAX_TEXT_LENGTH}."})
             result = page_api_call(
                 "POST",
                 f"{_pid(page_id)}/messages",

@@ -50,7 +50,7 @@ def sanitize_path(path_str: str, allowed_root: "Path") -> "Path":
     if not str(resolved).startswith(str(root_resolved) + "/") and resolved != root_resolved:
         raise ValueError(f"Path escapes allowed directory: {path_str!r}")
     return resolved
-from src.throttle import async_concurrency_limit, concurrency_limit
+from src.throttle import RATE_LIMIT_CODES, RATE_LIMIT_SUBCODES, async_concurrency_limit, concurrency_limit
 
 logger = logging.getLogger(__name__)
 
@@ -164,13 +164,7 @@ def handle_error(e: Exception, context: str = "") -> Dict[str, Any]:
         code = e.api_error_code()
         subcode = e.api_error_subcode()
         # Rate-limit without raising — surface it clearly
-        if code in {4, 17, 32, 613, 80004} or subcode in {
-            1487003,
-            1487048,
-            1487123,
-            1487182,
-            1639242,
-        }:
+        if code in RATE_LIMIT_CODES or subcode in RATE_LIMIT_SUBCODES:
             logger.warning(
                 "Rate limit hit in %s: code=%s subcode=%s", context, code, subcode
             )

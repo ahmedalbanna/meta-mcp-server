@@ -7,6 +7,8 @@ from src.config import WABA_ID, WHATSAPP_PHONE_NUMBER_ID
 from src.helpers import api_call, handle_error, json_dumps, write_guard
 from src.throttle import concurrency_limit
 
+WHATSAPP_MAX_TEXT_LENGTH = 4096
+
 PHONE_NUMBER_FIELDS = (
     "id,display_phone_number,verified_name,quality_rating,"
     "code_verification_status,throughput"
@@ -113,8 +115,8 @@ def register(mcp):
     ) -> str:
         """إرسال رسالة نصية واتساب (رقم المستخدم يجب أن يكون بدأ محادثة)."""
         try:
-            if len(text) > 4096:
-                return json_dumps({"error": f"النص طويل جدًا ({len(text)} حرف). الحد الأقصى 4096."})
+            if len(text) > WHATSAPP_MAX_TEXT_LENGTH:
+                return json_dumps({"error": f"النص طويل جدًا ({len(text)} حرف). الحد الأقصى {WHATSAPP_MAX_TEXT_LENGTH}."})
             result = api_call(
                 "POST",
                 f"{_require_phone(phone_number_id)}/messages",

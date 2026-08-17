@@ -24,6 +24,8 @@ IG_MEDIA_METRICS = [
     "total_interactions",
 ]
 
+CAPTION_TRUNCATE_LENGTH = 120
+
 
 def _write_csv(path: Path, rows: list[dict]) -> None:
     if not rows:
@@ -183,7 +185,7 @@ def register(mcp):
                 mid = item.get("id")
                 caption = item.get("caption", "")
                 caption_short = (
-                    (caption[:120] + "...") if len(caption) > 120 else caption
+                    (caption[:CAPTION_TRUNCATE_LENGTH] + "...") if len(caption) > CAPTION_TRUNCATE_LENGTH else caption
                 )
                 row = {
                     "id": mid,
