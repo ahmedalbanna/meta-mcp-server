@@ -7,8 +7,11 @@ Meta throttling surfaces as FacebookRequestError with rate-limit codes; those ar
 retried with exponential backoff. A shared global semaphore bounds the number of
 in-flight requests across the whole server, preventing a burst of parallel tool
 invocations from overwhelming the Meta Graph API and stalling the stdio pipe.
+
+Supports both sync (threading.Semaphore) and async (asyncio.Semaphore) modes.
 """
 
+import asyncio
 import os
 import threading
 import time
@@ -20,18 +23,30 @@ from facebook_business.exceptions import FacebookRequestError
 # Max concurrent Graph API requests across all in-flight tool invocations.
 MAX_CONCURRENT = max(1, int(os.getenv("FB_MAX_CONCURRENT", "4")))
 
+# Sync semaphore (for legacy sync tools)
 _API_SEMAPHORE = threading.Semaphore(MAX_CONCURRENT)
 _COUNT_LOCK = threading.Lock()
 _ACTIVE = 0
+
+# Async semaphore (for async tools and resources)
+_ASYNC_SEMAPHORE: asyncio.Semaphore | None = None
+_ASYNC_ACTIVE = 0
 
 # Meta rate-limit + transient error codes/subcodes worth retrying.
 RATE_LIMIT_CODES = {4, 17, 32, 613, 80004}
 RATE_LIMIT_SUBCODES = {1487003, 1487048, 1487123, 1487182, 1639242}
 
 
+def _get_async_semaphore() -> asyncio.Semaphore:
+    """Lazy-init the async semaphore (must be called from running event loop)."""
+    global _ASYNC_SEMAPHORE
+    if _ASYNC_SEMAPHORE is None:
+        _ASYNC_SEMAPHORE = asyncio.Semaphore(MAX_CONCURRENT)
+    return _ASYNC_SEMAPHORE
+
+
 def concurrent_count() -> int:
     """Return the number of currently in-flight API calls (for health checks)."""
-    global _ACTIVE
     with _COUNT_LOCK:
         return _ACTIVE
 
@@ -85,7 +100,7 @@ def concurrency_limit(
     base_delay: float = 0.5,
     backoff: float = 2.0,
 ):
-    """Bound concurrent Graph API traffic and retry transient rate-limit errors.
+    """Bound concurrent Graph API traffic and retry transient rate-limit errors (SYNC).
 
     Uses a shared global semaphore so every wrapped callable contributes to one
     account-wide cap. Preserves the wrapped callable's signature (via
@@ -101,6 +116,50 @@ def concurrency_limit(
                 return _retry_on_error(fn, args, kwargs, retries, base_delay, backoff)
             finally:
                 _release_slot()
+
+        return wrapper
+
+    return decorator
+
+
+async def _async_retry_on_error(
+    fn: Callable, args, kwargs, retries, base_delay, backoff
+):
+    """Async version of retry — calls sync fn in thread executor, retries on rate-limit."""
+    attempt = 0
+    while True:
+        try:
+            return await asyncio.to_thread(fn, *args, **kwargs)
+        except FacebookRequestError as e:
+            if not _is_rate_limit(e) or attempt >= retries:
+                raise
+            attempt += 1
+            delay = base_delay * (backoff ** (attempt - 1))
+            await asyncio.sleep(delay)
+        except Exception:
+            raise
+
+
+def async_concurrency_limit(
+    max_concurrent: int = MAX_CONCURRENT,
+    retries: int = 3,
+    base_delay: float = 0.5,
+    backoff: float = 2.0,
+):
+    """Bound concurrent Graph API traffic and retry transient rate-limit errors (ASYNC).
+
+    Wraps a sync callable and runs it via asyncio.to_thread with an async semaphore.
+    Use this for tool functions that need to call blocking Facebook SDK methods.
+    """
+
+    def decorator(fn: Callable) -> Callable:
+        @wraps(fn)
+        async def wrapper(*args, **kwargs):
+            sem = _get_async_semaphore()
+            async with sem:
+                return await _async_retry_on_error(
+                    fn, args, kwargs, retries, base_delay, backoff
+                )
 
         return wrapper
 

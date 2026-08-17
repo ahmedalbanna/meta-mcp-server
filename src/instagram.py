@@ -459,6 +459,56 @@ def register(mcp):
 
     @mcp.tool()
     @concurrency_limit()
+    def get_post_insights(media_id: str) -> str:
+        """
+        تحليل تفاعل منشور إنستغرام مع الكابشن والوصول.
+        يُرجع: الكابشن، النوع، الوصول، الإعجابات، التعليقات، الحفظ، المشاركات، الوقت.
+        """
+        try:
+            # Get media details (caption, type, timestamp)
+            media = api_call(
+                "GET",
+                media_id,
+                {
+                    "fields": "id,caption,media_type,media_product_type,permalink,timestamp,username"
+                },
+            )
+            # Get engagement insights
+            try:
+                insights_raw = IGMedia(media_id).get_insights(
+                    params={
+                        "metric": "reach,likes,comments,saved,total_interactions,shares"
+                    }
+                )
+                insights = {}
+                for i in insights_raw:
+                    d = i.export_all_data()
+                    name = d.get("name", "")
+                    values = d.get("values", [])
+                    if values:
+                        insights[name] = values[0].get("value", 0)
+            except Exception:
+                insights = {}
+
+            result = {
+                "id": media.get("id"),
+                "caption": media.get("caption", ""),
+                "media_type": media.get("media_type"),
+                "permalink": media.get("permalink"),
+                "timestamp": media.get("timestamp"),
+                "reach": insights.get("reach", 0),
+                "likes": insights.get("likes", 0),
+                "comments": insights.get("comments", 0),
+                "saved": insights.get("saved", 0),
+                "shares": insights.get("shares", 0),
+                "total_interactions": insights.get("total_interactions", 0),
+            }
+            return json_dumps(result)
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_post_insights"))
+
+    @mcp.tool()
+    @concurrency_limit()
     def get_instagram_media_comments(media_id: str, limit: int = 25) -> str:
         """التعليقات على منشور إنستغرام."""
         try:

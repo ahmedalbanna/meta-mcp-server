@@ -1,7 +1,9 @@
 """Shared helpers: SDK init, object conversion, error handling, raw API calls."""
 
+import asyncio
 import inspect
 import json
+import logging
 from functools import wraps
 from typing import Any, Dict, List, Optional
 
@@ -18,7 +20,9 @@ from src.config import (
     PAGE_ACCESS_TOKEN,
     PAGE_ID,
 )
-from src.throttle import concurrency_limit
+from src.throttle import async_concurrency_limit, concurrency_limit
+
+logger = logging.getLogger(__name__)
 
 
 def init_meta_api() -> None:
@@ -83,7 +87,16 @@ def get_page_api() -> FacebookAdsApi:
 def page_api_call(method: str, path: str, params: Optional[dict] = None) -> Any:
     """Perform a raw Graph API call using the page-scoped token."""
     api = get_page_api()
-    return api.call(method, (path,), params=params or {}).json()
+    resp = api.call(method, (path,), params=params or {})
+    return resp.json()
+
+
+@async_concurrency_limit()
+def async_page_api_call(method: str, path: str, params: Optional[dict] = None) -> Any:
+    """Async version: perform a raw Graph API call using the page-scoped token."""
+    api = get_page_api()
+    resp = api.call(method, (path,), params=params or {})
+    return resp.json()
 
 
 def to_dict(obj: Any) -> Dict[str, Any]:
@@ -108,35 +121,40 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
-def handle_error(e: Exception, context: str = "") -> Dict[str, str]:
-    """Normalise an exception into an error dict with an Arabic-friendly message."""
+def handle_error(e: Exception, context: str = "") -> Dict[str, Any]:
+    """Normalise an exception into an error dict with an Arabic-friendly message.
+
+    Handles FacebookRequestError (including rate-limit without exception),
+    generic exceptions, and empty/invalid API responses.
+    """
     from facebook_business.exceptions import FacebookRequestError
 
     if isinstance(e, FacebookRequestError):
         msg = e.api_error_message() or str(e)
         code = e.api_error_code()
+        subcode = e.api_error_subcode()
+        # Rate-limit without raising — surface it clearly
+        if code in {4, 17, 32, 613, 80004} or subcode in {
+            1487003,
+            1487048,
+            1487123,
+            1487182,
+            1639242,
+        }:
+            logger.warning(
+                "Rate limit hit in %s: code=%s subcode=%s", context, code, subcode
+            )
+            return {
+                "error": f"تم تقييد الوصول من Meta (rate limit). كود: {code}/{subcode}",
+                "context": context,
+                "retry_after": "إعادة المحاولة بعد 30-60 ثانية",
+            }
         return {
             "error": f"Meta API error ({code}): {msg}",
             "context": context,
         }
+    logger.exception("Unexpected error in %s", context)
     return {"error": f"{context}: {e}".strip(": "), "context": context}
-
-
-def paged(
-    getter, fields: List[str], params: Optional[dict] = None, limit: int = 25
-) -> List[dict]:
-    """DEPRECATED: use src.utils.paginate() (cursor-based, handles raw + SDK edges).
-
-    This helper only fetches the first page and ignores pagination cursors.
-    """
-    params = dict(params or {})
-    params["fields"] = fields
-    params["limit"] = limit
-    results = getter(params=params)
-    out: List[dict] = []
-    for item in results:
-        out.append(to_dict(item))
-    return out
 
 
 @concurrency_limit()
@@ -148,11 +166,22 @@ def api_call(method: str, path: str, params: Optional[dict] = None) -> Any:
     tool invocations cannot overwhelm the Meta Graph API and stall the server.
     """
     api = FacebookAdsApi.get_default_api()
-    return api.call(
-        method,
-        (path,),
-        params=params or {},
-    ).json()
+    resp = api.call(method, (path,), params=params or {})
+    data = resp.json()
+    if not data:
+        logger.warning("Empty response from Graph API: %s %s", method, path)
+    return data
+
+
+@async_concurrency_limit()
+def async_api_call(method: str, path: str, params: Optional[dict] = None) -> Any:
+    """Async version: perform a raw Graph API call and return parsed JSON."""
+    api = FacebookAdsApi.get_default_api()
+    resp = api.call(method, (path,), params=params or {})
+    data = resp.json()
+    if not data:
+        logger.warning("Empty response from Graph API: %s %s", method, path)
+    return data
 
 
 def json_dumps(data: Any) -> str:
