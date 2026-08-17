@@ -121,7 +121,10 @@ def handle_error(e: Exception, context: str = "") -> Dict[str, str]:
 
 
 def paged(getter, fields: List[str], params: Optional[dict] = None, limit: int = 25) -> List[dict]:
-    """Fetch a full page through the SDK's pagination helper."""
+    """DEPRECATED: use src.utils.paginate() (cursor-based, handles raw + SDK edges).
+
+    This helper only fetches the first page and ignores pagination cursors.
+    """
     params = dict(params or {})
     params["fields"] = fields
     params["limit"] = limit

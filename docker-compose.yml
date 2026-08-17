@@ -1,0 +1,23 @@
+services:
+  meta-mcp-server:
+    build: .
+    container_name: meta-mcp-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+      - "8080:8080"
+    environment:
+      - FB_ACCESS_TOKEN=${FB_ACCESS_TOKEN}
+      - MCP_TRANSPORT=streamable-http
+      - FB_APP_ID=${FB_APP_ID}
+      - FB_APP_SECRET=${FB_APP_SECRET}
+      - FB_PAGE_ID=${FB_PAGE_ID}
+      - FB_AD_ACCOUNT_ID=${FB_AD_ACCOUNT_ID}
+      - FB_WABA_ID=${FB_WABA_ID}
+      - FB_META_WEBHOOK_VERIFY_TOKEN=${FB_META_WEBHOOK_VERIFY_TOKEN}
+      - FB_ENABLE_WRITES=${FB_ENABLE_WRITES:-false}
+      - FB_DRY_RUN=${FB_DRY_RUN:-false}
+    volumes:
+      - ./.env:/app/.env:ro
+    command: >
+      python /app/server.py

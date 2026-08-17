@@ -379,3 +379,120 @@ def register(mcp):
             return json_dumps({"id": comment_id, "hidden": hide, "result": result})
         except Exception as e:
             return json_dumps(handle_error(e, "hide_instagram_comment"))
+
+    @mcp.tool()
+    def list_instagram_stories(instagram_business_id: str = "", limit: int = 25) -> str:
+        """قصص إنستغرام (Stories) النشطة للحساب."""
+        try:
+            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            data = api_call(
+                "GET",
+                f"{ig_id}/stories",
+                {"fields": "id,media_type,media_url,permalink,timestamp", "limit": limit},
+            )
+            return json_dumps(data)
+        except Exception as e:
+            return json_dumps(handle_error(e, "list_instagram_stories"))
+
+    @mcp.tool()
+    @write_guard
+    def ban_instagram_commenter(instagram_business_id: str, user_id: str) -> str:
+        """حظر مستخدم من التعليق على منشورات الحساب (لا يمنع المتابعة)."""
+        try:
+            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            result = api_call("POST", f"{ig_id}/blocked", {"user_id": user_id})
+            return json_dumps({"blocked_user_id": user_id, "result": result})
+        except Exception as e:
+            return json_dumps(handle_error(e, "ban_instagram_commenter"))
+
+    @mcp.tool()
+    @write_guard
+    def mute_instagram_commenter(instagram_business_id: str, user_id: str, end_time: int) -> str:
+        """
+        كتم مستخدم من التعليق لفترة مؤقتة.
+        end_time: طابع زمني Unix (ثوانٍ) لانتهاء الكتم.
+        """
+        try:
+            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            result = api_call(
+                "POST",
+                f"{ig_id}/muted_commenters",
+                {"user_id": user_id, "end_time": end_time},
+            )
+            return json_dumps({"muted_user_id": user_id, "until": end_time, "result": result})
+        except Exception as e:
+            return json_dumps(handle_error(e, "mute_instagram_commenter"))
+
+    @mcp.tool()
+    def list_instagram_conversations(instagram_business_id: str = "", limit: int = 25) -> str:
+        """محادثات الرسائل المباشرة (DMs) لحساب إنستغرام."""
+        try:
+            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            data = api_call(
+                "GET",
+                f"{ig_id}/conversations",
+                {
+                    "fields": "id,updated_time,unread_count,message_count,participants,pending",
+                    "limit": limit,
+                },
+            )
+            return json_dumps(data)
+        except Exception as e:
+            return json_dumps(handle_error(e, "list_instagram_conversations"))
+
+    @mcp.tool()
+    def get_instagram_conversation(conversation_id: str) -> str:
+        """تفاصيل محادثة مباشرة واحدة على إنستغرام."""
+        try:
+            data = api_call(
+                "GET",
+                conversation_id,
+                {"fields": "id,updated_time,unread_count,message_count,participants,pending"},
+            )
+            return json_dumps(data)
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_instagram_conversation"))
+
+    @mcp.tool()
+    def list_instagram_conversation_messages(conversation_id: str, limit: int = 25) -> str:
+        """رسائل محادثة مباشرة محددة على إنستغرام."""
+        try:
+            data = api_call(
+                "GET",
+                f"{conversation_id}/messages",
+                {"fields": "id,text,created_time,from,to,media", "limit": limit},
+            )
+            return json_dumps(data)
+        except Exception as e:
+            return json_dumps(handle_error(e, "list_instagram_conversation_messages"))
+
+    @mcp.tool()
+    def get_instagram_message(message_id: str) -> str:
+        """رسالة مباشرة واحدة على إنستغرام."""
+        try:
+            data = api_call(
+                "GET",
+                message_id,
+                {"fields": "id,text,created_time,from,to,media"},
+            )
+            return json_dumps(data)
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_instagram_message"))
+
+    @mcp.tool()
+    @write_guard
+    def send_instagram_dm(instagram_business_id: str, recipient_ig_id: str, text: str) -> str:
+        """إرسال رسالة مباشرة (DM) عبر إنستغرام إلى مستخدم تواصل مع الحساب."""
+        try:
+            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            result = api_call(
+                "POST",
+                f"{ig_id}/messages",
+                {
+                    "recipient": {"id": recipient_ig_id},
+                    "message": {"text": text},
+                },
+            )
+            return json_dumps({"recipient_id": recipient_ig_id, "result": result})
+        except Exception as e:
+            return json_dumps(handle_error(e, "send_instagram_dm"))

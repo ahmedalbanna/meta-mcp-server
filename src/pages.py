@@ -1,5 +1,12 @@
 from src.config import PAGE_ID
-from src.helpers import get_page_api, handle_error, json_dumps, page_api_call, to_dict, write_guard
+from src.helpers import (
+    get_page_api,
+    handle_error,
+    json_dumps,
+    page_api_call,
+    to_dict,
+    write_guard,
+)
 
 
 def register(mcp):
@@ -15,7 +22,12 @@ def register(mcp):
         """معلومات صفحة فيسبوك (الاسم، عدد المتابعين، التصنيف)."""
         try:
             info = _page(page_id).api_get(
-                fields=[Page.Field.name, Page.Field.fan_count, Page.Field.link, Page.Field.category]
+                fields=[
+                    Page.Field.name,
+                    Page.Field.fan_count,
+                    Page.Field.link,
+                    Page.Field.category,
+                ]
             )
             return json_dumps(to_dict(info))
         except Exception as e:
@@ -112,7 +124,10 @@ def register(mcp):
             return json_dumps(handle_error(e, "delete_page_post"))
 
     @mcp.tool()
-    def get_page_post_insights(post_id: str, metrics: str = "post_impressions,post_engaged_users,post_reactions_by_type_total,post_comments,post_shares,post_saves") -> str:
+    def get_page_post_insights(
+        post_id: str,
+        metrics: str = "post_impressions,post_engaged_users,post_reactions_by_type_total,post_comments,post_shares,post_saves",
+    ) -> str:
         """تحليلات منشور صفحة فيسبوك واحد (تفاعل، انطباعات، ردود فعل)."""
         try:
             from facebook_business.adobjects.post import Post
@@ -130,7 +145,9 @@ def register(mcp):
         try:
             from facebook_business.adobjects.post import Post
 
-            comments = Post(post_id, api=get_page_api()).get_comments(params={"limit": limit})
+            comments = Post(post_id, api=get_page_api()).get_comments(
+                params={"limit": limit}
+            )
             return json_dumps([to_dict(c) for c in comments])
         except Exception as e:
             return json_dumps(handle_error(e, "list_page_post_comments"))
@@ -165,7 +182,10 @@ def register(mcp):
         """ألبومات الصور على صفحة فيسبوك."""
         try:
             albums = _page(page_id).get_albums(
-                params={"fields": ["id", "name", "count", "created_time"], "limit": limit}
+                params={
+                    "fields": ["id", "name", "count", "created_time"],
+                    "limit": limit,
+                }
             )
             return json_dumps([to_dict(a) for a in albums])
         except Exception as e:
@@ -178,7 +198,10 @@ def register(mcp):
             from facebook_business.adobjects.album import Album
 
             photos = Album(album_id, api=get_page_api()).get_photos(
-                params={"fields": ["id", "name", "picture", "source", "created_time"], "limit": limit}
+                params={
+                    "fields": ["id", "name", "picture", "source", "created_time"],
+                    "limit": limit,
+                }
             )
             return json_dumps([to_dict(p) for p in photos])
         except Exception as e:
@@ -194,12 +217,23 @@ def register(mcp):
                 page_id or PAGE_ID,
                 {"cover": photo_id},
             )
-            return json_dumps({"page_id": page_id or PAGE_ID, "cover_photo_id": photo_id, "result": result})
+            return json_dumps(
+                {
+                    "page_id": page_id or PAGE_ID,
+                    "cover_photo_id": photo_id,
+                    "result": result,
+                }
+            )
         except Exception as e:
             return json_dumps(handle_error(e, "update_page_cover"))
 
     @mcp.tool()
-    def get_page_insights(page_id: str = "", period: str = "day", days: int = 7, metrics: str = "page_impressions,page_engaged_users,page_fans") -> str:
+    def get_page_insights(
+        page_id: str = "",
+        period: str = "day",
+        days: int = 7,
+        metrics: str = "page_impressions,page_engaged_users,page_fans",
+    ) -> str:
         """تحليلات صفحة فيسبوك (انطباعات، تفاعل، متابعون)."""
         try:
             import time
@@ -228,3 +262,168 @@ def register(mcp):
             return json_dumps(results)
         except Exception as e:
             return json_dumps(handle_error(e, "get_page_insights"))
+
+    # ------------------------------------------------------------------
+    # الأحداث Events
+    # ------------------------------------------------------------------
+
+    @mcp.tool()
+    def list_page_events(page_id: str = "", limit: int = 25) -> str:
+        """الأحداث المرتبطة بصفحة فيسبوك."""
+        try:
+            from src.utils import paginate
+
+            rows = paginate(
+                lambda params: _page(page_id).get_events(params=params),
+                fields=[
+                    "id",
+                    "name",
+                    "start_time",
+                    "end_time",
+                    "place",
+                    "ticket_uri",
+                    "cover",
+                    "is_canceled",
+                ],
+                limit=limit,
+            )
+            return json_dumps(rows)
+        except Exception as e:
+            return json_dumps(handle_error(e, "list_page_events"))
+
+    @mcp.tool()
+    def get_page_event(event_id: str) -> str:
+        """تفاصيل حدث واحد على الصفحة."""
+        try:
+            from facebook_business.adobjects.event import Event
+
+            info = Event(event_id, api=get_page_api()).api_get(
+                fields=[
+                    "id",
+                    "name",
+                    "description",
+                    "start_time",
+                    "end_time",
+                    "place",
+                    "ticket_uri",
+                    "cover",
+                    "is_canceled",
+                    "guest_list_enabled",
+                ]
+            )
+            return json_dumps(to_dict(info))
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_page_event"))
+
+    @mcp.tool()
+    @write_guard
+    def create_page_event(
+        name: str,
+        start_time: str,
+        end_time: str = "",
+        description: str = "",
+        ticket_uri: str = "",
+        place: str = "",
+        page_id: str = "",
+    ) -> str:
+        """
+        إنشاء حدث على صفحة فيسبوك.
+        start_time / end_time بصيغة ISO (مثال 2026-09-01T18:00:00+0300).
+        """
+        try:
+            params = {"name": name, "start_time": start_time}
+            if end_time:
+                params["end_time"] = end_time
+            if description:
+                params["description"] = description
+            if ticket_uri:
+                params["ticket_uri"] = ticket_uri
+            if place:
+                params["place"] = place
+            result = page_api_call("POST", (page_id or PAGE_ID) + "/events", params)
+            return json_dumps(to_dict(result))
+        except Exception as e:
+            return json_dumps(handle_error(e, "create_page_event"))
+
+    # ------------------------------------------------------------------
+    # المراجعات والتقييمات Ratings
+    # ------------------------------------------------------------------
+
+    @mcp.tool()
+    def list_page_ratings(page_id: str = "", limit: int = 25) -> str:
+        """تقييمات ومراجعات صفحة فيسبوك."""
+        try:
+            from src.utils import paginate
+
+            rows = paginate(
+                lambda params: _page(page_id).get_ratings(params=params),
+                fields=[
+                    "id",
+                    "rating",
+                    "recommendation_type",
+                    "review_text",
+                    "created_time",
+                    "reviewer",
+                    "open_graph_story",
+                ],
+                limit=limit,
+            )
+            return json_dumps(rows)
+        except Exception as e:
+            return json_dumps(handle_error(e, "list_page_ratings"))
+
+    # ------------------------------------------------------------------
+    # أدوار الصفحة Roles
+    # ------------------------------------------------------------------
+
+    @mcp.tool()
+    def list_page_roles(page_id: str = "", limit: int = 25) -> str:
+        """الأشخاص الذين يديرون الصفحة وأدوارهم ومهامهم."""
+        try:
+            from src.utils import paginate
+
+            rows = paginate(
+                lambda params: _page(page_id).get_roles(params=params),
+                fields=["user", "role", "tasks"],
+                limit=limit,
+            )
+            return json_dumps(rows)
+        except Exception as e:
+            return json_dumps(handle_error(e, "list_page_roles"))
+
+    # ------------------------------------------------------------------
+    # أزرار CTA
+    # ------------------------------------------------------------------
+
+    @mcp.tool()
+    def get_page_cta(page_id: str = "") -> str:
+        """زر الدعوة لاتخاذ إجراء الحالي على الصفحة."""
+        try:
+            result = page_api_call("GET", (page_id or PAGE_ID) + "/call_to_actions", {})
+            return json_dumps(to_dict(result))
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_page_cta"))
+
+    @mcp.tool()
+    @write_guard
+    def update_page_cta(cta_type: str, cta_link: str, page_id: str = "") -> str:
+        """
+        تعيين زر CTA على الصفحة.
+        cta_type: LEARN_MORE | SHOP_NOW | SIGN_UP | CONTACT_US | MESSAGE_PAGE | BOOK_NOW ...
+        cta_link: الرابط أو معرف Messenger المرتبط بالزر.
+        """
+        try:
+            result = page_api_call(
+                "POST",
+                (page_id or PAGE_ID) + "/call_to_actions",
+                {"type": cta_type, "link": cta_link},
+            )
+            return json_dumps(
+                {
+                    "page_id": page_id or PAGE_ID,
+                    "cta_type": cta_type,
+                    "result": to_dict(result),
+                }
+            )
+        except Exception as e:
+            return json_dumps(handle_error(e, "update_page_cta"))

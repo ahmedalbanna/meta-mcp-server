@@ -2,7 +2,7 @@
 
 خادم MCP شامل باللغة Python لإدارة التسويق على **فيسبوك وإنستغرام** عبر `facebook-business` SDK و `FastMCP`.
 
-## المزايا (87 أداة + 3 موارد + 2 مطالبات)
+## المزايا (155 أداة + 3 موارد + 2 مطالبات)
 
 | الوحدة | الأدوات |
 |---|---|
@@ -11,16 +11,24 @@
 | المجموعات `adsets` | list, get, create, update_status, update_budget, update_targeting |
 | الإعلانات `ads` | list, get, create, update_status, create_creative, upload_image, upload_video |
 | التحليلات `insights` | account / campaign / adset / ad (date_preset + metrics مخصصة) |
+| تجزئة التحليلات `breakdowns` | account / campaign / adset / ad مجزأة (عمر/جنس/دولة/موضع/جهاز) + time_increment + attribution |
 | التقارير `reports` | generate_campaign_report, account_summary, generate_instagram_report, generate_page_report |
-| الجماهير `audiences` | list, create, add_users, remove_users, create_lookalike |
-| الصفحات `pages` | get_info, list_posts, publish_text, publish_photo, schedule, update_post_caption, **delete_post**, post_insights, post_comments, reply_comment, delete_comment, albums, album_photos, get_insights, **update_cover** |
-| إنستغرام `instagram` | get_account, list_media, get_media, hashtag_search, hashtag_media, mentions, get_media_children, download_media, publish_photo/video/reel/carousel, update_media_caption, insights, comments, reply_comment, delete_comment, hide_comment, add_media_comment, delete_media |
+| الرصاص والنماذج `leads` | list_lead_gen_forms, get_lead_gen_form, get_form_leads, get_lead, create_lead_gen_form |
+| الجماهير `audiences` | list, create, add_users (SHA-256), remove_users, upload_custom_audience_csv, create_lookalike (SIMILARITY/ENGAGEMENT/VALUE) |
+| الصفحات `pages` | get_info, list_posts, publish_text, publish_photo, schedule, update_post_caption, delete_post, post_insights, post_comments, reply_comment, delete_comment, albums, album_photos, get_insights, update_cover, **events (list/get/create), ratings, roles, CTA (get/update)** |
+| إنستغرام `instagram` | get_account, list_media, get_media, hashtag_search, hashtag_media, mentions, get_media_children, download_media, publish_photo/video/reel/carousel, update_media_caption, insights, comments, reply_comment, delete_comment, hide_comment, add_media_comment, delete_media, **stories, ban_commenter, mute_commenter, conversations (DMs), messages, send_dm** |
+| ماسنجر `messenger` | list_conversations, get_conversation, list_conversation_messages, get_messenger_message, send_messenger_message, mark_messenger_seen, set_messenger_typing |
+| واتساب `whatsapp` | list/get_phone_numbers, list/get_message_templates (معتمد)، create_template, send_text, send_template |
 | الأتمتة `automation` | list_rules, create_rule, create_simple_rule, delete_rule, history |
 | المحفظة `finance` | get_balance, get_spend_cap, update_spend_cap, get_transactions, get_payment_methods, get_business_info, list_account_users, assign_user, remove_user |
+| الكتالوج والتجارة `catalog` | list/get/create/delete_catalog, get_catalog_settings, product_sets (list/get/create/delete), products (list/get/create/update/delete/batch), feeds (create/delete + get_uploads), commerce (get_merchant_settings, list/get_orders), get_catalog_insights |
+| مستخدمو الأعمال `business` | list_business_users, get_business_user, invite_business_user, update_business_user_role, delete_business_user |
+| الإبداع والمعاينات `creatives` | generate_ad_preview, generate_creative_preview, generate_creative_template |
 
 > أدوات الصفحات تستخدم **توكن الصفحة** (مشتق تلقائيًا من `FB_ACCESS_TOKEN` عبر `me/accounts`).
 > لذلك `list_page_posts` و `publish_page_photo` و `update_page_post_caption` و `delete_page_post`
 > تعمل حتى لو كان توكن النظام بلا صلاحية نشر مباشرة على الصفحة.
+> أدوات `messenger` تستخدم توكن الصفحة أيضًا، بينما تستخدم `instagram` و `whatsapp` توكن النظام.
 
 ## المتطلبات
 
@@ -28,6 +36,8 @@
 - Access Token بصلاحيات:
   - `ads_management`, `ads_read`, `business_management`
   - `pages_read_engagement`, `pages_manage_posts`, `pages_manage_ads`
+  - `pages_messaging` (ماسنجر), `instagram_manage_messages` (رسائل إنستغرام المباشرة)
+  - `whatsapp_business_management`, `whatsapp_business_messaging` (واتساب)
   - `instagram_basic`, `instagram_content_publish`, `instagram_manage_insights`
   - `read_insights`
   - للمحفظة: `business_management` + دور Admin/Finance Editor في Business Manager
@@ -52,6 +62,12 @@ pip install -r requirements.txt
 | `FB_PAGE_ID` | معرف الصفحة — اكتشفه بأداة `list_pages` |
 | `FB_AD_ACCOUNT_ID` | معرف الحساب الإعلاني (مثال `act_...`) — اكتشفه بأداة `list_ad_accounts` |
 | `FB_IG_USER_ID` | معرف Instagram Business — اكتشفه بأداة `discover_ig_user` |
+| `FB_WABA_ID` | معرف حساب واتساب للأعمال (WABA) — مطلوب لأدوات `whatsapp` |
+| `FB_WHATSAPP_PHONE_NUMBER_ID` | معرف رقم الهاتف المرسل في واتساب — مطلوب لإرسال الرسائل |
+| `FB_BUSINESS_ID` | معرف النشاط التجاري — مطلوب لأدوات الكتالوج والتجارة (`catalog`) |
+| `FB_COMMERCE_ACCOUNT_ID` | معرف حساب المتجر (اختياري) — لطلبات التجارة، يكتشف بأداة `get_commerce_merchant_settings` |
+| `FB_META_WEBHOOK_VERIFY_TOKEN` | (اختياري) رمز تحقق استقبال Webhooks — مطلوب لتشغيل `webhook_server.py` |
+| `FB_WEBHOOK_PORT` | (اختياري) منفذ خادم Webhooks (افتراضي `8080`) |
 | `FB_ENABLE_WRITES` | `false` = منع كل عمليات الكتابة (افتراضي آمن) |
 | `FB_DRY_RUN` | `true` = محاكاة الكتابة بدون إرسال |
 | `FB_ADS_ALLOW_ACTIVATE` | `true` = السماح بتفعيل الحملات (متطلب أمان إضافي) |
@@ -68,7 +84,37 @@ mcp dev server.py
 
 # اختبار البروتوكول مباشرة (سطر الأوامر)
 python server.py
+
+# فحص إعدادات .env (لا يطبع أي أسرار)
+python scripts/validate_config.py
 ```
+
+### الاختبارات الآلية
+
+```bash
+pip install -r requirements-dev.txt
+pytest -q
+```
+
+الاختبارات لا تتصل بالإنترنت: تحاكي SDK بالكامل وتتحقق من تسجيل كل الوحدات
+ومن أن كل أداة تعيد JSON صالحًا (`tests/test_server_import.py`,
+`tests/test_utils.py`, `tests/test_tools_smoke.py`، و `tests/test_webhook.py`
+لمستقبل الأحداث).
+
+## استقبال Webhooks
+
+خادم FastAPI مستقل يستقبل أحداث Meta في الوقت الفعلي ويخزّنها في `reports/webhooks/`:
+
+```bash
+# عيّن رمز التحقق في .env ثم شغّل:
+FB_META_WEBHOOK_VERIFY_TOKEN=my_secret python webhook_server.py
+```
+
+- `GET /webhook/meta` — مصافحة التحقق (تُستخدم عند تسجيل التطبيق في Meta).
+- `POST /webhook/meta` — استقبال الأحداث وحفظها JSON.
+
+أضف النقاط أعلاه كـ **Callback URL** لأي كائن مشترك (صفحة، Instagram، أداء الإعلانات...)
+في Meta Developer، وعيّن `hub.verify_token` بنفس القيمة في `.env`.
 
 ## الربط مع Claude Desktop
 
@@ -125,20 +171,39 @@ python server.py
 - **تعديل كابشن منشور إنستغرام منشور**: غير مدعوم نهائيًا من Meta Graph API. الحلول البديلة المتاحة: إضافة الكابشن كتعليق (`add_instagram_media_comment`) أو حذف المنشور وإعادة نشره (`delete_instagram_media` + publish).
 - **تعديل نص منشور فيسبوك**: مدعوم عبر `update_page_post_caption`.
 - **إنشاء إعلان** يتطلب صفحة مرتبطة بالحساب الإعلاني وصلاحيات عليها.
+- **أدوات الإبداع**: `generate_ad_preview`/`generate_creative_preview` تتطلب صلاحيات الإعلانات (`ads_read`) وقد تُرجع HTML فقط في بعض الأشكال.
+- **معالجة PII**: كل بريد/هاتف يُرسل إلى الجماهير المخصصة يُشفَّر SHA-256 افتراضيًا (`hash_pii=true`).
+- **Webhooks**: يستقبل `webhook_server.py` الأحداث ويخزّنها — يحتاج رمز تحقق مطابقًا لما سجلته في Meta.
 - التوكن يُقرأ من `.env` فقط ولا يظهر في الكود. لا تشاركه ولا ترفعه على GitHub.
 - بعض أدوات القواعد التلقائية وطرق الدفع تعتمد على دعم Meta للحقول؛ عند الفشل تُعاد رسالة إرشادية.
+
+## أفكار مستقبلية (خارج هذه النسخة)
+
+- لوحة تحكم ويب لمراجعة أحداث Webhooks المخزنة.
+- معالجة تلقائية للأحداث (رد فوري على التعليقات، تحديث الرصاص).
+- تصدير التقارير إلى Google Sheets.
 
 ## هيكل المشروع
 
 ```
 server.py                # نقطة الدخول
+webhook_server.py        # مستقبل Webhooks (FastAPI)
 src/
   config.py              # تحميل .env والتحقق (أسماء FB_*)
   helpers.py             # تهيئة SDK + تحويل + أخطاء + api_call + حراس الكتابة
+  utils.py               # paginate + retry_on_rate_limit + normalize_pii + cached + سجلات
   discovery.py           # اكتشاف المعرّفات (pages / ad_accounts / IG / token / config)
   campaigns.py adsets.py ads.py
-  insights.py reports.py
+  insights.py breakdowns.py reports.py
+  leads.py               # نماذج ورصاصات الجذب
   audiences.py pages.py instagram.py
+  messenger.py           # محادثات صفحة Messenger (الوارد + الإرسال)
+  whatsapp.py            # واتساب للأعمال (أرقام، قوالب، إرسال)
   automation.py finance.py
+  catalog.py             # الكتالوجات / مجموعات المنتجات / المنتجات / الخلاصات / التجارة
+  business.py            # مستخدمو Business Manager
+  creatives.py           # معاينات الإعلان + قوالب إبداعية
   resources_prompts.py
+tests/                   # اختبارات دون اتصال (pytest، SDK مُحاكى)
+scripts/validate_config.py  # فحص إعدادات .env
 ```

@@ -47,7 +47,8 @@ def register(mcp):
             numeric = pd.to_numeric(df[m], errors="coerce").fillna(0)
             summary[f"total_{m}"] = float(numeric.sum())
             if m == "clicks" and numeric.sum():
-                spend = pd.to_numeric(df.get("spend", pd.Series([0])), errors="coerce").fillna(0).sum()
+                spend_col = df["spend"] if "spend" in df.columns else pd.Series(0, index=df.index)
+                spend = pd.to_numeric(spend_col, errors="coerce").fillna(0).sum()
                 summary["avg_cpc"] = round(spend / numeric.sum(), 4)
         return summary
 

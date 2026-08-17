@@ -18,12 +18,18 @@ def register(mcp):
 
     from src.helpers import handle_error, json_dumps, to_dict
 
-    def _validate(preset: str, metrics: str) -> tuple:
+    def _validate(preset: str, metrics: str) -> list:
         if preset not in DATE_PRESETS:
             raise ValueError(
                 f"date_preset غير صالح. اختر من: {', '.join(DATE_PRESETS)}"
             )
         return [m.strip() for m in metrics.split(",") if m.strip()]
+
+    def _respond(insights) -> str:
+        rows = [to_dict(i) for i in insights]
+        if not rows:
+            return json_dumps({"data": [], "count": 0, "message": "لا توجد بيانات"})
+        return json_dumps({"data": rows, "count": len(rows)})
 
     @mcp.tool()
     def get_account_insights(date_preset: str = "last_30d", metrics: str = ",".join(DEFAULT_METRICS)) -> str:
@@ -34,7 +40,7 @@ def register(mcp):
             insights = account.get_insights(
                 params={"date_preset": date_preset, "fields": fields}
             )
-            return json_dumps([to_dict(i) for i in insights] or {"message": "لا توجد بيانات"})
+            return _respond(insights)
         except Exception as e:
             return json_dumps(handle_error(e, "get_account_insights"))
 
@@ -46,7 +52,7 @@ def register(mcp):
             insights = Campaign(campaign_id).get_insights(
                 params={"date_preset": date_preset, "fields": fields}
             )
-            return json_dumps([to_dict(i) for i in insights] or {"message": "لا توجد بيانات"})
+            return _respond(insights)
         except Exception as e:
             return json_dumps(handle_error(e, "get_campaign_insights"))
 
@@ -58,7 +64,7 @@ def register(mcp):
             insights = AdSet(adset_id).get_insights(
                 params={"date_preset": date_preset, "fields": fields}
             )
-            return json_dumps([to_dict(i) for i in insights] or {"message": "لا توجد بيانات"})
+            return _respond(insights)
         except Exception as e:
             return json_dumps(handle_error(e, "get_adset_insights"))
 
@@ -70,6 +76,6 @@ def register(mcp):
             insights = Ad(ad_id).get_insights(
                 params={"date_preset": date_preset, "fields": fields}
             )
-            return json_dumps([to_dict(i) for i in insights] or {"message": "لا توجد بيانات"})
+            return _respond(insights)
         except Exception as e:
             return json_dumps(handle_error(e, "get_ad_insights"))
