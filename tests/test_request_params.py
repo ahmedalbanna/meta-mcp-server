@@ -5,6 +5,7 @@ plain smoke tests (JSON-parse only) missed.
 """
 
 import json
+from unittest import mock
 
 from tests.conftest import Recorder, register_all
 
@@ -15,11 +16,13 @@ def _register():
     return recorder
 
 
+def _call(tool_name, **kwargs):
+    with mock.patch("src.helpers.ENABLE_WRITES", True):
+        return _register().tools[tool_name](**kwargs)
+
+
 def test_pages_operator_precedence_keeps_suffix(mock_meta_sdk_recorded):
-    recorder = _register()
-    recorder.tools["create_page_event"](
-        name="evt", start_time="2026-09-01T18:00:00+0300", page_id="123"
-    )
+    result = _call("create_page_event", name="evt", start_time="2026-09-01T18:00:00+0300", page_id="123")
     calls = mock_meta_sdk_recorded["page_api_call"].call_args_list
     assert calls, "page_api_call was not called"
     endpoint = calls[-1].args[1]
@@ -27,8 +30,7 @@ def test_pages_operator_precedence_keeps_suffix(mock_meta_sdk_recorded):
 
 
 def test_messenger_sender_action_is_string(mock_meta_sdk_recorded):
-    recorder = _register()
-    recorder.tools["mark_messenger_seen"](recipient_id="456")
+    _call("mark_messenger_seen", recipient_id="456")
     calls = mock_meta_sdk_recorded["page_api_call"].call_args_list
     assert calls, "page_api_call was not called"
     params = calls[-1].args[2]
@@ -38,8 +40,7 @@ def test_messenger_sender_action_is_string(mock_meta_sdk_recorded):
 
 
 def test_messenger_typing_sender_action_is_string(mock_meta_sdk_recorded):
-    recorder = _register()
-    recorder.tools["set_messenger_typing"](recipient_id="456", typing=False)
+    _call("set_messenger_typing", recipient_id="456", typing=False)
     calls = mock_meta_sdk_recorded["page_api_call"].call_args_list
     assert calls, "page_api_call was not called"
     params = calls[-1].args[2]
@@ -51,8 +52,7 @@ def test_messenger_typing_sender_action_is_string(mock_meta_sdk_recorded):
 def test_whatsapp_template_falls_back_to_env_waba(mock_meta_sdk_recorded):
     from src.config import WABA_ID
 
-    recorder = _register()
-    recorder.tools["create_whatsapp_message_template"](name="test")
+    _call("create_whatsapp_message_template", name="test")
     calls = mock_meta_sdk_recorded["api_call"].call_args_list
     assert calls, "api_call was not called"
     endpoint = calls[-1].args[1]
