@@ -1,0 +1,19 @@
+# Meta marketing MCP server
+# Project files
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Secrets - NEVER commit
+.env
+
+# Generated reports
+reports/
+output/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+media/*
