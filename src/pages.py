@@ -93,7 +93,7 @@ def register(mcp):
             post = _page(page_id).create_feed(
                 params={
                     "message": message,
-                    "published": "false",
+                    "published": False,
                     "scheduled_publish_time": scheduled_time,
                 }
             )

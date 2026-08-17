@@ -3,7 +3,7 @@ from pathlib import Path
 import requests
 
 from src.config import INSTAGRAM_BUSINESS_ID
-from src.helpers import api_call, handle_error, json_dumps, write_guard
+from src.helpers import api_call, handle_error, json_dumps, sanitize_path, write_guard
 from src.throttle import concurrency_limit
 
 MEDIA_DOWNLOAD_DIR = Path(__file__).resolve().parent.parent / "media"
@@ -146,7 +146,13 @@ def register(mcp):
         out_dir: مجلد الوجهة (اختياري — الافتراضي meta-mcp-server/media).
         """
         try:
-            target = Path(out_dir) if out_dir else MEDIA_DOWNLOAD_DIR
+            if out_dir:
+                try:
+                    target = sanitize_path(out_dir, MEDIA_DOWNLOAD_DIR.parent)
+                except ValueError as e:
+                    return json_dumps({"error": f"مسار غير صالح: {e}"})
+            else:
+                target = MEDIA_DOWNLOAD_DIR
             target.mkdir(parents=True, exist_ok=True)
             meta = api_call(
                 "GET", media_id, {"fields": "id,media_type,media_url,caption"}

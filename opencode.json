@@ -8,13 +8,13 @@
                 "/teamspace/studios/this_studio/meta-mcp-server/server.py"
             ],
             "environment": {
-                "FB_ACCESS_TOKEN": "EAAUOobdmyNUBSMkXbjqw6tPhNKUmCMmi8emRh7hZA2hLmDVmMt2NVg7xpe9ocBmlnObmCWhGcTPDK8wRAg88O3p7XZAsmwxNBwtd0i4bO1uFOSP597V0OxLZBkRT90pouZBlRWfy8y6EXsIhUbylA3hVomhyfGsB4mnB7E96NdVTpkuLTcW0WpuHgBKhJTPYWYZA0RNa9NqHtvA13DZA5xNZBTzGtrtGuCUczgZB",
-                "FB_APP_ID": "1423462613043413",
-                "FB_APP_SECRET": "9598fb19415d3f3e834bcd4d59f8e5ae",
-                "FB_PAGE_ID": "1838820466244084",
-                "FB_AD_ACCOUNT_ID": "act_1308651834466754",
-                "FB_IG_USER_ID": "17841457907375250",
-                "FB_BUSINESS_ID": "1055808189928032",
+                "FB_ACCESS_TOKEN": "REPLACE_WITH_YOUR_ACCESS_TOKEN",
+                "FB_APP_ID": "REPLACE_WITH_YOUR_APP_ID",
+                "FB_APP_SECRET": "REPLACE_WITH_YOUR_APP_SECRET",
+                "FB_PAGE_ID": "REPLACE_WITH_YOUR_PAGE_ID",
+                "FB_AD_ACCOUNT_ID": "act_REPLACE_WITH_YOUR_AD_ACCOUNT_ID",
+                "FB_IG_USER_ID": "REPLACE_WITH_YOUR_IG_USER_ID",
+                "FB_BUSINESS_ID": "REPLACE_WITH_YOUR_BUSINESS_ID",
                 "FB_MAX_CONCURRENT": "4"
             }
         }

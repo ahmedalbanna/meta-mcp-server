@@ -5,6 +5,7 @@ Raw Graph API calls using the system/business access token.
 
 from src.config import WABA_ID, WHATSAPP_PHONE_NUMBER_ID
 from src.helpers import api_call, handle_error, json_dumps, write_guard
+from src.throttle import concurrency_limit
 
 PHONE_NUMBER_FIELDS = (
     "id,display_phone_number,verified_name,quality_rating,"
@@ -26,6 +27,7 @@ def register(mcp):
         return phone_number_id or WHATSAPP_PHONE_NUMBER_ID
 
     @mcp.tool()
+    @concurrency_limit()
     def list_whatsapp_phone_numbers(waba_id: str = "", limit: int = 25) -> str:
         """أرقام الهواتف المسجّلة في حساب واتساب للأعمال (WABA)."""
         try:
@@ -39,6 +41,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_whatsapp_phone_numbers"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_whatsapp_phone_number(phone_number_id: str = "") -> str:
         """تفاصيل رقم هاتف واتساب واحد."""
         try:
@@ -52,6 +55,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_whatsapp_phone_number"))
 
     @mcp.tool()
+    @concurrency_limit()
     def list_whatsapp_message_templates(waba_id: str = "", limit: int = 25) -> str:
         """قوالب الرسائل المعتمدة في حساب واتساب للأعمال."""
         try:
@@ -65,6 +69,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_whatsapp_message_templates"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def create_whatsapp_message_template(
         name: str,
@@ -101,6 +106,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "create_whatsapp_message_template"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def send_whatsapp_text_message(
         to: str, text: str, phone_number_id: str = ""
@@ -122,6 +128,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "send_whatsapp_text_message"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def send_whatsapp_template_message(
         to: str,

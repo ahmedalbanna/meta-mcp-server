@@ -20,6 +20,36 @@ from src.config import (
     PAGE_ACCESS_TOKEN,
     PAGE_ID,
 )
+
+import re
+
+_FILENAME_RE = re.compile(r'^[^/\\:<>"|?*\x00]+$')
+
+
+def sanitize_filename(name: str) -> str:
+    """Strip path components and dangerous characters from a filename.
+
+    Raises ValueError if the result is empty or still contains path separators.
+    """
+    name = name.strip().lstrip("./\\")
+    name = name.split("/")[-1].split("\\")[-1]
+    if not name or not _FILENAME_RE.match(name):
+        raise ValueError(f"Invalid filename: {name!r}")
+    return name
+
+
+def sanitize_path(path_str: str, allowed_root: "Path") -> "Path":
+    """Resolve *path_str* relative to *allowed_root* and ensure it stays inside.
+
+    Raises ValueError if the resolved path escapes allowed_root.
+    """
+    from pathlib import Path as _P
+
+    resolved = (_P(allowed_root) / path_str).resolve()
+    root_resolved = _P(allowed_root).resolve()
+    if not str(resolved).startswith(str(root_resolved) + "/") and resolved != root_resolved:
+        raise ValueError(f"Path escapes allowed directory: {path_str!r}")
+    return resolved
 from src.throttle import async_concurrency_limit, concurrency_limit
 
 logger = logging.getLogger(__name__)

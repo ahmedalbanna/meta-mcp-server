@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from src.config import AD_ACCOUNT_ID
 
@@ -13,7 +14,7 @@ def register(mcp):
     from facebook_business.adobjects.adset import AdSet
     from facebook_business.adobjects.advideo import AdVideo
 
-    from src.helpers import handle_error, json_dumps, to_dict, write_guard
+    from src.helpers import handle_error, json_dumps, sanitize_path, to_dict, write_guard
 
     @mcp.tool()
     def list_ads(adset_id: str = "", limit: int = 25) -> str:
@@ -83,9 +84,13 @@ def register(mcp):
             if image_url:
                 params[AdImage.Field.url] = image_url
             if file_path:
-                if not os.path.exists(file_path):
+                try:
+                    resolved = sanitize_path(file_path, Path.cwd())
+                except ValueError as e:
+                    return json_dumps({"error": f"مسار غير صالح: {e}"})
+                if not resolved.is_file():
                     return json_dumps({"error": f"الملف غير موجود: {file_path}"})
-                params[AdImage.Field.filename] = file_path
+                params[AdImage.Field.filename] = str(resolved)
             if name:
                 params[AdImage.Field.name] = name
             result = image.api_create(parent_id=AD_ACCOUNT_ID, params=params)
@@ -113,9 +118,13 @@ def register(mcp):
             video = AdVideo(parent_id=AD_ACCOUNT_ID)
             params = {}
             if file_path:
-                if not os.path.exists(file_path):
+                try:
+                    resolved = sanitize_path(file_path, Path.cwd())
+                except ValueError as e:
+                    return json_dumps({"error": f"مسار غير صالح: {e}"})
+                if not resolved.is_file():
                     return json_dumps({"error": f"الملف غير موجود: {file_path}"})
-                params[AdVideo.Field.filename] = file_path
+                params[AdVideo.Field.filename] = str(resolved)
             if video_url:
                 params[AdVideo.Field.file_url] = video_url
             if title:

@@ -2,6 +2,7 @@
 
 from src.config import BUSINESS_ID
 from src.helpers import handle_error, json_dumps, to_dict, write_guard
+from src.throttle import concurrency_limit
 from src.utils import paginate
 
 USER_ROLES = [
@@ -41,6 +42,7 @@ def register(mcp):
         return r
 
     @mcp.tool()
+    @concurrency_limit()
     def list_business_users(business_id: str = "", limit: int = 25) -> str:
         """قائمة مستخدمي Business Manager وأدوارهم."""
         try:
@@ -57,6 +59,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_business_users"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_business_user(user_id: str) -> str:
         """تفاصيل مستخدم Business Manager واحد."""
         try:
@@ -66,6 +69,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_business_user"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def invite_business_user(email: str, role: str = "EMPLOYEE", name: str = "", business_id: str = "") -> str:
         """
@@ -86,6 +90,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "invite_business_user"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def update_business_user_role(user_id: str, role: str) -> str:
         """تغيير دور مستخدم في Business Manager."""
@@ -97,6 +102,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "update_business_user_role"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def delete_business_user(user_id: str) -> str:
         """إزالة مستخدم من Business Manager نهائيًا."""

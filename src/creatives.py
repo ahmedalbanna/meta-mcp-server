@@ -81,6 +81,7 @@ def register(mcp):
     """Register creative preview & template tools."""
 
     from src.helpers import api_call, handle_error, json_dumps, to_dict
+    from src.throttle import concurrency_limit
 
     def _validate_format(ad_format: str) -> str:
         fmt = ad_format.strip().upper()
@@ -89,6 +90,7 @@ def register(mcp):
         return fmt
 
     @mcp.tool()
+    @concurrency_limit()
     def generate_ad_preview(ad_id: str, ad_format: str = "DESKTOP_FEED_STANDARD") -> str:
         """
         توليد معاينة إعلان (HTML + رابط) بالشكل المطلوب.
@@ -102,6 +104,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "generate_ad_preview"))
 
     @mcp.tool()
+    @concurrency_limit()
     def generate_creative_preview(ad_creative_id: str, ad_format: str = "DESKTOP_FEED_STANDARD") -> str:
         """توليد معاينة إعلان من معرّف الإبداع (AdCreative) مباشرة."""
         try:
@@ -112,6 +115,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "generate_creative_preview"))
 
     @mcp.tool()
+    @concurrency_limit()
     def generate_creative_template(
         objective: str = "OUTCOME_SALES",
         business_name: str = "",

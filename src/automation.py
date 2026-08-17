@@ -3,6 +3,7 @@ import time
 
 from src.config import AD_ACCOUNT_ID
 from src.helpers import handle_error, json_dumps, to_dict, write_guard
+from src.throttle import concurrency_limit
 
 
 def register(mcp):
@@ -11,6 +12,7 @@ def register(mcp):
     from facebook_business.adobjects.adaccount import AdAccount
 
     @mcp.tool()
+    @concurrency_limit()
     def list_auto_rules(limit: int = 25) -> str:
         """قائمة القواعد التلقائية في الحساب الإعلاني."""
         try:
@@ -21,6 +23,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_auto_rules"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def create_auto_rule(
         name: str,
@@ -53,6 +56,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "create_auto_rule"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def create_simple_auto_rule(
         name: str,
@@ -97,6 +101,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "create_simple_auto_rule"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def delete_auto_rule(rule_id: str) -> str:
         """حذف قاعدة تلقائية."""
@@ -110,6 +115,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "delete_auto_rule"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_auto_rules_history(days: int = 7) -> str:
         """سجل تنفيذ القواعد التلقائية خلال الأيام الأخيرة."""
         try:

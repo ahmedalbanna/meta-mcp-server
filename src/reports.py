@@ -28,7 +28,7 @@ def register(mcp):
 
     from facebook_business.adobjects.adaccount import AdAccount
 
-    from src.helpers import handle_error, json_dumps
+    from src.helpers import handle_error, json_dumps, sanitize_filename
 
     ensure_report_dir()
 
@@ -80,6 +80,11 @@ def register(mcp):
             rows = _fetch_rows(AD_ACCOUNT_ID, date_preset, metric_list)
             df = pd.DataFrame(rows)
             base = filename or f"campaign_report_{date_preset}"
+            if filename:
+                try:
+                    base = sanitize_filename(base)
+                except ValueError as e:
+                    return json_dumps({"error": f"اسم ملف غير صالح: {e}"})
             if format == "excel":
                 path = Path(REPORT_DIR) / f"{base}.xlsx"
                 df.to_excel(path, index=False)
@@ -182,6 +187,11 @@ def register(mcp):
 
             df = pd.DataFrame(rows)
             base = filename or "instagram_report"
+            if filename:
+                try:
+                    base = sanitize_filename(base)
+                except ValueError as e:
+                    return json_dumps({"error": f"اسم ملف غير صالح: {e}"})
             if format == "excel":
                 path = Path(REPORT_DIR) / f"{base}.xlsx"
                 df.to_excel(path, index=False)
@@ -238,6 +248,11 @@ def register(mcp):
             data = to_dict(info)
             df = pd.DataFrame([data])
             base = filename or "page_report"
+            if filename:
+                try:
+                    base = sanitize_filename(base)
+                except ValueError as e:
+                    return json_dumps({"error": f"اسم ملف غير صالح: {e}"})
             if format == "excel":
                 path = Path(REPORT_DIR) / f"{base}.xlsx"
                 df.to_excel(path, index=False)

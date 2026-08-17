@@ -5,6 +5,7 @@ All calls use the page-scoped access token (page_api_call).
 
 from src.config import PAGE_ID
 from src.helpers import handle_error, json_dumps, page_api_call, write_guard
+from src.throttle import concurrency_limit
 
 CONVERSATION_FIELDS = (
     "id,updated_time,message_count,unread_count,participants,can_reply,last_used_tag"
@@ -19,6 +20,7 @@ def register(mcp):
         return page_id or PAGE_ID
 
     @mcp.tool()
+    @concurrency_limit()
     def list_conversations(page_id: str = "", limit: int = 25) -> str:
         """محادثات الصفحة على Messenger (الوارد)."""
         try:
@@ -32,6 +34,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_conversations"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_conversation(conversation_id: str) -> str:
         """تفاصيل محادثة Messenger واحدة."""
         try:
@@ -45,6 +48,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_conversation"))
 
     @mcp.tool()
+    @concurrency_limit()
     def list_conversation_messages(conversation_id: str, limit: int = 25) -> str:
         """رسائل محادثة Messenger محددة."""
         try:
@@ -58,6 +62,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_conversation_messages"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_messenger_message(message_id: str) -> str:
         """رسالة Messenger واحدة (نص، مرفقات، أطراف)."""
         try:
@@ -71,6 +76,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_messenger_message"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def send_messenger_message(recipient_id: str, text: str, page_id: str = "") -> str:
         """إرسال رد عبر Messenger إلى المستخدم الذي بدأ المحادثة."""
@@ -89,6 +95,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "send_messenger_message"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def mark_messenger_seen(recipient_id: str, page_id: str = "") -> str:
         """وضع علامة "تمت القراءة" على رسائل المستخدم (mark_seen)."""
@@ -106,6 +113,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "mark_messenger_seen"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def set_messenger_typing(
         recipient_id: str, typing: bool = True, page_id: str = ""
