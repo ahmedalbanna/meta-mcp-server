@@ -1,4 +1,4 @@
-from src.config import AD_ACCOUNT_ID, INSTAGRAM_BUSINESS_ID, PAGE_ID
+from src.config import AD_ACCOUNT_ID
 
 
 def register(mcp):

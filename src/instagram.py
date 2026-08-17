@@ -450,16 +450,23 @@ def register(mcp):
                 "POST", f"{ig_id}/media_publish", {"creation_id": creation_id}
             )
             new_id = result.get("id")
+            delete_ok = True
+            delete_error = ""
             if new_id:
-                api_call("DELETE", f"{media_id}")
-            return json_dumps(
-                {
-                    "old_id": media_id,
-                    "new_id": new_id,
-                    "container": container,
-                    "publish": result,
-                }
-            )
+                try:
+                    api_call("DELETE", f"{media_id}")
+                except Exception as del_e:
+                    delete_ok = False
+                    delete_error = str(del_e)
+            resp = {
+                "old_id": media_id,
+                "new_id": new_id,
+                "container": container,
+                "publish": result,
+            }
+            if not delete_ok:
+                resp["warning"] = f"تم النشر بالجديد لكن حذف المنشور القديم فشل: {delete_error}"
+            return json_dumps(resp)
         except Exception as e:
             return json_dumps(handle_error(e, "update_instagram_media_caption"))
 

@@ -124,6 +124,6 @@ def register(mcp):
             history = account.get_ad_rules_history(
                 params={"start_time": since, "end_time": int(time.time())}
             )
-            return json_dumps([to_dict(h) for h in history] or {"message": "لا توجد سجلات"})
+            return json_dumps([to_dict(h) for h in history])
         except Exception as e:
             return json_dumps(handle_error(e, "get_auto_rules_history"))

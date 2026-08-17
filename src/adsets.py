@@ -141,8 +141,10 @@ def register(mcp):
         targeting: JSON نصي مثل {"geo_locations":{"countries":["EG"]},"age_min":18,"interests":[]}
         """
         try:
+            target = json.loads(targeting)
+            target.setdefault("targeting_automation", {"advantage_audience": 0})
             adset = AdSet(adset_id)
-            adset.api_update(params={AdSet.Field.targeting: targeting})
-            return json_dumps({"success": True, "adset_id": adset_id, "targeting": targeting})
+            adset.api_update(params={AdSet.Field.targeting: json_dumps(target)})
+            return json_dumps({"success": True, "adset_id": adset_id, "targeting": target})
         except Exception as e:
             return json_dumps(handle_error(e, "update_adset_targeting"))

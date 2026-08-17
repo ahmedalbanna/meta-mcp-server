@@ -15,6 +15,31 @@ def register(mcp):
     def _split(items: str) -> list:
         return [i.strip() for i in (items or "").split(",") if i.strip()]
 
+    def _build_user_schema(emails: str, phone_numbers: str, user_ids: str, hash_pii: bool):
+        """Build (schema, users) from comma-separated PII strings."""
+        schema = []
+        users = []
+        if emails:
+            email_list = _split(emails)
+            if hash_pii:
+                schema.append("EMAIL_SHA256")
+                users.extend(normalize_pii(email_list, "email"))
+            else:
+                schema.append("EMAIL")
+                users.extend(email_list)
+        if phone_numbers:
+            phone_list = _split(phone_numbers)
+            if hash_pii:
+                schema.append("PHONE_SHA256")
+                users.extend(normalize_pii(phone_list, "phone"))
+            else:
+                schema.append("PHONE")
+                users.extend(phone_list)
+        if user_ids:
+            schema.append("ID")
+            users.extend(_split(user_ids))
+        return schema, users
+
     @mcp.tool()
     def list_custom_audiences(limit: int = 25) -> str:
         """قائمة الجماهير المخصصة في الحساب."""
@@ -68,27 +93,7 @@ def register(mcp):
         """
         try:
             audience = CustomAudience(audience_id)
-            schema = []
-            users = []
-            if emails:
-                email_list = _split(emails)
-                if hash_pii:
-                    schema.append("EMAIL_SHA256")
-                    users.extend(normalize_pii(email_list, "email"))
-                else:
-                    schema.append("EMAIL")
-                    users.extend(email_list)
-            if phone_numbers:
-                phone_list = _split(phone_numbers)
-                if hash_pii:
-                    schema.append("PHONE_SHA256")
-                    users.extend(normalize_pii(phone_list, "phone"))
-                else:
-                    schema.append("PHONE")
-                    users.extend(phone_list)
-            if user_ids:
-                schema.append("ID")
-                users.extend(_split(user_ids))
+            schema, users = _build_user_schema(emails, phone_numbers, user_ids, hash_pii)
             if not users:
                 return json_dumps({"error": "قدّم بريدًا أو أرقام هواتف أو معرفات"})
             result = audience.add_users(schema=schema, users=users)
@@ -116,27 +121,7 @@ def register(mcp):
         """إزالة مستخدمين من جمهور مخصص (نفس صيغة الإضافة)."""
         try:
             audience = CustomAudience(audience_id)
-            schema = []
-            users = []
-            if emails:
-                email_list = _split(emails)
-                if hash_pii:
-                    schema.append("EMAIL_SHA256")
-                    users.extend(normalize_pii(email_list, "email"))
-                else:
-                    schema.append("EMAIL")
-                    users.extend(email_list)
-            if phone_numbers:
-                phone_list = _split(phone_numbers)
-                if hash_pii:
-                    schema.append("PHONE_SHA256")
-                    users.extend(normalize_pii(phone_list, "phone"))
-                else:
-                    schema.append("PHONE")
-                    users.extend(phone_list)
-            if user_ids:
-                schema.append("ID")
-                users.extend(_split(user_ids))
+            schema, users = _build_user_schema(emails, phone_numbers, user_ids, hash_pii)
             if not users:
                 return json_dumps({"error": "قدّم بريدًا أو أرقام هواتف أو معرفات"})
             result = audience.remove_users(schema=schema, users=users)

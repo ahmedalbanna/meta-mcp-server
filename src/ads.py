@@ -16,6 +16,35 @@ def register(mcp):
 
     from src.helpers import handle_error, json_dumps, sanitize_path, to_dict, write_guard
 
+    def _build_object_story_spec(
+        page_id: str,
+        message: str,
+        image_hash: str = "",
+        image_url: str = "",
+        video_id: str = "",
+        link: str = "",
+        headline: str = "",
+        call_to_action: str = "",
+    ) -> dict:
+        """Build an object_story_spec dict for ad creative creation."""
+        media = {}
+        if image_hash:
+            media["image_hash"] = image_hash
+        elif image_url:
+            media["image_url"] = image_url
+        if link:
+            media["link"] = link
+        if headline:
+            media["name"] = headline
+        if call_to_action:
+            media["call_to_action"] = {"type": call_to_action}
+        if video_id:
+            media["video_id"] = video_id
+            story_key = "video_data"
+        else:
+            story_key = "link_data"
+        return {"page_id": page_id, story_key: {**media, "message": message}}
+
     @mcp.tool()
     def list_ads(adset_id: str = "", limit: int = 25) -> str:
         """قائمة الإعلانات (يمكن تحديد مجموعة إعلانية معينة)."""
@@ -154,25 +183,9 @@ def register(mcp):
         """
         try:
             account = AdAccount(AD_ACCOUNT_ID)
-            media = {}
-            if image_hash:
-                media["image_hash"] = image_hash
-            elif image_url:
-                media["image_url"] = image_url
-            if link:
-                media["link"] = link
-            if headline:
-                media["name"] = headline
-            if call_to_action:
-                media["call_to_action"] = {"type": call_to_action}
-
-            if video_id:
-                media["video_id"] = video_id
-                story_key = "video_data"
-            else:
-                story_key = "link_data"
-
-            object_story_spec = {"page_id": page_id, story_key: {**media, "message": message}}
+            object_story_spec = _build_object_story_spec(
+                page_id, message, image_hash, image_url, video_id, link, headline, call_to_action
+            )
             params = {
                 AdCreative.Field.name: name,
                 AdCreative.Field.object_story_spec: json_dumps(object_story_spec),
@@ -204,25 +217,9 @@ def register(mcp):
         """
         try:
             account = AdAccount(AD_ACCOUNT_ID)
-            media = {}
-            if image_hash:
-                media["image_hash"] = image_hash
-            elif image_url:
-                media["image_url"] = image_url
-            if link:
-                media["link"] = link
-            if headline:
-                media["name"] = headline
-            if call_to_action:
-                media["call_to_action"] = {"type": call_to_action}
-
-            if video_id:
-                media["video_id"] = video_id
-                story_key = "video_data"
-            else:
-                story_key = "link_data"
-
-            object_story_spec = {"page_id": page_id, story_key: {**media, "message": message}}
+            object_story_spec = _build_object_story_spec(
+                page_id, message, image_hash, image_url, video_id, link, headline, call_to_action
+            )
             creative = account.create_ad_creative(
                 params={
                     AdCreative.Field.name: creative_name,
