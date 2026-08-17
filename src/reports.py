@@ -1,7 +1,7 @@
 import csv
+import logging
+from collections import Counter
 from pathlib import Path
-
-import pandas as pd
 
 from src.config import (
     AD_ACCOUNT_ID,
@@ -10,6 +10,8 @@ from src.config import (
     REPORT_DIR,
     ensure_report_dir,
 )
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_METRICS = ["spend", "impressions", "clicks", "ctr", "cpc", "reach"]
 
@@ -21,6 +23,51 @@ IG_MEDIA_METRICS = [
     "shares",
     "total_interactions",
 ]
+
+
+def _write_csv(path: Path, rows: list[dict]) -> None:
+    if not rows:
+        path.write_text("", encoding="utf-8")
+        return
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _write_excel(path: Path, rows: list[dict]) -> None:
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    if not rows:
+        wb.save(path)
+        return
+    headers = list(rows[0].keys())
+    ws.append(headers)
+    for row in rows:
+        ws.append([row.get(h, "") for h in headers])
+    wb.save(path)
+
+
+def _to_numeric(val) -> float:
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _summarise(rows: list[dict], metrics: list) -> dict:
+    if not rows:
+        return {}
+    summary = {"campaigns": len(rows)}
+    for m in metrics:
+        total = sum(_to_numeric(r.get(m, 0)) for r in rows)
+        summary[f"total_{m}"] = round(total, 4)
+        if m == "clicks" and total:
+            spend = sum(_to_numeric(r.get("spend", 0)) for r in rows)
+            summary["avg_cpc"] = round(spend / total, 4)
+    return summary
 
 
 def register(mcp):
@@ -46,23 +93,6 @@ def register(mcp):
             rows.append(row)
         return rows
 
-    def _summarise(df: pd.DataFrame, metrics: list) -> dict:
-        if df.empty:
-            return {}
-        summary = {"campaigns": int(df.shape[0])}
-        for m in metrics:
-            numeric = pd.to_numeric(df[m], errors="coerce").fillna(0)
-            summary[f"total_{m}"] = float(numeric.sum())
-            if m == "clicks" and numeric.sum():
-                spend_col = (
-                    df["spend"]
-                    if "spend" in df.columns
-                    else pd.Series(0, index=df.index)
-                )
-                spend = pd.to_numeric(spend_col, errors="coerce").fillna(0).sum()
-                summary["avg_cpc"] = round(spend / numeric.sum(), 4)
-        return summary
-
     @mcp.tool()
     def generate_campaign_report(
         date_preset: str = "last_30d",
@@ -78,7 +108,6 @@ def register(mcp):
             ensure_report_dir()
             metric_list = [m.strip() for m in metrics.split(",") if m.strip()]
             rows = _fetch_rows(AD_ACCOUNT_ID, date_preset, metric_list)
-            df = pd.DataFrame(rows)
             base = filename or f"campaign_report_{date_preset}"
             if filename:
                 try:
@@ -87,16 +116,16 @@ def register(mcp):
                     return json_dumps({"error": f"اسم ملف غير صالح: {e}"})
             if format == "excel":
                 path = Path(REPORT_DIR) / f"{base}.xlsx"
-                df.to_excel(path, index=False)
+                _write_excel(path, rows)
             else:
                 path = Path(REPORT_DIR) / f"{base}.csv"
-                df.to_csv(path, index=False)
+                _write_csv(path, rows)
             return json_dumps(
                 {
                     "success": True,
                     "file": str(path),
-                    "rows": int(df.shape[0]),
-                    "summary": _summarise(df, metric_list),
+                    "rows": len(rows),
+                    "summary": _summarise(rows, metric_list),
                 }
             )
         except Exception as e:
@@ -107,30 +136,23 @@ def register(mcp):
         """ملخص أداء الحساب الإعلاني خلال فترة."""
         try:
             rows = _fetch_rows(AD_ACCOUNT_ID, date_preset, DEFAULT_METRICS)
-            df = pd.DataFrame(rows)
-            if df.empty:
+            if not rows:
                 return json_dumps(
                     {"message": "لا توجد بيانات", "date_preset": date_preset}
                 )
             summary = {
                 "date_preset": date_preset,
-                "campaigns": int(df.shape[0]),
+                "campaigns": len(rows),
             }
             for m in DEFAULT_METRICS:
-                numeric = pd.to_numeric(df[m], errors="coerce").fillna(0)
-                summary[f"total_{m}"] = float(numeric.sum())
+                total = sum(_to_numeric(r.get(m, 0)) for r in rows)
+                summary[f"total_{m}"] = round(total, 4)
             spend = summary.get("total_spend", 0)
             clicks = summary.get("total_clicks", 0)
             if clicks:
                 summary["avg_cpc"] = round(spend / clicks, 4)
-            summary["top_campaign"] = str(
-                df.loc[
-                    pd.to_numeric(df["spend"], errors="coerce").fillna(0).idxmax(),
-                    "campaign_name",
-                ]
-                if not df.empty
-                else "N/A"
-            )
+            best = max(rows, key=lambda r: _to_numeric(r.get("spend", 0)))
+            summary["top_campaign"] = best.get("campaign_name", "N/A")
             return json_dumps(summary)
         except Exception as e:
             return json_dumps(handle_error(e, "account_summary"))
@@ -160,7 +182,6 @@ def register(mcp):
             for item in media.get("data", []):
                 mid = item.get("id")
                 caption = item.get("caption", "")
-                # Truncate caption for CSV readability
                 caption_short = (
                     (caption[:120] + "...") if len(caption) > 120 else caption
                 )
@@ -181,11 +202,10 @@ def register(mcp):
                         name = ins.get("name", "")
                         values = ins.get("values", [])
                         row[name] = values[-1].get("value", 0) if values else 0
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Failed to fetch insights for media %s: %s", mid, e)
                 rows.append(row)
 
-            df = pd.DataFrame(rows)
             base = filename or "instagram_report"
             if filename:
                 try:
@@ -194,29 +214,25 @@ def register(mcp):
                     return json_dumps({"error": f"اسم ملف غير صالح: {e}"})
             if format == "excel":
                 path = Path(REPORT_DIR) / f"{base}.xlsx"
-                df.to_excel(path, index=False)
+                _write_excel(path, rows)
             else:
                 path = Path(REPORT_DIR) / f"{base}.csv"
-                df.to_csv(path, index=False)
+                _write_csv(path, rows)
 
-            # Summary stats
+            type_counts = Counter(r.get("media_type", "") for r in rows)
             summary = {
                 "success": True,
                 "file": str(path),
-                "posts": int(df.shape[0]),
-                "media_types": df["media_type"].value_counts().to_dict()
-                if not df.empty
-                else {},
+                "posts": len(rows),
+                "media_types": dict(type_counts),
             }
-            if not df.empty and "total_interactions" in df.columns:
-                interactions = pd.to_numeric(
-                    df["total_interactions"], errors="coerce"
-                ).fillna(0)
-                summary["avg_engagement"] = round(float(interactions.mean()), 1)
-                summary["total_engagement"] = int(interactions.sum())
-                if "reach" in df.columns:
-                    reach = pd.to_numeric(df["reach"], errors="coerce").fillna(0)
-                    summary["avg_reach"] = round(float(reach.mean()), 0)
+            if rows and "total_interactions" in rows[0]:
+                interactions = [_to_numeric(r.get("total_interactions", 0)) for r in rows]
+                summary["avg_engagement"] = round(sum(interactions) / len(interactions), 1)
+                summary["total_engagement"] = int(sum(interactions))
+                if "reach" in rows[0]:
+                    reach_vals = [_to_numeric(r.get("reach", 0)) for r in rows]
+                    summary["avg_reach"] = round(sum(reach_vals) / len(reach_vals), 0)
             return json_dumps(summary)
         except Exception as e:
             return json_dumps(handle_error(e, "generate_instagram_report"))
@@ -246,7 +262,7 @@ def register(mcp):
                 ]
             )
             data = to_dict(info)
-            df = pd.DataFrame([data])
+            rows = [data]
             base = filename or "page_report"
             if filename:
                 try:
@@ -255,12 +271,12 @@ def register(mcp):
                     return json_dumps({"error": f"اسم ملف غير صالح: {e}"})
             if format == "excel":
                 path = Path(REPORT_DIR) / f"{base}.xlsx"
-                df.to_excel(path, index=False)
+                _write_excel(path, rows)
             else:
                 path = Path(REPORT_DIR) / f"{base}.csv"
-                df.to_csv(path, index=False)
+                _write_csv(path, rows)
             return json_dumps(
-                {"success": True, "file": str(path), "rows": int(df.shape[0])}
+                {"success": True, "file": str(path), "rows": len(rows)}
             )
         except Exception as e:
             return json_dumps(handle_error(e, "generate_page_report"))

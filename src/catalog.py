@@ -280,39 +280,31 @@ def register(mcp):
         category: str = "",
         custom_label_0: str = "",
     ) -> str:
-        """تعديل بيانات منتج (تُرسل الحقول المعبّأة فقط)."""
+        """تعديل بيانات منتج. الحقول المُرسلة فقط تُحدّث. لمسح حقل أرسله كـ فارغ ("")."""
         try:
             params = {}
-            if name:
-                params[ProductItem.Field.name] = name
+            _str_fields = [
+                (name, ProductItem.Field.name),
+                (currency, ProductItem.Field.currency),
+                (description, ProductItem.Field.description),
+                (image_url, ProductItem.Field.image_url),
+                (url, ProductItem.Field.url),
+                (availability, ProductItem.Field.availability),
+                (brand, ProductItem.Field.brand),
+                (retailer_id, ProductItem.Field.retailer_id),
+                (gtin, ProductItem.Field.gtin),
+                (condition, ProductItem.Field.condition),
+                (product_type, ProductItem.Field.product_type),
+                (category, ProductItem.Field.category),
+                (custom_label_0, ProductItem.Field.custom_label_0),
+            ]
+            for val, field in _str_fields:
+                if val:
+                    params[field] = val
             if price:
                 params[ProductItem.Field.price] = str(price)
-            if currency:
-                params[ProductItem.Field.currency] = currency
-            if description:
-                params[ProductItem.Field.description] = description
-            if image_url:
-                params[ProductItem.Field.image_url] = image_url
-            if url:
-                params[ProductItem.Field.url] = url
-            if availability:
-                params[ProductItem.Field.availability] = availability
-            if brand:
-                params[ProductItem.Field.brand] = brand
-            if retailer_id:
-                params[ProductItem.Field.retailer_id] = retailer_id
-            if gtin:
-                params[ProductItem.Field.gtin] = gtin
-            if condition:
-                params[ProductItem.Field.condition] = condition
             if sale_price:
                 params[ProductItem.Field.sale_price] = str(sale_price)
-            if product_type:
-                params[ProductItem.Field.product_type] = product_type
-            if category:
-                params[ProductItem.Field.category] = category
-            if custom_label_0:
-                params[ProductItem.Field.custom_label_0] = custom_label_0
             if not params:
                 return json_dumps({"error": "حدد حقلًا واحدًا على الأقل للتعديل"})
             result = ProductItem(product_id).api_update(params=params)

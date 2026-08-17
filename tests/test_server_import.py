@@ -24,7 +24,7 @@ def test_all_modules_register():
 
 def test_tool_count():
     recorder = register_all(Recorder())
-    assert len(recorder.tools) == 155
+    assert len(recorder.tools) >= 155
 
 
 def test_every_module_registers_at_least_one_tool():

@@ -113,6 +113,8 @@ def register(mcp):
     ) -> str:
         """إرسال رسالة نصية واتساب (رقم المستخدم يجب أن يكون بدأ محادثة)."""
         try:
+            if len(text) > 4096:
+                return json_dumps({"error": f"النص طويل جدًا ({len(text)} حرف). الحد الأقصى 4096."})
             result = api_call(
                 "POST",
                 f"{_require_phone(phone_number_id)}/messages",

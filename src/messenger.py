@@ -81,6 +81,8 @@ def register(mcp):
     def send_messenger_message(recipient_id: str, text: str, page_id: str = "") -> str:
         """إرسال رد عبر Messenger إلى المستخدم الذي بدأ المحادثة."""
         try:
+            if len(text) > 2000:
+                return json_dumps({"error": f"النص طويل جدًا ({len(text)} حرف). الحد الأقصى 2000."})
             result = page_api_call(
                 "POST",
                 f"{_pid(page_id)}/messages",
