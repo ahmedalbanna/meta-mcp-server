@@ -35,10 +35,14 @@ def get_queued_events(limit: int = 50) -> list[dict]:
 
 
 def pop_queued_events(limit: int = 50) -> list[dict]:
-    """Return and clear recent queued events."""
+    """Return and remove the most recent queued events (up to limit)."""
     with _event_lock:
         events = list(_event_queue[-limit:])
-        _event_queue.clear()
+        for e in events:
+            try:
+                _event_queue.remove(e)
+            except ValueError:
+                pass
         return events
 
 

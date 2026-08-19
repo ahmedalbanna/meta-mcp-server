@@ -11,7 +11,7 @@ def register(mcp):
     from facebook_business.adobjects.adaccount import AdAccount
     from facebook_business.adobjects.customaudience import CustomAudience
 
-    from src.helpers import handle_error, json_dumps, to_dict, write_guard
+    from src.helpers import handle_error, json_dumps, sanitize_path, to_dict, write_guard
     from src.throttle import concurrency_limit
 
     def _split(items: str) -> list:
@@ -163,7 +163,7 @@ def register(mcp):
             import csv as _csv
             from pathlib import Path
 
-            path = Path(csv_path)
+            path = sanitize_path(csv_path)
             if not path.is_file():
                 return json_dumps({"error": f"الملف غير موجود: {csv_path}"})
             schema_list = [s.strip().upper() for s in _split(schema)]
@@ -331,3 +331,26 @@ def register(mcp):
             return json_dumps(to_dict(audience))
         except Exception as e:
             return json_dumps(handle_error(e, "create_lookalike_audience"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    def get_custom_audience_insights(audience_id: str) -> str:
+        """تفاصيل جمهور مخصص: الحجم، المصدر، الحالة، تاريخ الإنشاء."""
+        try:
+            audience = CustomAudience(audience_id)
+            audience.api_read(
+                fields=[
+                    "id",
+                    "name",
+                    "description",
+                    "approximate_count",
+                    "customer_file_source",
+                    "delivery_info",
+                    "status",
+                    "time_created",
+                    "time_updated",
+                ]
+            )
+            return json_dumps(to_dict(audience))
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_custom_audience_insights"))

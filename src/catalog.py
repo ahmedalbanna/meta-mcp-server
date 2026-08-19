@@ -250,7 +250,7 @@ def register(mcp):
         try:
             params = {
                 ProductItem.Field.name: name,
-                ProductItem.Field.price: str(int(price)) if price else "0",
+                ProductItem.Field.price: str(round(price, 2)) if price else "0",
                 ProductItem.Field.currency: currency,
             }
             optional = {
@@ -317,9 +317,9 @@ def register(mcp):
                 if val:
                     params[field] = val
             if price:
-                params[ProductItem.Field.price] = str(int(price))
+                params[ProductItem.Field.price] = str(round(price, 2))
             if sale_price:
-                params[ProductItem.Field.sale_price] = str(int(sale_price))
+                params[ProductItem.Field.sale_price] = str(round(sale_price, 2))
             if not params:
                 return json_dumps({"error": "حدد حقلًا واحدًا على الأقل للتعديل"})
             result = ProductItem(product_id).api_update(params=params)
@@ -522,3 +522,58 @@ def register(mcp):
             return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_catalog_insights"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    @write_guard
+    def bulk_update_products(updates_json: str) -> str:
+        """
+        تعديل عدة منتجات دفعة واحدة.
+        updates_json: مصفوفة JSON من التعديلات، مثال:
+        [{"product_id":"xxx","price":50.00,"name":"قميص جديد"},{"product_id":"yyy","availability":"out of stock"}]
+        """
+        try:
+            updates = json.loads(updates_json)
+            if not isinstance(updates, list):
+                return json_dumps({"error": "updates_json يجب أن يكون مصفوفة"})
+            results = []
+            for item in updates:
+                pid = item.pop("product_id", None)
+                if not pid:
+                    results.append({"error": "product_id مفقود"})
+                    continue
+                try:
+                    product = ProductItem(pid)
+                    params = {}
+                    if "name" in item:
+                        params[ProductItem.Field.name] = item["name"]
+                    if "price" in item:
+                        params[ProductItem.Field.price] = str(round(float(item["price"]), 2))
+                    if "sale_price" in item:
+                        params[ProductItem.Field.sale_price] = str(round(float(item["sale_price"]), 2))
+                    if "currency" in item:
+                        params[ProductItem.Field.currency] = item["currency"]
+                    if "description" in item:
+                        params[ProductItem.Field.description] = item["description"]
+                    if "image_url" in item:
+                        params[ProductItem.Field.image_url] = item["image_url"]
+                    if "url" in item:
+                        params[ProductItem.Field.url] = item["url"]
+                    if "availability" in item:
+                        params[ProductItem.Field.availability] = item["availability"]
+                    if "brand" in item:
+                        params[ProductItem.Field.brand] = item["brand"]
+                    if "product_type" in item:
+                        params[ProductItem.Field.product_type] = item["product_type"]
+                    if "category" in item:
+                        params[ProductItem.Field.category] = item["category"]
+                    if "custom_label_0" in item:
+                        params[ProductItem.Field.custom_label_0] = item["custom_label_0"]
+                    if params:
+                        product.api_update(params=params)
+                    results.append({"product_id": pid, "success": True})
+                except Exception as ex:
+                    results.append({"product_id": pid, "error": str(ex)})
+            return json_dumps({"results": results, "total": len(results)})
+        except Exception as e:
+            return json_dumps(handle_error(e, "bulk_update_products"))

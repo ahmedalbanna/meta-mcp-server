@@ -303,6 +303,39 @@ def register(mcp):
     @mcp.tool()
     @concurrency_limit()
     @write_guard
+    def publish_instagram_story(
+        image_url: str = "",
+        video_url: str = "",
+        link: str = "",
+        instagram_business_id: str = "",
+    ) -> str:
+        """نشر قصة (Story) على إنستغرام. أرسل image_url أو video_url فقط."""
+        try:
+            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            if not image_url and not video_url:
+                return json_dumps({"error": "حدد image_url أو video_url"})
+            params = {}
+            if video_url:
+                params["media_type"] = "STORIES"
+                params["video_url"] = video_url
+            else:
+                params["image_url"] = image_url
+            if link:
+                params["link"] = link
+            container = api_call("POST", f"{ig_id}/media", params)
+            creation_id = container.get("id")
+            if not creation_id:
+                return json_dumps(container)
+            result = api_call(
+                "POST", f"{ig_id}/media_publish", {"creation_id": creation_id}
+            )
+            return json_dumps({"container": container, "publish": result})
+        except Exception as e:
+            return json_dumps(handle_error(e, "publish_instagram_story"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    @write_guard
     def publish_instagram_carousel(
         image_urls: str, caption: str = "", instagram_business_id: str = ""
     ) -> str:
@@ -707,3 +740,41 @@ def register(mcp):
             return json_dumps({"recipient_id": recipient_ig_id, "result": result})
         except Exception as e:
             return json_dumps(handle_error(e, "send_instagram_dm"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    @write_guard
+    def send_instagram_dm_with_image(
+        instagram_business_id: str,
+        recipient_ig_id: str,
+        image_url: str,
+        text: str = "",
+    ) -> str:
+        """إرسال رسالة مباشرة (DM) مع صورة عبر إنستغرام."""
+        try:
+            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            result = api_call(
+                "POST",
+                f"{ig_id}/messages",
+                {
+                    "recipient": {"id": recipient_ig_id},
+                    "message": {
+                        "attachment": {
+                            "type": "image",
+                            "payload": {"url": image_url},
+                        }
+                    },
+                },
+            )
+            if text:
+                api_call(
+                    "POST",
+                    f"{ig_id}/messages",
+                    {
+                        "recipient": {"id": recipient_ig_id},
+                        "message": {"text": text},
+                    },
+                )
+            return json_dumps({"recipient_id": recipient_ig_id, "result": result})
+        except Exception as e:
+            return json_dumps(handle_error(e, "send_instagram_dm_with_image"))

@@ -95,6 +95,10 @@ def register(mcp):
     def update_ad_status(ad_id: str, status: str) -> str:
         """تغيير حالة إعلان (ACTIVE, PAUSED, DELETED, ARCHIVED)."""
         try:
+            valid = {"ACTIVE", "PAUSED", "DELETED", "ARCHIVED"}
+            status = status.upper()
+            if status not in valid:
+                return json_dumps({"error": f"status غير صالح. القيم: {', '.join(sorted(valid))}"})
             ad = Ad(ad_id)
             ad.api_update(params={Ad.Field.status: status})
             return json_dumps({"success": True, "ad_id": ad_id, "new_status": status})
@@ -243,3 +247,37 @@ def register(mcp):
             return json_dumps(to_dict(ad))
         except Exception as e:
             return json_dumps(handle_error(e, "create_ad"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    def list_ad_creatives(limit: int = 25) -> str:
+        """قائمة الإبداعات (Ad Creatives) في الحساب الإعلاني."""
+        try:
+            account = AdAccount(AD_ACCOUNT_ID)
+            creatives = account.get_ad_creatives(params={"limit": limit})
+            return json_dumps([to_dict(c) for c in creatives])
+        except Exception as e:
+            return json_dumps(handle_error(e, "list_ad_creatives"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    def get_ad_creative(creative_id: str) -> str:
+        """تفاصيل إبداع (Ad Creative) واحد."""
+        try:
+            creative = AdCreative(creative_id)
+            creative.api_read()
+            return json_dumps(to_dict(creative))
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_ad_creative"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    @write_guard
+    def delete_ad_creative(creative_id: str) -> str:
+        """حذف إبداع (Ad Creative) نهائيًا."""
+        try:
+            creative = AdCreative(creative_id)
+            creative.api_delete()
+            return json_dumps({"success": True, "creative_id": creative_id})
+        except Exception as e:
+            return json_dumps(handle_error(e, "delete_ad_creative"))

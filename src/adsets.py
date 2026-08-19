@@ -115,6 +115,10 @@ def register(mcp):
     def update_adset_status(adset_id: str, status: str) -> str:
         """تغيير حالة مجموعة إعلانية (ACTIVE, PAUSED, DELETED, ARCHIVED)."""
         try:
+            valid = {"ACTIVE", "PAUSED", "DELETED", "ARCHIVED"}
+            status = status.upper()
+            if status not in valid:
+                return json_dumps({"error": f"status غير صالح. القيم: {', '.join(sorted(valid))}"})
             adset = AdSet(adset_id)
             adset.api_update(params={AdSet.Field.status: status})
             return json_dumps({"success": True, "adset_id": adset_id, "new_status": status})
@@ -156,3 +160,29 @@ def register(mcp):
             return json_dumps({"success": True, "adset_id": adset_id, "targeting": target})
         except Exception as e:
             return json_dumps(handle_error(e, "update_adset_targeting"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    @write_guard
+    def schedule_adset(
+        adset_id: str,
+        start_time: str = "",
+        end_time: str = "",
+    ) -> str:
+        """
+        جدولة مجموعة إعلانية: تعيين وقت بدء و/أو انتهاء.
+        start_time / end_time بصيغة ISO مثل 2026-09-01T18:00:00+0300
+        """
+        try:
+            params = {}
+            if start_time:
+                params[AdSet.Field.start_time] = start_time
+            if end_time:
+                params[AdSet.Field.end_time] = end_time
+            if not params:
+                return json_dumps({"error": "حدد start_time و/أو end_time"})
+            adset = AdSet(adset_id)
+            adset.api_update(params=params)
+            return json_dumps({"success": True, "adset_id": adset_id, "scheduled": params})
+        except Exception as e:
+            return json_dumps(handle_error(e, "schedule_adset"))

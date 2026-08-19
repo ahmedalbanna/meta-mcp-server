@@ -107,6 +107,10 @@ def register(mcp):
         status: ACTIVE, PAUSED, DELETED, ARCHIVED
         """
         try:
+            valid = {"ACTIVE", "PAUSED", "DELETED", "ARCHIVED"}
+            status = status.upper()
+            if status not in valid:
+                return json_dumps({"error": f"status غير صالح. القيم: {', '.join(sorted(valid))}"})
             campaign = Campaign(campaign_id)
             result = campaign.api_update(params={Campaign.Field.status: status})
             return json_dumps(
