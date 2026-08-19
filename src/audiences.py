@@ -66,7 +66,7 @@ def register(mcp):
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def create_custom_audience(name: str, description: str = "") -> str:
+    def create_custom_audience(name: str, description: str = "", customer_file_source: str = "BOTH_USER_AND_PARTNER_PROVIDED") -> str:
         """إنشاء جمهور مخصص جديد."""
         try:
             account = AdAccount(AD_ACCOUNT_ID)
@@ -75,6 +75,7 @@ def register(mcp):
                     CustomAudience.Field.name: name,
                     CustomAudience.Field.subtype: "CUSTOM",
                     CustomAudience.Field.description: description,
+                    "customer_file_source": customer_file_source,
                 }
             )
             return json_dumps(to_dict(audience))

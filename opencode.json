@@ -3,23 +3,12 @@
     "mcp": {
         "meta-marketing-pro": {
             "type": "local",
-            "command": [
-                "python",
-                "server.py"
-            ],
-            "environment": {
-                "FB_ACCESS_TOKEN": "REPLACE_WITH_YOUR_ACCESS_TOKEN",
-                "FB_APP_ID": "REPLACE_WITH_YOUR_APP_ID",
-                "FB_APP_SECRET": "REPLACE_WITH_YOUR_APP_SECRET",
-                "FB_PAGE_ID": "REPLACE_WITH_YOUR_PAGE_ID",
-                "FB_AD_ACCOUNT_ID": "act_REPLACE_WITH_YOUR_AD_ACCOUNT_ID",
-                "FB_IG_USER_ID": "REPLACE_WITH_YOUR_IG_USER_ID",
-                "FB_BUSINESS_ID": "REPLACE_WITH_YOUR_BUSINESS_ID",
-                "FB_MAX_CONCURRENT": "4"
-            }
+            "command": ["python", "server.py"],
+            "enabled": true,
+            "timeout": 120000
         }
     },
     "experimental": {
-        "mcp_timeout": 60000
+        "mcp_timeout": 120000
     }
 }
