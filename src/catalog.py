@@ -44,6 +44,7 @@ def register(mcp):
         ProductItem.Field.currency,
         ProductItem.Field.availability,
         ProductItem.Field.image_url,
+        "images",
         ProductItem.Field.url,
         ProductItem.Field.status,
         ProductItem.Field.product_catalog,
