@@ -11,8 +11,10 @@ def register(mcp):
     from facebook_business.adobjects.campaign import Campaign
 
     from src.helpers import handle_error, json_dumps, to_dict, write_guard
+    from src.throttle import concurrency_limit
 
     @mcp.tool()
+    @concurrency_limit()
     def list_adsets(campaign_id: str = "", limit: int = 25) -> str:
         """قائمة المجموعات الإعلانية (يمكن تحديد حملة معينة)."""
         try:
@@ -38,6 +40,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_adsets"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_adset(adset_id: str) -> str:
         """تفاصيل مجموعة إعلانية واحدة."""
         try:
@@ -62,11 +65,12 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_adset"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def create_adset(
         campaign_id: str,
         name: str,
-        daily_budget: int = 1000,
+        daily_budget: int = 0,
         optimization_goal: str = "LINK_CLICKS",
         billing_event: str = "IMPRESSIONS",
         targeting: str = "",
@@ -87,13 +91,14 @@ def register(mcp):
             account = AdAccount(AD_ACCOUNT_ID)
             params = {
                 AdSet.Field.name: name,
-                AdSet.Field.daily_budget: daily_budget,
                 AdSet.Field.optimization_goal: optimization_goal,
                 AdSet.Field.billing_event: billing_event,
                 AdSet.Field.targeting: targeting,
                 AdSet.Field.status: status,
                 "campaign_id": campaign_id,
             }
+            if daily_budget and daily_budget > 0:
+                params[AdSet.Field.daily_budget] = daily_budget
             if bid_amount and bid_amount > 0:
                 params[AdSet.Field.bid_strategy] = "LOWEST_COST_WITH_BID_CAP"
                 params[AdSet.Field.bid_amount] = bid_amount
@@ -105,6 +110,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "create_adset"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def update_adset_status(adset_id: str, status: str) -> str:
         """تغيير حالة مجموعة إعلانية (ACTIVE, PAUSED, DELETED, ARCHIVED)."""
@@ -116,6 +122,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "update_adset_status"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def update_adset_budget(adset_id: str, daily_budget: int = 0, lifetime_budget: int = 0) -> str:
         """تعديل ميزانية مجموعة إعلانية (بالعملة الصغرى)."""
@@ -134,6 +141,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "update_adset_budget"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def update_adset_targeting(adset_id: str, targeting: str) -> str:
         """

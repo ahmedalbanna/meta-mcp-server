@@ -20,6 +20,7 @@ from src import (
     catalog,
     creatives,
     discovery,
+    events,
     finance,
     insights,
     instagram,
@@ -82,6 +83,7 @@ def main() -> None:
         business,
         creatives,
         whatsapp,
+        events,
         resources_prompts,
     ):
         module.register(mcp)

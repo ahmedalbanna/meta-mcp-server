@@ -8,8 +8,10 @@ def register(mcp):
     from facebook_business.adobjects.campaign import Campaign
 
     from src.helpers import handle_error, json_dumps, to_dict, write_guard
+    from src.throttle import concurrency_limit
 
     @mcp.tool()
+    @concurrency_limit()
     def list_campaigns(status: str = "", limit: int = 25) -> str:
         """
         قائمة الحملات الإعلانية في الحساب.
@@ -39,6 +41,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_campaigns"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_campaign(campaign_id: str) -> str:
         """تفاصيل حملة واحدة."""
         try:
@@ -60,6 +63,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_campaign"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def create_campaign(
         name: str,
@@ -81,6 +85,7 @@ def register(mcp):
                 Campaign.Field.objective: objective,
                 Campaign.Field.status: status,
                 Campaign.Field.special_ad_categories: [],
+                "is_adset_budget_sharing_enabled": False,
             }
             if daily_budget and daily_budget > 0:
                 params[Campaign.Field.daily_budget] = daily_budget
@@ -94,6 +99,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "create_campaign"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def update_campaign_status(campaign_id: str, status: str) -> str:
         """
@@ -110,6 +116,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "update_campaign_status"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def update_campaign_budget(campaign_id: str, daily_budget: int = 0, lifetime_budget: int = 0) -> str:
         """تعديل ميزانية حملة (بالعملة الصغرى)."""
@@ -128,6 +135,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "update_campaign_budget"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def delete_campaign(campaign_id: str) -> str:
         """حذف حملة نهائيًا."""

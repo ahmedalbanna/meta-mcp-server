@@ -14,6 +14,7 @@ def register(mcp):
     from facebook_business.adobjects.advideo import AdVideo
 
     from src.helpers import handle_error, json_dumps, sanitize_path, to_dict, write_guard
+    from src.throttle import concurrency_limit
 
     def _build_object_story_spec(
         page_id: str,
@@ -45,6 +46,7 @@ def register(mcp):
         return {"page_id": page_id, story_key: {**media, "message": message}}
 
     @mcp.tool()
+    @concurrency_limit()
     def list_ads(adset_id: str = "", limit: int = 25) -> str:
         """قائمة الإعلانات (يمكن تحديد مجموعة إعلانية معينة)."""
         try:
@@ -68,6 +70,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_ads"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_ad(ad_id: str) -> str:
         """تفاصيل إعلان واحد."""
         try:
@@ -87,6 +90,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_ad"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def update_ad_status(ad_id: str, status: str) -> str:
         """تغيير حالة إعلان (ACTIVE, PAUSED, DELETED, ARCHIVED)."""
@@ -98,6 +102,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "update_ad_status"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def upload_image(name: str = "", image_url: str = "", file_path: str = "") -> str:
         """
@@ -134,6 +139,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "upload_image"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def upload_video(title: str = "", file_path: str = "", video_url: str = "") -> str:
         """
@@ -163,6 +169,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "upload_video"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def create_ad_creative(
         name: str,
@@ -195,6 +202,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "create_ad_creative"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def create_ad(
         adset_id: str,

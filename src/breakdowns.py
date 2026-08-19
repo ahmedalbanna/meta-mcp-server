@@ -42,6 +42,7 @@ def register(mcp):
     from facebook_business.adobjects.campaign import Campaign
 
     from src.helpers import handle_error, json_dumps, to_dict
+    from src.throttle import concurrency_limit
 
     def _validate(preset: str, metrics: str, breakdown: str) -> tuple:
         if preset not in DATE_PRESETS:
@@ -83,6 +84,7 @@ def register(mcp):
         return json_dumps({"data": rows, "count": len(rows)})
 
     @mcp.tool()
+    @concurrency_limit()
     def get_account_insights_breakdown(
         breakdown: str = "age,gender",
         date_preset: str = "last_30d",
@@ -108,6 +110,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_account_insights_breakdown"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_campaign_insights_breakdown(
         campaign_id: str,
         breakdown: str = "age,gender",
@@ -130,6 +133,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_campaign_insights_breakdown"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_adset_insights_breakdown(
         adset_id: str,
         breakdown: str = "age,gender",
@@ -152,6 +156,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_adset_insights_breakdown"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_ad_insights_breakdown(
         ad_id: str,
         breakdown: str = "age,gender",

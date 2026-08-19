@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ /app/src/
 COPY .env* /app/
 COPY server.py /app/
+COPY webhook_server.py /app/
 
 # Run the server with streamable-http transport for Docker connectivity
 CMD ["python", "/app/server.py"]

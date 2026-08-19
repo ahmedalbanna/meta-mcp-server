@@ -2,6 +2,7 @@
 
 from src.config import PAGE_ID
 from src.helpers import get_page_api, handle_error, json_dumps, to_dict, write_guard
+from src.throttle import concurrency_limit
 from src.utils import paginate
 
 LEAD_FORM_FIELDS = [
@@ -41,6 +42,7 @@ def register(mcp):
         return Page(node_id or PAGE_ID, api=get_page_api())
 
     @mcp.tool()
+    @concurrency_limit()
     def list_lead_gen_forms(page_id: str = "", limit: int = 25) -> str:
         """قائمة نماذج جذب العملاء (Lead Gen Forms) على الصفحة."""
         try:
@@ -54,6 +56,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_lead_gen_forms"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_lead_gen_form(form_id: str) -> str:
         """تفاصيل نموذج جذب عملاء واحد (الأسئلة، الإخلاء القانوني، الصفحة...)."""
         try:
@@ -79,6 +82,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_lead_gen_form"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_form_leads(form_id: str, limit: int = 25) -> str:
         """الرصاصات (Leads) المسجّلة عبر نموذج جذب عملاء معيّن."""
         try:
@@ -92,6 +96,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_form_leads"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_lead(lead_id: str) -> str:
         """تفاصيل رصاصة واحدة (إجابات الحقول: الاسم، الهاتف، البريد...)."""
         try:
@@ -101,6 +106,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_lead"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def create_lead_gen_form(
         name: str,

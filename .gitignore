@@ -19,4 +19,3 @@ output/
 .ipynb_checkpoints/
 .pytest_cache/
 media/*
-opencode.json

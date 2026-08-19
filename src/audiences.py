@@ -12,6 +12,7 @@ def register(mcp):
     from facebook_business.adobjects.customaudience import CustomAudience
 
     from src.helpers import handle_error, json_dumps, to_dict, write_guard
+    from src.throttle import concurrency_limit
 
     def _split(items: str) -> list:
         return [i.strip() for i in (items or "").split(",") if i.strip()]
@@ -42,6 +43,7 @@ def register(mcp):
         return schema, users
 
     @mcp.tool()
+    @concurrency_limit()
     def list_custom_audiences(limit: int = 25) -> str:
         """قائمة الجماهير المخصصة في الحساب."""
         try:
@@ -62,6 +64,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_custom_audiences"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def create_custom_audience(name: str, description: str = "") -> str:
         """إنشاء جمهور مخصص جديد."""
@@ -79,6 +82,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "create_custom_audience"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def add_users_to_custom_audience(
         audience_id: str,
@@ -111,6 +115,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "add_users_to_custom_audience"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def remove_users_from_custom_audience(
         audience_id: str,
@@ -139,6 +144,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "remove_users_from_custom_audience"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def upload_custom_audience_csv(
         audience_id: str,
@@ -214,6 +220,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "upload_custom_audience_csv"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def create_lookalike_audience(
         source_audience_id: str = "",

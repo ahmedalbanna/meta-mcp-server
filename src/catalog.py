@@ -15,6 +15,7 @@ def register(mcp):
     from facebook_business.adobjects.productset import ProductSet
 
     from src.helpers import api_call, handle_error, json_dumps, to_dict, write_guard
+    from src.throttle import concurrency_limit
     from src.utils import paginate
 
     CATALOG_FIELDS = [
@@ -59,6 +60,7 @@ def register(mcp):
     # ------------------------------------------------------------------
 
     @mcp.tool()
+    @concurrency_limit()
     def list_catalogs(business_id: str = "", limit: int = 25) -> str:
         """قائمة كتالوجات المنتجات التابعة لنشاط تجاري."""
         try:
@@ -75,6 +77,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_catalogs"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_catalog(catalog_id: str) -> str:
         """تفاصيل كتالوج واحد."""
         try:
@@ -84,6 +87,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_catalog"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_catalog_settings(catalog_id: str) -> str:
         """إعدادات الكتالوج (الصور الافتراضية، المتجر، الفئات...)."""
         try:
@@ -105,6 +109,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_catalog_settings"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def create_catalog(name: str, business_id: str = "") -> str:
         """إنشاء كتالوج منتجات جديد."""
@@ -120,6 +125,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "create_catalog"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def delete_catalog(catalog_id: str) -> str:
         """حذف كتالوج نهائيًا."""
@@ -134,6 +140,7 @@ def register(mcp):
     # ------------------------------------------------------------------
 
     @mcp.tool()
+    @concurrency_limit()
     def list_product_sets(catalog_id: str, limit: int = 25) -> str:
         """قائمة مجموعات المنتجات داخل كتالوج."""
         try:
@@ -147,6 +154,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_product_sets"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_product_set(product_set_id: str) -> str:
         """تفاصيل مجموعة منتجات (تتضمن فلتر الاختيار)."""
         try:
@@ -156,6 +164,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_product_set"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def create_product_set(catalog_id: str, name: str, filters_json: str = "") -> str:
         """
@@ -173,6 +182,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "create_product_set"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def delete_product_set(product_set_id: str) -> str:
         """حذف مجموعة منتجات."""
@@ -187,6 +197,7 @@ def register(mcp):
     # ------------------------------------------------------------------
 
     @mcp.tool()
+    @concurrency_limit()
     def list_products(catalog_id: str, limit: int = 25, filter: str = "") -> str:
         """قائمة المنتجات في كتالوج (يمكن إضافة فلتر JSON)."""
         try:
@@ -201,6 +212,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_products"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_product(product_id: str) -> str:
         """تفاصيل منتج واحد."""
         try:
@@ -210,6 +222,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_product"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def create_product(
         catalog_id: str,
@@ -236,7 +249,7 @@ def register(mcp):
         try:
             params = {
                 ProductItem.Field.name: name,
-                ProductItem.Field.price: str(price),
+                ProductItem.Field.price: str(int(price)) if price else "0",
                 ProductItem.Field.currency: currency,
             }
             optional = {
@@ -261,6 +274,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "create_product"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def update_product(
         product_id: str,
@@ -302,9 +316,9 @@ def register(mcp):
                 if val:
                     params[field] = val
             if price:
-                params[ProductItem.Field.price] = str(price)
+                params[ProductItem.Field.price] = str(int(price))
             if sale_price:
-                params[ProductItem.Field.sale_price] = str(sale_price)
+                params[ProductItem.Field.sale_price] = str(int(sale_price))
             if not params:
                 return json_dumps({"error": "حدد حقلًا واحدًا على الأقل للتعديل"})
             result = ProductItem(product_id).api_update(params=params)
@@ -313,6 +327,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "update_product"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def delete_product(product_id: str) -> str:
         """حذف منتج من الكتالوج."""
@@ -323,6 +338,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "delete_product"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def batch_create_products(catalog_id: str, items_json: str) -> str:
         """
@@ -346,6 +362,7 @@ def register(mcp):
     # ------------------------------------------------------------------
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def create_product_feed(
         catalog_id: str,
@@ -376,6 +393,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "create_product_feed"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_feed_uploads(feed_id: str, limit: int = 25) -> str:
         """حالة رفع الخلاصة الأخيرة (أخطاء/تحديثات/حذف)."""
         try:
@@ -399,6 +417,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_feed_uploads"))
 
     @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def delete_product_feed(feed_id: str) -> str:
         """حذف خلاصة منتجات."""
@@ -413,6 +432,7 @@ def register(mcp):
     # ------------------------------------------------------------------
 
     @mcp.tool()
+    @concurrency_limit()
     def get_commerce_merchant_settings(business_id: str = "") -> str:
         """إعدادات التجارة (المتجر) المرتبطة بنشاط تجاري."""
         try:
@@ -438,6 +458,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_commerce_merchant_settings"))
 
     @mcp.tool()
+    @concurrency_limit()
     def list_commerce_orders(commerce_account_id: str = "", limit: int = 25) -> str:
         """قائمة طلبات المتجر (يتطلب Commerce Account ID)."""
         try:
@@ -463,6 +484,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "list_commerce_orders"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_commerce_order(order_id: str) -> str:
         """تفاصيل طلب واحد (منتجات، عنوان شحن، حالة)."""
         try:
@@ -485,6 +507,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_commerce_order"))
 
     @mcp.tool()
+    @concurrency_limit()
     def get_catalog_insights(catalog_id: str, metrics: str = "", date_preset: str = "last_30d") -> str:
         """
         تحليلات الكتالوج (مقاييس الأداء).

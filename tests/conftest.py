@@ -4,8 +4,10 @@ The mock_meta_sdk fixture replaces the facebook-business SDK classes and the
 raw-call helpers with stdlib MagicMocks, so every tool can be exercised offline.
 """
 
-import pytest
+from contextlib import ExitStack
 from unittest import mock
+
+import pytest
 
 # Classes that tools instantiate inside register() — replaced with MagicMock.
 SDK_CLASSES = [
@@ -32,51 +34,53 @@ SDK_CLASSES = [
 ]
 
 
+def _fake_to_dict(obj):
+    """Convert mocked SDK objects to a plain dict for JSON serialisation."""
+    if isinstance(obj, dict):
+        return obj
+    try:
+        data = obj.export_all_data()
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return {"id": "123", "mocked": True}
+
+
+# Paths that need to_dict patched (each module imports to_dict independently).
+_TO_DICT_PATHS = [
+    "src.helpers",
+    "src.automation",
+    "src.finance",
+    "src.pages",
+    "src.resources_prompts",
+    "src.business",
+]
+
+
 @pytest.fixture
 def mock_meta_sdk():
-    def fake_to_dict(obj):
-        """Convert mocked SDK objects to a plain dict for JSON serialisation."""
-        if isinstance(obj, dict):
-            return obj
-        try:
-            data = obj.export_all_data()
-            if isinstance(data, dict):
-                return data
-        except Exception:
-            pass
-        return {"id": "123", "mocked": True}
-
-    with mock.patch.multiple(
-        "facebook_business.api.FacebookAdsApi",
-        init=mock.DEFAULT,
-        get_default_api=mock.DEFAULT,
-    ) as api_mocks:
-        with mock.patch(
-            "src.helpers.api_call", return_value={"data": [], "paging": {}}
-        ):
-            with mock.patch("src.helpers.page_api_call", return_value={"data": []}):
-                with mock.patch("src.helpers.to_dict", new=fake_to_dict):
-                    with mock.patch("src.automation.to_dict", new=fake_to_dict):
-                        with mock.patch("src.finance.to_dict", new=fake_to_dict):
-                            with mock.patch("src.pages.to_dict", new=fake_to_dict):
-                                with mock.patch(
-                                    "src.resources_prompts.to_dict", new=fake_to_dict
-                                ):
-                                    with mock.patch(
-                                        "src.business.to_dict", new=fake_to_dict
-                                    ):
-                                        with mock.patch(
-                                            "src.helpers.get_page_api"
-                                        ) as page_api:
-                                            with mock.patch(
-                                                "src.instagram.requests"
-                                            ) as requests_mock:
-                                                for path in SDK_CLASSES:
-                                                    mock.patch(path).start()
-                                                try:
-                                                    yield api_mocks
-                                                finally:
-                                                    mock.patch.stopall()
+    with ExitStack() as stack:
+        stack.enter_context(
+            mock.patch.multiple(
+                "facebook_business.api.FacebookAdsApi",
+                init=mock.DEFAULT,
+                get_default_api=mock.DEFAULT,
+            )
+        )
+        stack.enter_context(
+            mock.patch("src.helpers.api_call", return_value={"data": [], "paging": {}})
+        )
+        stack.enter_context(
+            mock.patch("src.helpers.page_api_call", return_value={"data": []})
+        )
+        for mod_path in _TO_DICT_PATHS:
+            stack.enter_context(mock.patch(f"{mod_path}.to_dict", new=_fake_to_dict))
+        stack.enter_context(mock.patch("src.helpers.get_page_api"))
+        stack.enter_context(mock.patch("src.instagram.requests"))
+        for path in SDK_CLASSES:
+            stack.enter_context(mock.patch(path))
+        yield
 
 
 @pytest.fixture
@@ -87,82 +91,42 @@ def mock_meta_sdk_recorded():
     imported them via `from src.helpers import ...`), so the recorded calls
     reflect the real request params/URLs the tools build.
     """
-
-    def fake_to_dict(obj):
-        if isinstance(obj, dict):
-            return obj
-        try:
-            data = obj.export_all_data()
-            if isinstance(data, dict):
-                return data
-        except Exception:
-            pass
-        return {"id": "123", "mocked": True}
-
     api_call = mock.MagicMock(return_value={"data": [], "paging": {}})
     page_api_call = mock.MagicMock(return_value={"data": []})
-    with mock.patch.multiple(
-        "facebook_business.api.FacebookAdsApi",
-        init=mock.DEFAULT,
-        get_default_api=mock.DEFAULT,
-    ):
-        with mock.patch("src.helpers.api_call", new=api_call):
-            with mock.patch("src.helpers.page_api_call", new=page_api_call):
-                with mock.patch("src.whatsapp.api_call", new=api_call):
-                    with mock.patch("src.finance.api_call", new=api_call):
-                        with mock.patch("src.instagram.api_call", new=api_call):
-                            with mock.patch("src.discovery.api_call", new=api_call):
-                                with mock.patch(
-                                    "src.messenger.page_api_call",
-                                    new=page_api_call,
-                                ):
-                                    with mock.patch(
-                                        "src.pages.page_api_call",
-                                        new=page_api_call,
-                                    ):
-                                        with mock.patch(
-                                            "src.helpers.to_dict",
-                                            new=fake_to_dict,
-                                        ):
-                                            with mock.patch(
-                                                "src.automation.to_dict",
-                                                new=fake_to_dict,
-                                            ):
-                                                with mock.patch(
-                                                    "src.finance.to_dict",
-                                                    new=fake_to_dict,
-                                                ):
-                                                    with mock.patch(
-                                                        "src.pages.to_dict",
-                                                        new=fake_to_dict,
-                                                    ):
-                                                        with mock.patch(
-                                                            "src.resources_prompts.to_dict",
-                                                            new=fake_to_dict,
-                                                        ):
-                                                            with mock.patch(
-                                                                "src.business.to_dict",
-                                                                new=fake_to_dict,
-                                                            ):
-                                                                with mock.patch(
-                                                                    "src.helpers.get_page_api"
-                                                                ):
-                                                                    with mock.patch(
-                                                                        "src.instagram.requests"
-                                                                    ):
-                                                                        for path in (
-                                                                            SDK_CLASSES
-                                                                        ):
-                                                                            mock.patch(
-                                                                                path
-                                                                            ).start()
-                                                                        try:
-                                                                            yield {
-                                                                                "api_call": api_call,
-                                                                                "page_api_call": page_api_call,
-                                                                            }
-                                                                        finally:
-                                                                            mock.patch.stopall()
+
+    # Modules that import api_call and/or page_api_call at module level.
+    api_call_patches = [
+        "src.helpers.api_call",
+        "src.whatsapp.api_call",
+        "src.finance.api_call",
+        "src.instagram.api_call",
+        "src.discovery.api_call",
+    ]
+    page_api_call_patches = [
+        "src.helpers.page_api_call",
+        "src.messenger.page_api_call",
+        "src.pages.page_api_call",
+    ]
+
+    with ExitStack() as stack:
+        stack.enter_context(
+            mock.patch.multiple(
+                "facebook_business.api.FacebookAdsApi",
+                init=mock.DEFAULT,
+                get_default_api=mock.DEFAULT,
+            )
+        )
+        for p in api_call_patches:
+            stack.enter_context(mock.patch(p, new=api_call))
+        for p in page_api_call_patches:
+            stack.enter_context(mock.patch(p, new=page_api_call))
+        for mod_path in _TO_DICT_PATHS:
+            stack.enter_context(mock.patch(f"{mod_path}.to_dict", new=_fake_to_dict))
+        stack.enter_context(mock.patch("src.helpers.get_page_api"))
+        stack.enter_context(mock.patch("src.instagram.requests"))
+        for path in SDK_CLASSES:
+            stack.enter_context(mock.patch(path))
+        yield {"api_call": api_call, "page_api_call": page_api_call}
 
 
 class Recorder:
@@ -214,6 +178,7 @@ ALL_MODULES = (
     "catalog",
     "business",
     "creatives",
+    "events",
     "resources_prompts",
 )
 
@@ -234,6 +199,7 @@ def register_all(recorder):
         catalog,
         creatives,
         discovery,
+        events,
         finance,
         insights,
         instagram,
@@ -245,27 +211,28 @@ def register_all(recorder):
         whatsapp,
     )
 
+    module_map = {
+        "ads": ads,
+        "adsets": adsets,
+        "audiences": audiences,
+        "automation": automation,
+        "breakdowns": breakdowns,
+        "business": business,
+        "campaigns": campaigns,
+        "catalog": catalog,
+        "creatives": creatives,
+        "discovery": discovery,
+        "events": events,
+        "finance": finance,
+        "insights": insights,
+        "instagram": instagram,
+        "leads": leads,
+        "messenger": messenger,
+        "pages": pages,
+        "reports": reports,
+        "resources_prompts": resources_prompts,
+        "whatsapp": whatsapp,
+    }
     for name in ALL_MODULES:
-        module = {
-            "ads": ads,
-            "adsets": adsets,
-            "audiences": audiences,
-            "automation": automation,
-            "breakdowns": breakdowns,
-            "business": business,
-            "campaigns": campaigns,
-            "catalog": catalog,
-            "creatives": creatives,
-            "discovery": discovery,
-            "finance": finance,
-            "insights": insights,
-            "instagram": instagram,
-            "leads": leads,
-            "messenger": messenger,
-            "pages": pages,
-            "reports": reports,
-            "resources_prompts": resources_prompts,
-            "whatsapp": whatsapp,
-        }[name]
-        module.register(recorder)
+        module_map[name].register(recorder)
     return recorder

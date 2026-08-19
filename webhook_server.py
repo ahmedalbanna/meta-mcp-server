@@ -88,6 +88,11 @@ async def webhook_receive(request: Request):
     try:
         saved = save_webhook_event(payload)
         log.info("استُلم حدث Webhook وحُفظ في %s", saved)
+        try:
+            from src.events import push_webhook_event
+            push_webhook_event(payload)
+        except Exception:
+            pass
         return {"received": True, "saved": saved}
     except Exception as e:
         log.error("فشل حفظ حدث Webhook: %s", e)

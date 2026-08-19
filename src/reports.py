@@ -78,6 +78,7 @@ def register(mcp):
     from facebook_business.adobjects.adaccount import AdAccount
 
     from src.helpers import handle_error, json_dumps, sanitize_filename
+    from src.throttle import concurrency_limit
 
     ensure_report_dir()
 
@@ -96,6 +97,7 @@ def register(mcp):
         return rows
 
     @mcp.tool()
+    @concurrency_limit()
     def generate_campaign_report(
         date_preset: str = "last_30d",
         metrics: str = ",".join(DEFAULT_METRICS),
@@ -134,6 +136,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "generate_campaign_report"))
 
     @mcp.tool()
+    @concurrency_limit()
     def account_summary(date_preset: str = "last_30d") -> str:
         """ملخص أداء الحساب الإعلاني خلال فترة."""
         try:
@@ -160,6 +163,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "account_summary"))
 
     @mcp.tool()
+    @concurrency_limit()
     def generate_instagram_report(
         limit: int = 25,
         format: str = "csv",
@@ -240,6 +244,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "generate_instagram_report"))
 
     @mcp.tool()
+    @concurrency_limit()
     def generate_page_report(
         format: str = "csv",
         filename: str = "",
