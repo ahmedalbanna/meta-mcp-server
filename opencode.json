@@ -8,23 +8,6 @@
             "timeout": 120000
         }
     },
-    "agent": {
-        "meta-expert": {
-            "description": "Meta Marketing API specialist. Manages Facebook/Instagram ads, catalogs, campaigns, and audiences.",
-            "mode": "subagent",
-            "model": "anthropic/claude-sonnet-4-6"
-        },
-        "content-creator": {
-            "description": "Instagram and Facebook content creator. Creates posts, schedules content, manages content calendar.",
-            "mode": "subagent",
-            "model": "anthropic/claude-sonnet-4-6"
-        },
-        "analytics": {
-            "description": "Performance analytics agent. Analyzes Instagram insights, campaign metrics, and generates reports.",
-            "mode": "subagent",
-            "model": "anthropic/claude-sonnet-4-6"
-        }
-    },
     "command": {
         "products": { "description": "List and manage catalog products" },
         "campaigns": { "description": "Manage ad campaigns" },
