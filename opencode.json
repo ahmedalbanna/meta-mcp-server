@@ -8,14 +8,6 @@
             "timeout": 120000
         }
     },
-    "command": {
-        "products": { "description": "List and manage catalog products" },
-        "campaigns": { "description": "Manage ad campaigns" },
-        "schedule": { "description": "Schedule Facebook posts" },
-        "analytics": { "description": "Get Instagram and campaign analytics" },
-        "competitors": { "description": "Run competitor analysis" },
-        "product": { "description": "Quick product actions (add, update, delete)" }
-    },
     "experimental": {
         "mcp_timeout": 120000
     }
