@@ -41,6 +41,7 @@ def register(mcp):
 
     from src.helpers import handle_error, json_dumps, to_dict
     from src.throttle import concurrency_limit
+    from src.utils import cached
 
     def _validate(preset: str, metrics: str) -> list:
         if preset not in DATE_PRESETS:
@@ -54,6 +55,7 @@ def register(mcp):
         return json_dumps({"data": rows, "count": len(rows)})
 
     @mcp.tool()
+    @cached(ttl=60.0)
     @concurrency_limit()
     def get_account_insights(date_preset: str = "last_30d", metrics: str = ",".join(DEFAULT_METRICS)) -> str:
         """تحليلات على مستوى الحساب الإعلاني."""
@@ -66,6 +68,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_account_insights"))
 
     @mcp.tool()
+    @cached(ttl=60.0)
     @concurrency_limit()
     def get_campaign_insights(
         campaign_id: str,
@@ -81,6 +84,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_campaign_insights"))
 
     @mcp.tool()
+    @cached(ttl=60.0)
     @concurrency_limit()
     def get_adset_insights(
         adset_id: str,
@@ -96,6 +100,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_adset_insights"))
 
     @mcp.tool()
+    @cached(ttl=60.0)
     @concurrency_limit()
     def get_ad_insights(
         ad_id: str,
@@ -111,6 +116,7 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_ad_insights"))
 
     @mcp.tool()
+    @cached(ttl=60.0)
     @concurrency_limit()
     def get_account_insights_trend(
         date_preset: str = "last_30d",

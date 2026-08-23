@@ -11,6 +11,8 @@ __pycache__/
 # Generated reports
 reports/
 output/
+.coverage
+htmlcov/
 
 # OS / editor
 .DS_Store

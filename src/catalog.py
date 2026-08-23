@@ -348,16 +348,35 @@ def register(mcp):
     @write_guard
     def batch_create_products(catalog_id: str, items_json: str) -> str:
         """
-        إنشاء عدة منتجات دفعة واحدة عبر Batch API.
+        إنشاء عدة منتجات دفعة واحدة عبر Batch API (يدعم حتى 1000 منتج، مقسم تلقائيًا).
         items_json: مصفوفة JSON من عناصر المنتج، مثال:
         [{"name":"قميص","price":"49.99","currency":"USD","availability":"in stock"}]
+        يُقسم تلقائيًا إلى دفعات 500 عنصر (حد Batch API) مع تجميع النتائج.
         """
         try:
             items = _json.loads(items_json)
             if not isinstance(items, list):
                 return json_dumps({"error": "items_json يجب أن يكون مصفوفة JSON"})
-            result = ProductCatalog(catalog_id).create_items_batch(params={"items": _json.dumps(items)})
-            return json_dumps({"success": True, "batch": to_dict(result), "count": len(items)})
+            if not items:
+                return json_dumps({"error": "items_json فارغ"})
+            if len(items) > 1000:
+                return json_dumps({"error": f"الحد الأقصى 1000 منتج (تلقيت {len(items)})"})
+            # Chunked Batch API (Phase 6.2): 500 per batch (Meta limit ~100-500)
+            CHUNK = 500
+            batches = []
+            total = len(items)
+            for i in range(0, total, CHUNK):
+                chunk = items[i : i + CHUNK]
+                result = ProductCatalog(catalog_id).create_items_batch(params={"items": _json.dumps(chunk)})
+                batches.append(to_dict(result) if result else {"chunk": i // CHUNK + 1, "count": len(chunk)})
+            return json_dumps(
+                {
+                    "success": True,
+                    "chunks": len(batches),
+                    "count": total,
+                    "batches": batches,
+                }
+            )
         except Exception as e:
             return json_dumps(handle_error(e, "batch_create_products"))
 

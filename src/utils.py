@@ -93,10 +93,12 @@ def paginate(
     fields: list[str] | None = None,
     params: dict | None = None,
     limit: int = 25,
-    max_pages: int = 10,
+    max_pages: int | None = 10,
 ) -> list[dict]:
-    """Walk an entire edge via cursor-based pagination.
+    """Walk an entire edge via cursor-based pagination (adaptive).
 
+    - max_pages=None → paginate until no `after` cursor (adaptive, capped at 100 pages for safety)
+    - max_pages=int → bounded paginate (Phase 6.1)
     getter is called as getter(params={...}) and must return either a raw dict
     with a "data"/"paging" shape or an SDK collection exposing get_cursors().
     """
@@ -105,8 +107,10 @@ def paginate(
         batch["fields"] = fields
     batch["limit"] = limit
 
+    # Adaptive: None = unlimited until cursor exhausted, capped at 100
+    effective_max = 100 if max_pages is None else max_pages
     out: list[dict] = []
-    for _ in range(max_pages):
+    for _ in range(effective_max):
         try:
             result = getter(params=batch)
         except Exception:
@@ -114,6 +118,9 @@ def paginate(
         items, after = _extract_batch(result)
         out.extend(items)
         if not after:
+            break
+        # Stop early if API returned fewer than limit (last page) and no cursor
+        if len(items) < limit and not after:
             break
         batch["after"] = after
     return out
