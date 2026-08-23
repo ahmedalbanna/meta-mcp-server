@@ -118,9 +118,7 @@ def register(mcp):
             bid = _require_business_id(business_id)
             if not bid:
                 return json_dumps({"error": "حدد FB_BUSINESS_ID في .env أو مرّر business_id"})
-            catalog = Business(bid).create_owned_product_catalog(
-                params={ProductCatalog.Field.name: name}
-            )
+            catalog = Business(bid).create_owned_product_catalog(params={ProductCatalog.Field.name: name})
             return json_dumps(to_dict(catalog))
         except Exception as e:
             return json_dumps(handle_error(e, "create_catalog"))
@@ -202,6 +200,7 @@ def register(mcp):
     def list_products(catalog_id: str, limit: int = 25, filter: str = "") -> str:
         """قائمة المنتجات في كتالوج (يمكن إضافة فلتر JSON)."""
         try:
+
             def getter(params):
                 if filter:
                     params["filter"] = filter
@@ -351,9 +350,7 @@ def register(mcp):
             items = _json.loads(items_json)
             if not isinstance(items, list):
                 return json_dumps({"error": "items_json يجب أن يكون مصفوفة JSON"})
-            result = ProductCatalog(catalog_id).create_items_batch(
-                params={"items": _json.dumps(items)}
-            )
+            result = ProductCatalog(catalog_id).create_items_batch(params={"items": _json.dumps(items)})
             return json_dumps({"success": True, "batch": to_dict(result), "count": len(items)})
         except Exception as e:
             return json_dumps(handle_error(e, "batch_create_products"))
@@ -533,10 +530,10 @@ def register(mcp):
         [{"product_id":"xxx","price":50.00,"name":"قميص جديد"},{"product_id":"yyy","availability":"out of stock"}]
         """
         try:
-            updates = json.loads(updates_json)
+            updates = _json.loads(updates_json)
             if not isinstance(updates, list):
                 return json_dumps({"error": "updates_json يجب أن يكون مصفوفة"})
-            results = []
+            results: list[dict[str, object]] = []
             for item in updates:
                 pid = item.pop("product_id", None)
                 if not pid:

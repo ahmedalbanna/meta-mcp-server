@@ -1,6 +1,4 @@
-from pathlib import Path
-
-from src.config import AD_ACCOUNT_ID
+from src.config import AD_ACCOUNT_ID, BASE_DIR
 
 
 def register(mcp):
@@ -27,7 +25,7 @@ def register(mcp):
         call_to_action: str = "",
     ) -> dict:
         """Build an object_story_spec dict for ad creative creation."""
-        media = {}
+        media: dict[str, object] = {}
         if image_hash:
             media["image_hash"] = image_hash
         elif image_url:
@@ -122,7 +120,8 @@ def register(mcp):
                 params[AdImage.Field.url] = image_url
             if file_path:
                 try:
-                    resolved = sanitize_path(file_path, Path.cwd())
+                    # Scope file access to BASE_DIR/media to prevent traversal outside project
+                    resolved = sanitize_path(file_path, BASE_DIR)
                 except ValueError as e:
                     return json_dumps({"error": f"مسار غير صالح: {e}"})
                 if not resolved.is_file():
@@ -157,7 +156,7 @@ def register(mcp):
             params = {}
             if file_path:
                 try:
-                    resolved = sanitize_path(file_path, Path.cwd())
+                    resolved = sanitize_path(file_path, BASE_DIR)
                 except ValueError as e:
                     return json_dumps({"error": f"مسار غير صالح: {e}"})
                 if not resolved.is_file():

@@ -40,9 +40,7 @@ def register(mcp):
 
     def _validate(preset: str, metrics: str) -> list:
         if preset not in DATE_PRESETS:
-            raise ValueError(
-                f"date_preset غير صالح. اختر من: {', '.join(DATE_PRESETS)}"
-            )
+            raise ValueError(f"date_preset غير صالح. اختر من: {', '.join(DATE_PRESETS)}")
         return [m.strip() for m in metrics.split(",") if m.strip()]
 
     def _respond(insights) -> str:
@@ -53,16 +51,12 @@ def register(mcp):
 
     @mcp.tool()
     @concurrency_limit()
-    def get_account_insights(
-        date_preset: str = "last_30d", metrics: str = ",".join(DEFAULT_METRICS)
-    ) -> str:
+    def get_account_insights(date_preset: str = "last_30d", metrics: str = ",".join(DEFAULT_METRICS)) -> str:
         """تحليلات على مستوى الحساب الإعلاني."""
         try:
             fields = _validate(date_preset, metrics)
             account = AdAccount(AD_ACCOUNT_ID)
-            insights = account.get_insights(
-                params={"date_preset": date_preset, "fields": fields}
-            )
+            insights = account.get_insights(params={"date_preset": date_preset, "fields": fields})
             return _respond(insights)
         except Exception as e:
             return json_dumps(handle_error(e, "get_account_insights"))
@@ -77,9 +71,7 @@ def register(mcp):
         """تحليلات حملة معينة."""
         try:
             fields = _validate(date_preset, metrics)
-            insights = Campaign(campaign_id).get_insights(
-                params={"date_preset": date_preset, "fields": fields}
-            )
+            insights = Campaign(campaign_id).get_insights(params={"date_preset": date_preset, "fields": fields})
             return _respond(insights)
         except Exception as e:
             return json_dumps(handle_error(e, "get_campaign_insights"))
@@ -94,9 +86,7 @@ def register(mcp):
         """تحليلات مجموعة إعلانية معينة."""
         try:
             fields = _validate(date_preset, metrics)
-            insights = AdSet(adset_id).get_insights(
-                params={"date_preset": date_preset, "fields": fields}
-            )
+            insights = AdSet(adset_id).get_insights(params={"date_preset": date_preset, "fields": fields})
             return _respond(insights)
         except Exception as e:
             return json_dumps(handle_error(e, "get_adset_insights"))
@@ -111,9 +101,7 @@ def register(mcp):
         """تحليلات إعلان معين."""
         try:
             fields = _validate(date_preset, metrics)
-            insights = Ad(ad_id).get_insights(
-                params={"date_preset": date_preset, "fields": fields}
-            )
+            insights = Ad(ad_id).get_insights(params={"date_preset": date_preset, "fields": fields})
             return _respond(insights)
         except Exception as e:
             return json_dumps(handle_error(e, "get_ad_insights"))
@@ -147,11 +135,7 @@ def register(mcp):
                     "data": rows,
                     "count": len(rows),
                     "time_increment": time_increment,
-                    "period": "daily"
-                    if time_increment == 1
-                    else "weekly"
-                    if time_increment == 7
-                    else "total",
+                    "period": "daily" if time_increment == 1 else "weekly" if time_increment == 7 else "total",
                 }
             )
         except Exception as e:

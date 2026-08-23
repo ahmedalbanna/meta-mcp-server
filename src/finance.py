@@ -41,9 +41,7 @@ def register(mcp):
         """حدود الإنفاق الحالية للحساب الإعلاني."""
         try:
             account = AdAccount(AD_ACCOUNT_ID)
-            info = account.api_get(
-                fields=["spend_cap", "amount_spent", "balance", "currency"]
-            )
+            info = account.api_get(fields=["spend_cap", "amount_spent", "balance", "currency"])
             return json_dumps(to_dict(info))
         except Exception as e:
             return json_dumps(handle_error(e, "get_spend_cap"))
@@ -60,9 +58,7 @@ def register(mcp):
             account = AdAccount(AD_ACCOUNT_ID)
             params = {"spend_cap": spend_cap} if spend_cap > 0 else {"spend_cap": 0}
             result = account.api_update(params=params)
-            return json_dumps(
-                {"success": True, "spend_cap": spend_cap, "result": to_dict(result)}
-            )
+            return json_dumps({"success": True, "spend_cap": spend_cap, "result": to_dict(result)})
         except Exception as e:
             return json_dumps(handle_error(e, "update_spend_cap"))
 
@@ -137,9 +133,7 @@ def register(mcp):
         """المستخدمون المرتبطون بالحساب الإعلاني وصلاحياتهم."""
         try:
             account = AdAccount(AD_ACCOUNT_ID)
-            users = account.get_assigned_users(
-                params={"fields": ["name", "role", "tasks", "id"]}
-            )
+            users = account.get_assigned_users(params={"fields": ["name", "role", "tasks", "id"]})
             return json_dumps([to_dict(u) for u in users])
         except Exception as e:
             return json_dumps(handle_error(e, "list_account_users"))

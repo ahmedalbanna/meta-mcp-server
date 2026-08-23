@@ -9,9 +9,7 @@ from src.throttle import concurrency_limit
 
 MESSENGER_MAX_TEXT_LENGTH = 2000
 
-CONVERSATION_FIELDS = (
-    "id,updated_time,message_count,unread_count,participants,can_reply,last_used_tag"
-)
+CONVERSATION_FIELDS = "id,updated_time,message_count,unread_count,participants,can_reply,last_used_tag"
 MESSAGE_FIELDS = "id,message,created_time,from,to,sticker,attachments"
 
 
@@ -84,7 +82,9 @@ def register(mcp):
         """إرسال رد عبر Messenger إلى المستخدم الذي بدأ المحادثة."""
         try:
             if len(text) > MESSENGER_MAX_TEXT_LENGTH:
-                return json_dumps({"error": f"النص طويل جدًا ({len(text)} حرف). الحد الأقصى {MESSENGER_MAX_TEXT_LENGTH}."})
+                return json_dumps(
+                    {"error": f"النص طويل جدًا ({len(text)} حرف). الحد الأقصى {MESSENGER_MAX_TEXT_LENGTH}."}
+                )
             result = page_api_call(
                 "POST",
                 f"{_pid(page_id)}/messages",
@@ -119,9 +119,7 @@ def register(mcp):
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def set_messenger_typing(
-        recipient_id: str, typing: bool = True, page_id: str = ""
-    ) -> str:
+    def set_messenger_typing(recipient_id: str, typing: bool = True, page_id: str = "") -> str:
         """إرسال مؤشر الكتابة (typing_on/typing_off) داخل محادثة Messenger."""
         try:
             action = "typing_on" if typing else "typing_off"
@@ -133,8 +131,6 @@ def register(mcp):
                     "sender_action": action,
                 },
             )
-            return json_dumps(
-                {"recipient_id": recipient_id, "action": action, "result": result}
-            )
+            return json_dumps({"recipient_id": recipient_id, "action": action, "result": result})
         except Exception as e:
             return json_dumps(handle_error(e, "set_messenger_typing"))

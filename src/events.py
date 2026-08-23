@@ -4,6 +4,7 @@ Provides MCP tools to query received webhook events, and an in-memory event
 queue that the webhook server can push to for real-time processing.
 """
 
+import contextlib
 import json
 import logging
 import threading
@@ -39,10 +40,8 @@ def pop_queued_events(limit: int = 50) -> list[dict]:
     with _event_lock:
         events = list(_event_queue[-limit:])
         for e in events:
-            try:
+            with contextlib.suppress(ValueError):
                 _event_queue.remove(e)
-            except ValueError:
-                pass
         return events
 
 
@@ -86,10 +85,12 @@ def register(mcp):
                 for s in saved:
                     if s.get("id") not in existing_ids:
                         events.append(s)
-            return json_dumps({
-                "events": events[:limit],
-                "count": len(events[:limit]),
-            })
+            return json_dumps(
+                {
+                    "events": events[:limit],
+                    "count": len(events[:limit]),
+                }
+            )
         except Exception as e:
             return json_dumps({"error": str(e)})
 
@@ -102,10 +103,12 @@ def register(mcp):
         """
         try:
             events = pop_queued_events(limit)
-            return json_dumps({
-                "events": events,
-                "count": len(events),
-            })
+            return json_dumps(
+                {
+                    "events": events,
+                    "count": len(events),
+                }
+            )
         except Exception as e:
             return json_dumps({"error": str(e)})
 
@@ -117,10 +120,12 @@ def register(mcp):
             queue_count = len(_event_queue)
             webhook_dir = REPORT_DIR / "webhooks"
             file_count = len(list(webhook_dir.glob("event_*.json"))) if webhook_dir.exists() else 0
-            return json_dumps({
-                "queued": queue_count,
-                "saved_files": file_count,
-                "total": queue_count + file_count,
-            })
+            return json_dumps(
+                {
+                    "queued": queue_count,
+                    "saved_files": file_count,
+                    "total": queue_count + file_count,
+                }
+            )
         except Exception as e:
             return json_dumps({"error": str(e)})

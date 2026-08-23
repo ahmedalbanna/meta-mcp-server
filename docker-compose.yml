@@ -9,15 +9,27 @@ services:
     environment:
       - FB_ACCESS_TOKEN=${FB_ACCESS_TOKEN}
       - MCP_TRANSPORT=streamable-http
+      - FB_API_VERSION=${FB_API_VERSION:-v26.0}
       - FB_APP_ID=${FB_APP_ID}
       - FB_APP_SECRET=${FB_APP_SECRET}
       - FB_PAGE_ID=${FB_PAGE_ID}
       - FB_AD_ACCOUNT_ID=${FB_AD_ACCOUNT_ID}
+      - FB_IG_USER_ID=${FB_IG_USER_ID}
+      - FB_BUSINESS_ID=${FB_BUSINESS_ID}
+      - FB_COMMERCE_ACCOUNT_ID=${FB_COMMERCE_ACCOUNT_ID}
       - FB_WABA_ID=${FB_WABA_ID}
+      - FB_WHATSAPP_PHONE_NUMBER_ID=${FB_WHATSAPP_PHONE_NUMBER_ID}
       - FB_META_WEBHOOK_VERIFY_TOKEN=${FB_META_WEBHOOK_VERIFY_TOKEN}
+      - FB_WEBHOOK_PORT=${FB_WEBHOOK_PORT:-8080}
       - FB_ENABLE_WRITES=${FB_ENABLE_WRITES:-false}
       - FB_DRY_RUN=${FB_DRY_RUN:-false}
+      - FB_ADS_ALLOW_ACTIVATE=${FB_ADS_ALLOW_ACTIVATE:-false}
+      - FB_ADS_MAX_DAILY_BUDGET=${FB_ADS_MAX_DAILY_BUDGET:-0}
+      - FB_ADS_MAX_LIFETIME_BUDGET=${FB_ADS_MAX_LIFETIME_BUDGET:-0}
+      - FB_MAX_CONCURRENT=${FB_MAX_CONCURRENT:-4}
     volumes:
       - ./.env:/app/.env:ro
+      - ./reports:/app/reports
+      - ./media:/app/media:ro
     command: >
       python /app/server.py

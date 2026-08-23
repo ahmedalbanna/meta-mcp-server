@@ -41,6 +41,7 @@ def verify_signature(body: bytes, signature: str) -> bool:
     (e.g. local/dev runs) validation is skipped so the server still starts.
     """
     if not APP_SECRET:
+        log.warning("APP_SECRET غير مضبوط — تخطي التحقق من توقيع Webhook (وضع التطوير فقط)")
         return True
     if not signature:
         return False

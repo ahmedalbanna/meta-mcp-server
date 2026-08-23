@@ -123,9 +123,7 @@ def register(mcp):
         try:
             account = AdAccount(AD_ACCOUNT_ID)
             since = int(time.time()) - days * SECONDS_PER_DAY
-            history = account.get_ad_rules_history(
-                params={"start_time": since, "end_time": int(time.time())}
-            )
+            history = account.get_ad_rules_history(params={"start_time": since, "end_time": int(time.time())})
             return json_dumps([to_dict(h) for h in history])
         except Exception as e:
             return json_dumps(handle_error(e, "get_auto_rules_history"))

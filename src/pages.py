@@ -143,9 +143,7 @@ def register(mcp):
         try:
             from facebook_business.adobjects.post import Post
 
-            insights = Post(post_id, api=get_page_api()).get_insights(
-                params={"metric": metrics}
-            )
+            insights = Post(post_id, api=get_page_api()).get_insights(params={"metric": metrics})
             return json_dumps([to_dict(i) for i in insights])
         except Exception as e:
             return json_dumps(handle_error(e, "get_page_post_insights"))
@@ -157,9 +155,7 @@ def register(mcp):
         try:
             from facebook_business.adobjects.post import Post
 
-            comments = Post(post_id, api=get_page_api()).get_comments(
-                params={"limit": limit}
-            )
+            comments = Post(post_id, api=get_page_api()).get_comments(params={"limit": limit})
             return json_dumps([to_dict(c) for c in comments])
         except Exception as e:
             return json_dumps(handle_error(e, "list_page_post_comments"))

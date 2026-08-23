@@ -1,11 +1,14 @@
 """Shared helpers: SDK init, object conversion, error handling, raw API calls."""
 
+from __future__ import annotations
+
 import inspect
 import json
 import logging
 import re
 from functools import wraps
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any
 
 from facebook_business.api import FacebookAdsApi
 
@@ -36,18 +39,17 @@ def sanitize_filename(name: str) -> str:
     return name
 
 
-def sanitize_path(path_str: str, allowed_root: "Path") -> "Path":
+def sanitize_path(path_str: str, allowed_root: Path) -> Path:
     """Resolve *path_str* relative to *allowed_root* and ensure it stays inside.
 
     Raises ValueError if the resolved path escapes allowed_root.
     """
-    from pathlib import Path as _P
-
-    resolved = (_P(allowed_root) / path_str).resolve()
-    root_resolved = _P(allowed_root).resolve()
+    resolved = (Path(allowed_root) / path_str).resolve()
+    root_resolved = Path(allowed_root).resolve()
     if not str(resolved).startswith(str(root_resolved) + "/") and resolved != root_resolved:
         raise ValueError(f"Path escapes allowed directory: {path_str!r}")
     return resolved
+
 
 from src.throttle import (  # noqa: E402
     RATE_LIMIT_CODES,
@@ -79,15 +81,14 @@ def _fetch_page_access_token() -> str:
         page_id = str(PAGE_ID)
         for page in data.get("data", []):
             if str(page.get("id")) == page_id and page.get("access_token"):
-                return page["access_token"]
+                return str(page["access_token"])
         raise RuntimeError(
-            f"الصفحة {page_id} غير موجودة في me/accounts أو بدون توكن صفحة. "
-            "تأكد من أن المستخدم يدير الصفحة."
+            f"الصفحة {page_id} غير موجودة في me/accounts أو بدون توكن صفحة. " "تأكد من أن المستخدم يدير الصفحة."
         )
     except Exception as e:
         if isinstance(e, RuntimeError):
             raise
-        raise RuntimeError(f"تعذّر اشتقاق توكن الصفحة من توكن النظام: {e}")
+        raise RuntimeError(f"تعذّر اشتقاق توكن الصفحة من توكن النظام: {e}") from e
 
 
 def get_page_access_token() -> str:
@@ -106,7 +107,7 @@ def init_page_api() -> FacebookAdsApi:
     return FacebookAdsApi(session, api_version=GRAPH_VERSION)
 
 
-_page_api: Optional[FacebookAdsApi] = None
+_page_api: FacebookAdsApi | None = None
 
 
 def get_page_api() -> FacebookAdsApi:
@@ -118,7 +119,7 @@ def get_page_api() -> FacebookAdsApi:
 
 
 @concurrency_limit()
-def page_api_call(method: str, path: str, params: Optional[dict] = None) -> Any:
+def page_api_call(method: str, path: str, params: dict | None = None) -> Any:
     """Perform a raw Graph API call using the page-scoped token."""
     api = get_page_api()
     resp = api.call(method, (path,), params=params or {})
@@ -126,36 +127,36 @@ def page_api_call(method: str, path: str, params: Optional[dict] = None) -> Any:
 
 
 @async_concurrency_limit()
-def async_page_api_call(method: str, path: str, params: Optional[dict] = None) -> Any:
+def async_page_api_call(method: str, path: str, params: dict | None = None) -> Any:
     """Async version: perform a raw Graph API call using the page-scoped token."""
     api = get_page_api()
     resp = api.call(method, (path,), params=params or {})
     return resp.json()
 
 
-def to_dict(obj: Any) -> Dict[str, Any]:
+def to_dict(obj: Any) -> dict[str, Any]:
     """Convert a Meta SDK object to a plain JSON-safe dict."""
     if obj is None:
         return {}
     try:
-        data = obj.export_all_data()
+        data = obj.export_all_data()  # type: ignore[no-any-return, attr-defined]
     except Exception:
         data = obj
-    return _json_safe(data)
+    return _json_safe(data)  # type: ignore[no-any-return]
 
 
 def _json_safe(value: Any) -> Any:
     """Recursively convert values to JSON-safe primitives."""
     if isinstance(value, dict):
         return {str(k): _json_safe(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return [_json_safe(v) for v in value]
-    if isinstance(value, bool) or isinstance(value, (int, float)) or value is None:
+    if isinstance(value, bool | int | float) or value is None:
         return value
     return str(value)
 
 
-def handle_error(e: Exception, context: str = "") -> Dict[str, Any]:
+def handle_error(e: Exception, context: str = "") -> dict[str, Any]:
     """Normalise an exception into an error dict with an Arabic-friendly message.
 
     Handles FacebookRequestError (including rate-limit without exception),
@@ -169,9 +170,7 @@ def handle_error(e: Exception, context: str = "") -> Dict[str, Any]:
         subcode = e.api_error_subcode()
         # Rate-limit without raising — surface it clearly
         if code in RATE_LIMIT_CODES or subcode in RATE_LIMIT_SUBCODES:
-            logger.warning(
-                "Rate limit hit in %s: code=%s subcode=%s", context, code, subcode
-            )
+            logger.warning("Rate limit hit in %s: code=%s subcode=%s", context, code, subcode)
             return {
                 "error": f"تم تقييد الوصول من Meta (rate limit). كود: {code}/{subcode}",
                 "context": context,
@@ -186,7 +185,7 @@ def handle_error(e: Exception, context: str = "") -> Dict[str, Any]:
 
 
 @concurrency_limit()
-def api_call(method: str, path: str, params: Optional[dict] = None) -> Any:
+def api_call(method: str, path: str, params: dict | None = None) -> Any:
     """Perform a raw Graph API call and return parsed JSON.
 
     Pass path as a tuple so the SDK prepends the versioned Graph base URL.
@@ -202,7 +201,7 @@ def api_call(method: str, path: str, params: Optional[dict] = None) -> Any:
 
 
 @async_concurrency_limit()
-def async_api_call(method: str, path: str, params: Optional[dict] = None) -> Any:
+def async_api_call(method: str, path: str, params: dict | None = None) -> Any:
     """Async version: perform a raw Graph API call and return parsed JSON."""
     api = FacebookAdsApi.get_default_api()
     resp = api.call(method, (path,), params=params or {})
@@ -236,11 +235,7 @@ def evaluate_guard(
             False,
             f"الميزانية اليومية ({daily_budget}) تتجاوز الحد المسموح ({MAX_DAILY_BUDGET}).",
         )
-    if (
-        MAX_LIFETIME_BUDGET
-        and lifetime_budget
-        and lifetime_budget > MAX_LIFETIME_BUDGET
-    ):
+    if MAX_LIFETIME_BUDGET and lifetime_budget and lifetime_budget > MAX_LIFETIME_BUDGET:
         return (
             False,
             f"الميزانية الإجمالية ({lifetime_budget}) تتجاوز الحد المسموح ({MAX_LIFETIME_BUDGET}).",

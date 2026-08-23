@@ -62,7 +62,7 @@ def _to_numeric(val) -> float:
 def _summarise(rows: list[dict], metrics: list) -> dict:
     if not rows:
         return {}
-    summary = {"campaigns": len(rows)}
+    summary: dict[str, float | int | str] = {"campaigns": len(rows)}
     for m in metrics:
         total = sum(_to_numeric(r.get(m, 0)) for r in rows)
         summary[f"total_{m}"] = round(total, 4)
@@ -84,9 +84,7 @@ def register(mcp):
 
     def _fetch_rows(object_id: str, preset: str, metrics: list) -> list:
         ad_account = AdAccount(object_id)
-        insights = ad_account.get_insights(
-            params={"date_preset": preset, "fields": ["campaign_name"] + metrics}
-        )
+        insights = ad_account.get_insights(params={"date_preset": preset, "fields": ["campaign_name", *metrics]})
         rows = []
         for item in insights:
             data = item.export_all_data()
@@ -142,18 +140,16 @@ def register(mcp):
         try:
             rows = _fetch_rows(AD_ACCOUNT_ID, date_preset, DEFAULT_METRICS)
             if not rows:
-                return json_dumps(
-                    {"message": "لا توجد بيانات", "date_preset": date_preset}
-                )
-            summary = {
+                return json_dumps({"message": "لا توجد بيانات", "date_preset": date_preset})
+            summary: dict[str, float | int | str] = {
                 "date_preset": date_preset,
                 "campaigns": len(rows),
             }
             for m in DEFAULT_METRICS:
                 total = sum(_to_numeric(r.get(m, 0)) for r in rows)
                 summary[f"total_{m}"] = round(total, 4)
-            spend = summary.get("total_spend", 0)
-            clicks = summary.get("total_clicks", 0)
+            spend = float(summary.get("total_spend", 0) or 0)
+            clicks = float(summary.get("total_clicks", 0) or 0)
             if clicks:
                 summary["avg_cpc"] = round(spend / clicks, 4)
             best = max(rows, key=lambda r: _to_numeric(r.get("spend", 0)))
@@ -255,8 +251,9 @@ def register(mcp):
         """
         try:
             ensure_report_dir()
-            from src.helpers import to_dict
             from facebook_business.adobjects.page import Page
+
+            from src.helpers import to_dict
 
             page = Page(PAGE_ID)
             info = page.api_get(
@@ -282,8 +279,6 @@ def register(mcp):
             else:
                 path = Path(REPORT_DIR) / f"{base}.csv"
                 _write_csv(path, rows)
-            return json_dumps(
-                {"success": True, "file": str(path), "rows": len(rows)}
-            )
+            return json_dumps({"success": True, "file": str(path), "rows": len(rows)})
         except Exception as e:
             return json_dumps(handle_error(e, "generate_page_report"))

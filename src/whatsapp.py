@@ -9,10 +9,7 @@ from src.throttle import concurrency_limit
 
 WHATSAPP_MAX_TEXT_LENGTH = 4096
 
-PHONE_NUMBER_FIELDS = (
-    "id,display_phone_number,verified_name,quality_rating,"
-    "code_verification_status,throughput"
-)
+PHONE_NUMBER_FIELDS = "id,display_phone_number,verified_name,quality_rating," "code_verification_status,throughput"
 TEMPLATE_FIELDS = "id,name,status,language,components,category"
 TEMPLATE_CATEGORIES = ["MARKETING", "UTILITY", "AUTHENTICATION"]
 
@@ -85,11 +82,7 @@ def register(mcp):
         try:
             cat = category.upper()
             if cat not in TEMPLATE_CATEGORIES:
-                return json_dumps(
-                    {
-                        "error": f"الفئة غير صالحة. اختر من: {', '.join(TEMPLATE_CATEGORIES)}"
-                    }
-                )
+                return json_dumps({"error": f"الفئة غير صالحة. اختر من: {', '.join(TEMPLATE_CATEGORIES)}"})
             components = [{"type": "BODY", "text": body_text}]
             if header_text:
                 components.insert(0, {"type": "HEADER", "text": header_text})
@@ -110,13 +103,13 @@ def register(mcp):
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def send_whatsapp_text_message(
-        to: str, text: str, phone_number_id: str = ""
-    ) -> str:
+    def send_whatsapp_text_message(to: str, text: str, phone_number_id: str = "") -> str:
         """إرسال رسالة نصية واتساب (رقم المستخدم يجب أن يكون بدأ محادثة)."""
         try:
             if len(text) > WHATSAPP_MAX_TEXT_LENGTH:
-                return json_dumps({"error": f"النص طويل جدًا ({len(text)} حرف). الحد الأقصى {WHATSAPP_MAX_TEXT_LENGTH}."})
+                return json_dumps(
+                    {"error": f"النص طويل جدًا ({len(text)} حرف). الحد الأقصى {WHATSAPP_MAX_TEXT_LENGTH}."}
+                )
             result = api_call(
                 "POST",
                 f"{_require_phone(phone_number_id)}/messages",
@@ -147,15 +140,11 @@ def register(mcp):
             if body_params_json:
                 params = _json.loads(body_params_json)
                 if not isinstance(params, list):
-                    return json_dumps(
-                        {"error": "body_params_json يجب أن يكون مصفوفة JSON"}
-                    )
+                    return json_dumps({"error": "body_params_json يجب أن يكون مصفوفة JSON"})
                 template["components"] = [
                     {
                         "type": "body",
-                        "parameters": [
-                            {"type": "text", "text": str(p)} for p in params
-                        ],
+                        "parameters": [{"type": "text", "text": str(p)} for p in params],
                     }
                 ]
             result = api_call(
@@ -168,8 +157,6 @@ def register(mcp):
                     "template": template,
                 },
             )
-            return json_dumps(
-                {"to": to, "template_name": template_name, "result": result}
-            )
+            return json_dumps({"to": to, "template_name": template_name, "result": result})
         except Exception as e:
             return json_dumps(handle_error(e, "send_whatsapp_template_message"))

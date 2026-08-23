@@ -1,7 +1,7 @@
 """Insights breakdowns: age/gender/placement/country/device + time-series + attribution."""
 
 from src.config import AD_ACCOUNT_ID
-from src.insights import DEFAULT_METRICS, DATE_PRESETS
+from src.insights import DATE_PRESETS, DEFAULT_METRICS
 
 BREAKDOWN_VALUES = [
     "age",
@@ -22,7 +22,16 @@ BREAKDOWN_VALUES = [
     "product_id",
 ]
 
-ATTRIBUTION_WINDOWS = ["1d_click", "7d_click", "28d_click", "1d_view", "7d_view", "28d_view", "7d_click_1d_view", "28d_click_7d_view"]
+ATTRIBUTION_WINDOWS = [
+    "1d_click",
+    "7d_click",
+    "28d_click",
+    "1d_view",
+    "7d_view",
+    "28d_view",
+    "7d_click_1d_view",
+    "28d_click_7d_view",
+]
 
 ACTION_BREAKDOWN_VALUES = [
     "action_type",
@@ -50,9 +59,7 @@ def register(mcp):
         breakdown_list = [b.strip() for b in breakdown.split(",") if b.strip()]
         for b in breakdown_list:
             if b not in BREAKDOWN_VALUES:
-                raise ValueError(
-                    f"breakdown غير صالح: {b}. الاختيارات: {', '.join(BREAKDOWN_VALUES)}"
-                )
+                raise ValueError(f"breakdown غير صالح: {b}. الاختيارات: {', '.join(BREAKDOWN_VALUES)}")
         return [m.strip() for m in metrics.split(",") if m.strip()], breakdown_list
 
     def _build_params(preset, fields, breakdown_list, time_increment, attribution, action_breakdowns):
@@ -101,8 +108,12 @@ def register(mcp):
         try:
             fields, breakdown_list = _validate(date_preset, metrics, breakdown)
             params = _build_params(
-                date_preset, fields, breakdown_list, time_increment,
-                action_attribution_windows, action_breakdowns,
+                date_preset,
+                fields,
+                breakdown_list,
+                time_increment,
+                action_attribution_windows,
+                action_breakdowns,
             )
             insights = AdAccount(AD_ACCOUNT_ID).get_insights(params=params)
             return _respond(insights)
@@ -124,8 +135,12 @@ def register(mcp):
         try:
             fields, breakdown_list = _validate(date_preset, metrics, breakdown)
             params = _build_params(
-                date_preset, fields, breakdown_list, time_increment,
-                action_attribution_windows, action_breakdowns,
+                date_preset,
+                fields,
+                breakdown_list,
+                time_increment,
+                action_attribution_windows,
+                action_breakdowns,
             )
             insights = Campaign(campaign_id).get_insights(params=params)
             return _respond(insights)
@@ -147,8 +162,12 @@ def register(mcp):
         try:
             fields, breakdown_list = _validate(date_preset, metrics, breakdown)
             params = _build_params(
-                date_preset, fields, breakdown_list, time_increment,
-                action_attribution_windows, action_breakdowns,
+                date_preset,
+                fields,
+                breakdown_list,
+                time_increment,
+                action_attribution_windows,
+                action_breakdowns,
             )
             insights = AdSet(adset_id).get_insights(params=params)
             return _respond(insights)
@@ -170,8 +189,12 @@ def register(mcp):
         try:
             fields, breakdown_list = _validate(date_preset, metrics, breakdown)
             params = _build_params(
-                date_preset, fields, breakdown_list, time_increment,
-                action_attribution_windows, action_breakdowns,
+                date_preset,
+                fields,
+                breakdown_list,
+                time_increment,
+                action_attribution_windows,
+                action_breakdowns,
             )
             insights = Ad(ad_id).get_insights(params=params)
             return _respond(insights)

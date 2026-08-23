@@ -98,10 +98,10 @@ def register(mcp):
                 "campaign_id": campaign_id,
             }
             if daily_budget and daily_budget > 0:
-                params[AdSet.Field.daily_budget] = daily_budget
+                params[AdSet.Field.daily_budget] = str(daily_budget)
             if bid_amount and bid_amount > 0:
                 params[AdSet.Field.bid_strategy] = "LOWEST_COST_WITH_BID_CAP"
-                params[AdSet.Field.bid_amount] = bid_amount
+                params[AdSet.Field.bid_amount] = str(bid_amount)
             else:
                 params[AdSet.Field.bid_strategy] = "LOWEST_COST_WITHOUT_CAP"
             adset = account.create_ad_set(params=params)

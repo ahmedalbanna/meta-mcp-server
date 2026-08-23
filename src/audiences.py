@@ -66,7 +66,9 @@ def register(mcp):
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def create_custom_audience(name: str, description: str = "", customer_file_source: str = "BOTH_USER_AND_PARTNER_PROVIDED") -> str:
+    def create_custom_audience(
+        name: str, description: str = "", customer_file_source: str = "BOTH_USER_AND_PARTNER_PROVIDED"
+    ) -> str:
         """إنشاء جمهور مخصص جديد."""
         try:
             account = AdAccount(AD_ACCOUNT_ID)
@@ -161,9 +163,11 @@ def register(mcp):
         """
         try:
             import csv as _csv
-            from pathlib import Path
 
-            path = sanitize_path(csv_path)
+            from src.config import BASE_DIR
+
+            # Scope CSV reads to BASE_DIR (and subdirs) to prevent traversal outside project
+            path = sanitize_path(csv_path, BASE_DIR)
             if not path.is_file():
                 return json_dumps({"error": f"الملف غير موجود: {csv_path}"})
             schema_list = [s.strip().upper() for s in _split(schema)]
@@ -182,7 +186,7 @@ def register(mcp):
                     if clean and any(clean):
                         rows.append(clean)
 
-            users_by_schema = {s: [] for s in schema_list}
+            users_by_schema: dict[str, list[str]] = {s: [] for s in schema_list}
             for row in rows:
                 for idx, s in enumerate(schema_list):
                     if idx < len(row) and row[idx]:
@@ -205,9 +209,7 @@ def register(mcp):
                     users.extend(values)
             if not users:
                 return json_dumps({"error": "لا توجد بيانات صالحة في الملف"})
-            result = CustomAudience(audience_id).add_users(
-                schema=api_schema, users=users
-            )
+            result = CustomAudience(audience_id).add_users(schema=api_schema, users=users)
             return json_dumps(
                 {
                     "success": True,
@@ -253,9 +255,7 @@ def register(mcp):
                             "operator": "or",
                             "rules": [
                                 {
-                                    "event_sources": [
-                                        {"type": "pixel", "id": source_pixel_id}
-                                    ],
+                                    "event_sources": [{"type": "pixel", "id": source_pixel_id}],
                                     "retention_seconds": RETENTION_SECONDS_90D,
                                     "filter": {"operator": "and", "filters": []},
                                 }
@@ -274,9 +274,7 @@ def register(mcp):
                             "operator": "or",
                             "rules": [
                                 {
-                                    "event_sources": [
-                                        {"type": "pixel", "id": source_website_url}
-                                    ],
+                                    "event_sources": [{"type": "pixel", "id": source_website_url}],
                                     "retention_seconds": RETENTION_SECONDS_90D,
                                     "filter": {
                                         "operator": "and",
@@ -300,19 +298,13 @@ def register(mcp):
                 seed = account.create_custom_audience(params=seed_params)
                 seed_id = seed["id"]
             if not seed_id:
-                return json_dumps(
-                    {
-                        "error": "حدد source_audience_id أو source_pixel_id أو source_website_url"
-                    }
-                )
+                return json_dumps({"error": "حدد source_audience_id أو source_pixel_id أو source_website_url"})
             if not name:
                 return json_dumps({"error": "حدد اسمًا للجمهور (name)"})
             ltype = lookalike_type.strip().upper()
             if ltype not in LOOKALIKE_TYPES:
                 return json_dumps(
-                    {
-                        "error": f"lookalike_type غير صالح: {lookalike_type}. الاختيارات: {', '.join(LOOKALIKE_TYPES)}"
-                    }
+                    {"error": f"lookalike_type غير صالح: {lookalike_type}. الاختيارات: {', '.join(LOOKALIKE_TYPES)}"}
                 )
             spec = {
                 "origin_audience_id": seed_id,

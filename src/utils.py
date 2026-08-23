@@ -10,21 +10,20 @@ import logging
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from facebook_business.exceptions import FacebookRequestError
 
 from src.helpers import to_dict
-from src.throttle import RATE_LIMIT_CODES, RATE_LIMIT_SUBCODES, _is_rate_limit
+from src.throttle import _is_rate_limit
 
 # ---------------------------------------------------------------------------
 # Structured logging with correlation id
 # ---------------------------------------------------------------------------
 
-_correlation_id: contextvars.ContextVar = contextvars.ContextVar(
-    "correlation_id", default=""
-)
+_correlation_id: contextvars.ContextVar = contextvars.ContextVar("correlation_id", default="")
 
 
 def set_correlation_id(prefix: str = "req") -> str:
@@ -36,7 +35,7 @@ def set_correlation_id(prefix: str = "req") -> str:
 
 def get_correlation_id() -> str:
     """Return the current correlation id (empty when unset)."""
-    return _correlation_id.get()
+    return str(_correlation_id.get() or "")
 
 
 class CorrelationFormatter(logging.Formatter):
@@ -55,9 +54,7 @@ def make_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     if not any(isinstance(h.formatter, CorrelationFormatter) for h in logger.handlers):
         handler = logging.StreamHandler()
-        handler.setFormatter(
-            CorrelationFormatter("%(asctime)s %(levelname)s %(message)s")
-        )
+        handler.setFormatter(CorrelationFormatter("%(asctime)s %(levelname)s %(message)s"))
         logger.addHandler(handler)
         logger.propagate = False
     logger.setLevel(logging.INFO)
@@ -93,11 +90,11 @@ def _extract_batch(result: Any) -> tuple:
 
 def paginate(
     getter: Callable[..., Any],
-    fields: Optional[List[str]] = None,
-    params: Optional[dict] = None,
+    fields: list[str] | None = None,
+    params: dict | None = None,
     limit: int = 25,
     max_pages: int = 10,
-) -> List[dict]:
+) -> list[dict]:
     """Walk an entire edge via cursor-based pagination.
 
     getter is called as getter(params={...}) and must return either a raw dict
@@ -108,7 +105,7 @@ def paginate(
         batch["fields"] = fields
     batch["limit"] = limit
 
-    out: List[dict] = []
+    out: list[dict] = []
     for _ in range(max_pages):
         try:
             result = getter(params=batch)
@@ -129,9 +126,7 @@ def paginate(
 # Meta rate-limit + transient error codes worth retrying (from src.throttle)
 
 
-def retry_on_rate_limit(
-    retries: int = 3, base_delay: float = 2.0, backoff: float = 2.0
-):
+def retry_on_rate_limit(retries: int = 3, base_delay: float = 2.0, backoff: float = 2.0):
     """Retry a call with exponential backoff when Meta throttles the request.
 
     Non-rate-limit errors propagate immediately.
@@ -189,7 +184,7 @@ def normalize_phone(phone: str) -> str:
     return _sha256_hex(digits) if digits else phone
 
 
-def normalize_pii(items: List[str], pii_type: str = "email") -> List[str]:
+def normalize_pii(items: list[str], pii_type: str = "email") -> list[str]:
     """Hash a batch of emails or phones for the Customer List API.
 
     pii_type: "email" | "phone". Non-hashable/empty entries are dropped.
@@ -216,7 +211,7 @@ def cached(ttl: float = 60.0):
     """
 
     def decorator(fn: Callable) -> Callable:
-        cache: Dict[Any, tuple] = {}
+        cache: dict[Any, tuple] = {}
         lock = threading.Lock()
 
         def _key(args, kwargs) -> str:

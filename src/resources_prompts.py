@@ -98,9 +98,7 @@ def register(mcp):
 
             def _fetch():
                 account = AdAccount(AD_ACCOUNT_ID)
-                return account.get_custom_audiences(
-                    params={"fields": ["name", "subtype", "approximate_count", "id"]}
-                )
+                return account.get_custom_audiences(params={"fields": ["name", "subtype", "approximate_count", "id"]})
 
             t0 = time.monotonic()
             audiences = await asyncio.to_thread(_fetch)

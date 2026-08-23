@@ -31,6 +31,7 @@ def _get_bool(*names: str, default: bool = False) -> bool:
     v = _get(*names, default=str(default)).lower()
     return v in ("1", "true", "yes", "on")
 
+
 # Credentials (FB_* primary, META_* fallback)
 META_ACCESS_TOKEN = _get("FB_ACCESS_TOKEN", "META_ACCESS_TOKEN")
 # Optional explicit page-scoped token (usually auto-derived from META_ACCESS_TOKEN via me/accounts)

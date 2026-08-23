@@ -1,0 +1,33 @@
+# Secrets
+.env
+.env.*
+*.env
+
+# Git / CI
+.git
+.gitignore
+.github
+
+# Python caches
+__pycache__
+*.pyc
+*.pyo
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.venv
+venv
+
+# Reports / local data (mounted as volume at runtime)
+reports/
+media/
+output/
+*.log
+
+# Docs / tests (not needed in runtime image)
+tests/
+docs/
+*.md
+.DS_Store
+.idea
+.vscode

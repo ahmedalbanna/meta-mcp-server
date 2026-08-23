@@ -131,9 +131,7 @@ def register(mcp):
         try:
             obj = objective.strip().upper()
             if obj not in _TEMPLATES:
-                raise ValueError(
-                    f"objective غير صالح: {objective}. الاختيارات: {', '.join(sorted(_TEMPLATES))}"
-                )
+                raise ValueError(f"objective غير صالح: {objective}. الاختيارات: {', '.join(sorted(_TEMPLATES))}")
             tpl = _TEMPLATES[obj]
             fill = {
                 "business": business_name or "علامتك التجارية",

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import requests
+import requests  # type: ignore[import-untyped]
 
 from src.config import INSTAGRAM_BUSINESS_ID
 from src.helpers import api_call, handle_error, json_dumps, sanitize_path, write_guard
@@ -23,9 +23,7 @@ def register(mcp):
             data = api_call(
                 "GET",
                 ig_id,
-                {
-                    "fields": "id,username,media_count,followers_count,biography,profile_picture_url"
-                },
+                {"fields": "id,username,media_count,followers_count,biography,profile_picture_url"},
             )
             return json_dumps(data)
         except Exception as e:
@@ -57,9 +55,7 @@ def register(mcp):
             data = api_call(
                 "GET",
                 media_id,
-                {
-                    "fields": "id,caption,media_type,media_url,permalink,timestamp,username"
-                },
+                {"fields": "id,caption,media_type,media_url,permalink,timestamp,username"},
             )
             return json_dumps(data)
         except Exception as e:
@@ -106,9 +102,7 @@ def register(mcp):
 
     @mcp.tool()
     @concurrency_limit()
-    def get_instagram_account_mentions(
-        instagram_business_id: str = "", limit: int = 25
-    ) -> str:
+    def get_instagram_account_mentions(instagram_business_id: str = "", limit: int = 25) -> str:
         """المنشورات التي ذُكر فيها الحساب (Mentions)."""
         try:
             ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
@@ -154,14 +148,10 @@ def register(mcp):
             else:
                 target = MEDIA_DOWNLOAD_DIR
             target.mkdir(parents=True, exist_ok=True)
-            meta = api_call(
-                "GET", media_id, {"fields": "id,media_type,media_url,caption"}
-            )
+            meta = api_call("GET", media_id, {"fields": "id,media_type,media_url,caption"})
             urls = []
             if meta.get("media_type") == "CAROUSEL_ALBUM":
-                children = api_call(
-                    "GET", f"{media_id}/children", {"fields": "id,media_type,media_url"}
-                )
+                children = api_call("GET", f"{media_id}/children", {"fields": "id,media_type,media_url"})
                 urls = [(c["id"], c.get("media_url")) for c in children.get("data", [])]
             else:
                 urls = [(meta.get("id"), meta.get("media_url"))]
@@ -219,9 +209,7 @@ def register(mcp):
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def publish_instagram_photo(
-        image_url: str, caption: str = "", instagram_business_id: str = ""
-    ) -> str:
+    def publish_instagram_photo(image_url: str, caption: str = "", instagram_business_id: str = "") -> str:
         """
         نشر صورة على إنستغرام.
         يتطلب صلاحية instagram_content_publish و Instagram Business Account مرتبط بصفحة.
@@ -236,9 +224,7 @@ def register(mcp):
             creation_id = container.get("id")
             if not creation_id:
                 return json_dumps(container)
-            result = api_call(
-                "POST", f"{ig_id}/media_publish", {"creation_id": creation_id}
-            )
+            result = api_call("POST", f"{ig_id}/media_publish", {"creation_id": creation_id})
             return json_dumps({"container": container, "publish": result})
         except Exception as e:
             return json_dumps(handle_error(e, "publish_instagram_photo"))
@@ -262,9 +248,7 @@ def register(mcp):
             creation_id = container.get("id")
             if not creation_id:
                 return json_dumps(container)
-            result = api_call(
-                "POST", f"{ig_id}/media_publish", {"creation_id": creation_id}
-            )
+            result = api_call("POST", f"{ig_id}/media_publish", {"creation_id": creation_id})
             return json_dumps({"container": container, "publish": result})
         except Exception as e:
             return json_dumps(handle_error(e, "publish_instagram_video"))
@@ -293,9 +277,7 @@ def register(mcp):
             creation_id = container.get("id")
             if not creation_id:
                 return json_dumps(container)
-            result = api_call(
-                "POST", f"{ig_id}/media_publish", {"creation_id": creation_id}
-            )
+            result = api_call("POST", f"{ig_id}/media_publish", {"creation_id": creation_id})
             return json_dumps({"container": container, "publish": result})
         except Exception as e:
             return json_dumps(handle_error(e, "publish_instagram_reel"))
@@ -326,9 +308,7 @@ def register(mcp):
             creation_id = container.get("id")
             if not creation_id:
                 return json_dumps(container)
-            result = api_call(
-                "POST", f"{ig_id}/media_publish", {"creation_id": creation_id}
-            )
+            result = api_call("POST", f"{ig_id}/media_publish", {"creation_id": creation_id})
             return json_dumps({"container": container, "publish": result})
         except Exception as e:
             return json_dumps(handle_error(e, "publish_instagram_story"))
@@ -336,9 +316,7 @@ def register(mcp):
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def publish_instagram_carousel(
-        image_urls: str, caption: str = "", instagram_business_id: str = ""
-    ) -> str:
+    def publish_instagram_carousel(image_urls: str, caption: str = "", instagram_business_id: str = "") -> str:
         """
         نشر ألبوم كاروسيل على إنستغرام.
         image_urls: روابط الصور مفصولة بفواصل (مثال "url1,url2,url3").
@@ -376,12 +354,8 @@ def register(mcp):
             creation_id = container.get("id")
             if not creation_id:
                 return json_dumps(container)
-            result = api_call(
-                "POST", f"{ig_id}/media_publish", {"creation_id": creation_id}
-            )
-            return json_dumps(
-                {"children": child_ids, "container": container, "publish": result}
-            )
+            result = api_call("POST", f"{ig_id}/media_publish", {"creation_id": creation_id})
+            return json_dumps({"children": child_ids, "container": container, "publish": result})
         except Exception as e:
             return json_dumps(handle_error(e, "publish_instagram_carousel"))
 
@@ -415,9 +389,7 @@ def register(mcp):
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def update_instagram_media_caption(
-        media_id: str, caption: str, instagram_business_id: str = ""
-    ) -> str:
+    def update_instagram_media_caption(media_id: str, caption: str, instagram_business_id: str = "") -> str:
         """
         تحديث كابشن منشور إنستغرام (صورة أو كاروسيل) بسير عمل: إعادة نشر بكابشن جديد ثم حذف القديم.
         بما أن Graph API لا يدعم تعديل الكابشن مباشرة، يُعاد النشر بنفس الصور ثم يُحذف المنشور القديم.
@@ -428,14 +400,8 @@ def register(mcp):
             media_type = meta.get("media_type", "")
 
             if media_type == "CAROUSEL_ALBUM":
-                children = api_call(
-                    "GET", f"{media_id}/children", {"fields": "id,media_type,media_url"}
-                )
-                urls = [
-                    c["media_url"]
-                    for c in children.get("data", [])
-                    if c.get("media_url")
-                ]
+                children = api_call("GET", f"{media_id}/children", {"fields": "id,media_type,media_url"})
+                urls = [c["media_url"] for c in children.get("data", []) if c.get("media_url")]
                 if not urls:
                     return json_dumps(
                         {
@@ -472,16 +438,12 @@ def register(mcp):
                             "context": "update_instagram_media_caption",
                         }
                     )
-                container = api_call(
-                    "POST", f"{ig_id}/media", {"image_url": url, "caption": caption}
-                )
+                container = api_call("POST", f"{ig_id}/media", {"image_url": url, "caption": caption})
 
             creation_id = container.get("id")
             if not creation_id:
                 return json_dumps(container)
-            result = api_call(
-                "POST", f"{ig_id}/media_publish", {"creation_id": creation_id}
-            )
+            result = api_call("POST", f"{ig_id}/media_publish", {"creation_id": creation_id})
             new_id = result.get("id")
             delete_ok = True
             delete_error = ""
@@ -515,16 +477,12 @@ def register(mcp):
             media = api_call(
                 "GET",
                 media_id,
-                {
-                    "fields": "id,caption,media_type,media_product_type,permalink,timestamp,username"
-                },
+                {"fields": "id,caption,media_type,media_product_type,permalink,timestamp,username"},
             )
             # Get engagement insights
             try:
                 insights_raw = IGMedia(media_id).get_insights(
-                    params={
-                        "metric": "reach,likes,comments,saved,total_interactions,shares"
-                    }
+                    params={"metric": "reach,likes,comments,saved,total_interactions,shares"}
                 )
                 insights = {}
                 for i in insights_raw:
@@ -634,9 +592,7 @@ def register(mcp):
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def mute_instagram_commenter(
-        instagram_business_id: str, user_id: str, end_time: int
-    ) -> str:
+    def mute_instagram_commenter(instagram_business_id: str, user_id: str, end_time: int) -> str:
         """
         كتم مستخدم من التعليق لفترة مؤقتة.
         end_time: طابع زمني Unix (ثوانٍ) لانتهاء الكتم.
@@ -648,17 +604,13 @@ def register(mcp):
                 f"{ig_id}/muted_commenters",
                 {"user_id": user_id, "end_time": end_time},
             )
-            return json_dumps(
-                {"muted_user_id": user_id, "until": end_time, "result": result}
-            )
+            return json_dumps({"muted_user_id": user_id, "until": end_time, "result": result})
         except Exception as e:
             return json_dumps(handle_error(e, "mute_instagram_commenter"))
 
     @mcp.tool()
     @concurrency_limit()
-    def list_instagram_conversations(
-        instagram_business_id: str = "", limit: int = 25
-    ) -> str:
+    def list_instagram_conversations(instagram_business_id: str = "", limit: int = 25) -> str:
         """محادثات الرسائل المباشرة (DMs) لحساب إنستغرام."""
         try:
             ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
@@ -682,9 +634,7 @@ def register(mcp):
             data = api_call(
                 "GET",
                 conversation_id,
-                {
-                    "fields": "id,updated_time,unread_count,message_count,participants,pending"
-                },
+                {"fields": "id,updated_time,unread_count,message_count,participants,pending"},
             )
             return json_dumps(data)
         except Exception as e:
@@ -692,9 +642,7 @@ def register(mcp):
 
     @mcp.tool()
     @concurrency_limit()
-    def list_instagram_conversation_messages(
-        conversation_id: str, limit: int = 25
-    ) -> str:
+    def list_instagram_conversation_messages(conversation_id: str, limit: int = 25) -> str:
         """رسائل محادثة مباشرة محددة على إنستغرام."""
         try:
             data = api_call(
@@ -723,9 +671,7 @@ def register(mcp):
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def send_instagram_dm(
-        instagram_business_id: str, recipient_ig_id: str, text: str
-    ) -> str:
+    def send_instagram_dm(instagram_business_id: str, recipient_ig_id: str, text: str) -> str:
         """إرسال رسالة مباشرة (DM) عبر إنستغرام إلى مستخدم تواصل مع الحساب."""
         try:
             ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID

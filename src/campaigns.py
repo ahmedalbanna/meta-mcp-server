@@ -32,9 +32,7 @@ def register(mcp):
                 "limit": limit,
             }
             if status:
-                params["filtering"] = json_dumps(
-                    [{"field": "status", "operator": "EQUAL", "value": status}]
-                )
+                params["filtering"] = json_dumps([{"field": "status", "operator": "EQUAL", "value": status}])
             campaigns = account.get_campaigns(params=params)
             return json_dumps([to_dict(c) for c in campaigns])
         except Exception as e:

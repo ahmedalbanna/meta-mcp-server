@@ -15,8 +15,8 @@ import asyncio
 import os
 import threading
 import time
+from collections.abc import Callable
 from functools import wraps
-from typing import Callable
 
 from facebook_business.exceptions import FacebookRequestError
 
@@ -122,9 +122,7 @@ def concurrency_limit(
     return decorator
 
 
-async def _async_retry_on_error(
-    fn: Callable, args, kwargs, retries, base_delay, backoff
-):
+async def _async_retry_on_error(fn: Callable, args, kwargs, retries, base_delay, backoff):
     """Async version of retry — calls sync fn in thread executor, retries on rate-limit."""
     attempt = 0
     while True:
@@ -157,9 +155,7 @@ def async_concurrency_limit(
         async def wrapper(*args, **kwargs):
             sem = _get_async_semaphore()
             async with sem:
-                return await _async_retry_on_error(
-                    fn, args, kwargs, retries, base_delay, backoff
-                )
+                return await _async_retry_on_error(fn, args, kwargs, retries, base_delay, backoff)
 
         return wrapper
 
