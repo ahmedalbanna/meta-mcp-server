@@ -74,21 +74,52 @@ def _is_rate_limit(e: FacebookRequestError) -> bool:
     return code in RATE_LIMIT_CODES or subcode in RATE_LIMIT_SUBCODES
 
 
+_COOLDOWN_UNTIL = 0.0
+# Use config ADAPTIVE_THROTTLE if available, else env
+try:
+    from src.config import ADAPTIVE_THROTTLE as _ADAPTIVE_CFG
+
+    _ADAPTIVE = bool(_ADAPTIVE_CFG)
+except Exception:
+    _ADAPTIVE = os.getenv("FB_ADAPTIVE_THROTTLE", "true").lower() in ("1", "true", "yes", "on")
+
+
 def _retry_on_error(fn: Callable, args, kwargs, retries, base_delay, backoff):
     """Invoke fn, retrying only on explicit Facebook rate-limit errors.
 
     Any non-rate-limit exception propagates immediately so callers keep their
-    existing error-handling behaviour.
+    existing error-handling behaviour. Adaptive throttling (Phase 4.4) adds
+    cooldown after rate-limit bursts.
     """
+    global _COOLDOWN_UNTIL
     attempt = 0
     while True:
+        # Adaptive: if in cooldown, extra sleep
+        if _ADAPTIVE and time.time() < _COOLDOWN_UNTIL:
+            time.sleep(0.5)
         try:
             return fn(*args, **kwargs)
         except FacebookRequestError as e:
             if not _is_rate_limit(e) or attempt >= retries:
                 raise
             attempt += 1
+            # Metrics + adaptive cooldown
+            try:
+                from src.metrics import inc_rate_limit
+
+                inc_rate_limit(e.api_error_code() or 0)
+            except Exception:
+                pass
+            if _ADAPTIVE:
+                _COOLDOWN_UNTIL = time.time() + 5 * attempt  # exponential cooldown
             delay = base_delay * (backoff ** (attempt - 1))
+            # Respect Retry-After if present (Meta sends via header, not body)
+            try:
+                retry_after = e._error.get("error", {}).get("retry_after") if hasattr(e, "_error") else None  # type: ignore
+                if retry_after and int(retry_after) > 0:
+                    delay = max(delay, float(retry_after))
+            except Exception:
+                pass
             time.sleep(delay)
         except Exception:
             raise
@@ -112,9 +143,36 @@ def concurrency_limit(
         @wraps(fn)
         def wrapper(*args, **kwargs):
             _acquire_slot()
+            t0 = time.monotonic()
+            status = "ok"
+            # Ensure correlation_id for tracing (Phase 4.2)
             try:
-                return _retry_on_error(fn, args, kwargs, retries, base_delay, backoff)
+                from src.utils import get_correlation_id, set_correlation_id
+
+                if not get_correlation_id():
+                    set_correlation_id(fn.__name__[:6])
+            except Exception:
+                pass
+            try:
+                result = _retry_on_error(fn, args, kwargs, retries, base_delay, backoff)
+                # Heuristic error detection: if result is JSON string containing "error"
+                try:
+                    if isinstance(result, str) and '"error"' in result:
+                        status = "error"
+                except Exception:
+                    pass
+                return result
+            except Exception:
+                status = "exception"
+                raise
             finally:
+                try:
+                    from src.metrics import inc_tool_call, observe_tool_duration
+
+                    inc_tool_call(fn.__name__, status)
+                    observe_tool_duration(fn.__name__, time.monotonic() - t0)
+                except Exception:
+                    pass
                 _release_slot()
 
         return wrapper
@@ -126,12 +184,22 @@ async def _async_retry_on_error(fn: Callable, args, kwargs, retries, base_delay,
     """Async version of retry — calls sync fn in thread executor, retries on rate-limit."""
     attempt = 0
     while True:
+        if _ADAPTIVE and time.time() < _COOLDOWN_UNTIL:
+            await asyncio.sleep(0.5)
         try:
             return await asyncio.to_thread(fn, *args, **kwargs)
         except FacebookRequestError as e:
             if not _is_rate_limit(e) or attempt >= retries:
                 raise
             attempt += 1
+            try:
+                from src.metrics import inc_rate_limit
+
+                inc_rate_limit(e.api_error_code() or 0)
+            except Exception:
+                pass
+            if _ADAPTIVE:
+                globals()["_COOLDOWN_UNTIL"] = time.time() + 5 * attempt
             delay = base_delay * (backoff ** (attempt - 1))
             await asyncio.sleep(delay)
         except Exception:
@@ -155,7 +223,34 @@ def async_concurrency_limit(
         async def wrapper(*args, **kwargs):
             sem = _get_async_semaphore()
             async with sem:
-                return await _async_retry_on_error(fn, args, kwargs, retries, base_delay, backoff)
+                t0 = time.monotonic()
+                status = "ok"
+                try:
+                    from src.utils import get_correlation_id, set_correlation_id
+
+                    if not get_correlation_id():
+                        set_correlation_id(fn.__name__[:6])
+                except Exception:
+                    pass
+                try:
+                    result = await _async_retry_on_error(fn, args, kwargs, retries, base_delay, backoff)
+                    try:
+                        if isinstance(result, str) and '"error"' in result:
+                            status = "error"
+                    except Exception:
+                        pass
+                    return result
+                except Exception:
+                    status = "exception"
+                    raise
+                finally:
+                    try:
+                        from src.metrics import inc_tool_call, observe_tool_duration
+
+                        inc_tool_call(fn.__name__, status)
+                        observe_tool_duration(fn.__name__, time.monotonic() - t0)
+                    except Exception:
+                        pass
 
         return wrapper
 

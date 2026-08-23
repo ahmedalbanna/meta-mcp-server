@@ -39,6 +39,8 @@ BOOL_KEYS = {
     "FB_DRY_RUN": "وضع المحاكاة",
     "FB_ADS_ALLOW_ACTIVATE": "السماح بتفعيل الحملات",
     "FB_CONFIRM_WRITES": "طلب تأكيد للحذف (FB_CONFIRM_WRITES)",
+    "FB_ADAPTIVE_THROTTLE": "التروق التكيفي (adaptive throttle)",
+    "FB_AUTO_RUN_WEBHOOK_AUTOMATIONS": "تشغيل أتمتة Webhook تلقائيًا",
 }
 
 

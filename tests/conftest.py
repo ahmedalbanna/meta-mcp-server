@@ -198,6 +198,7 @@ ALL_MODULES = (
     "events",
     "webhook_automations",
     "scheduler",
+    "metrics",
     "resources_prompts",
 )
 
@@ -224,6 +225,7 @@ def register_all(recorder):
         instagram,
         leads,
         messenger,
+        metrics,
         pages,
         reports,
         resources_prompts,
@@ -249,6 +251,7 @@ def register_all(recorder):
         "instagram": instagram,
         "leads": leads,
         "messenger": messenger,
+        "metrics": metrics,
         "pages": pages,
         "reports": reports,
         "resources_prompts": resources_prompts,

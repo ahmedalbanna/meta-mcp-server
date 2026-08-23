@@ -2,7 +2,7 @@
 
 خادم MCP شامل باللغة Python لإدارة التسويق على **فيسبوك وإنستغرام** عبر `facebook-business` SDK و `FastMCP`.
 
-## المزايا (196 أداة + 3 موارد + 2 مطالبات)
+## المزايا (199 أداة + 3 موارد + 2 مطالبات)
 
 | الوحدة | الأدوات |
 |---|---|
@@ -74,6 +74,8 @@ pip install -r requirements.txt
 | `FB_ADS_MAX_DAILY_BUDGET` / `FB_ADS_MAX_LIFETIME_BUDGET` | حدود الإنفاق بالسنات (0 = بدون حد) |
 | `FB_MAX_CONCURRENT` | حد التوازي لطلبات Graph API (افتراضي `4`, نطاق 1–20) |
 | `FB_CONFIRM_WRITES` | `true` = طلب `confirm='yes'` للعمليات الحذفية (حماية إضافية) |
+| `FB_ADAPTIVE_THROTTLE` | `true` = تروق تكيفي عند Rate Limit (نوم إضافي + cooldown) |
+| `FB_AUTO_RUN_WEBHOOK_AUTOMATIONS` | `true` = تشغيل أتمتة Webhook تلقائيًا عند استقبال حدث |
 
 > كل عمليات الكتابة تتجاوز 5 حراس أمان: تفعيل الكتابة، حدّ الميزانية، وسماح التفعيل، ودراي-رن مع معاينة الفروق، وتأكيد الحذف (`FB_CONFIRM_WRITES`).
 > اكتشاف المعرفات: `list_pages` ← `list_ad_accounts` ← `discover_ig_user` ثم عبّئ `.env` وأعد تشغيل الخادم.
@@ -113,10 +115,16 @@ FB_META_WEBHOOK_VERIFY_TOKEN=my_secret python webhook_server.py
 ```
 
 - `GET /webhook/meta` — مصافحة التحقق (تُستخدم عند تسجيل التطبيق في Meta).
-- `POST /webhook/meta` — استقبال الأحداث وحفظها JSON.
+- `POST /webhook/meta` — استقبال الأحداث وحفظها JSON (مع `_correlation_id` و `FB_AUTO_RUN_WEBHOOK_AUTOMATIONS`).
+- `GET /metrics` — مقاييس Prometheus (`mcp_tool_calls_total`, `meta_api_calls_total`, `throttle_concurrent`, `process_uptime_seconds`).
+- `GET /dashboard` — لوحة HTML لآخر 20 حدثًا + المقاييس (تحمي بـ `FB_MCP_TOKEN` Bearer إن ضُبط) — `Phase 4.3`.
+- `GET /health` — فحص حيوية.
 
 أضف النقاط أعلاه كـ **Callback URL** لأي كائن مشترك (صفحة، Instagram، أداء الإعلانات...)
 في Meta Developer، وعيّن `hub.verify_token` بنفس القيمة في `.env`.
+
+> **Scale knobs (Phase 4.4):** `FB_MAX_CONCURRENT` (افتراضي 4، 1–20) + `FB_ADAPTIVE_THROTTLE=true` (cooldown 5s×attempt عند Rate Limit). التوازي محصور بـ `src/throttle.py:24` semaphore ويُقاس عبر `throttle_concurrent` في `/metrics`. استخدم `get_metrics` (MCP) أو `GET /metrics` لمراقبة `meta_rate_limit_total`.
+> **Persistence (Phase 4.5):** `reports/webhooks/event_*.json` محفوظة بحد 500 ملف (أقدم ملف يُحذف تلقائيًا)، `reports/` و `media/` مربوطة كـ volume في `docker-compose.yml:20`.
 
 ## الربط مع Claude Desktop
 

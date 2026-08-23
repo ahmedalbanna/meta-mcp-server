@@ -26,6 +26,7 @@ from src import (
     instagram,
     leads,
     messenger,
+    metrics,
     pages,
     reports,
     resources_prompts,
@@ -65,7 +66,7 @@ def main() -> None:
     _install_exception_hook()
     log.info("حد التوازي لطلبات Graph API: %d", MAX_CONCURRENT)
 
-    # Register all tool modules
+    # Register all tool modules (Phase 4 adds metrics)
     for module in (
         discovery,
         campaigns,
@@ -88,6 +89,7 @@ def main() -> None:
         events,
         webhook_automations,
         scheduler,
+        metrics,
         resources_prompts,
     ):
         module.register(mcp)

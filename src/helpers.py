@@ -122,16 +122,59 @@ def get_page_api() -> FacebookAdsApi:
 @concurrency_limit()
 def page_api_call(method: str, path: str, params: dict | None = None) -> Any:
     """Perform a raw Graph API call using the page-scoped token."""
+    import time
+
+    from src.utils import get_correlation_id
+
+    cid = get_correlation_id()
+    if cid:
+        params = dict(params or {})
+        # Propagate correlation via custom header emulation (added to params for tracing)
+        params["_cid"] = cid
+    t0 = time.monotonic()
+    try:
+        from src.metrics import inc_api_call
+
+        inc_api_call(method)
+    except Exception:
+        pass
     api = get_page_api()
     resp = api.call(method, (path,), params=params or {})
+    try:
+        from src.metrics import observe_tool_duration
+
+        observe_tool_duration(f"page_api:{method}", time.monotonic() - t0)
+    except Exception:
+        pass
     return resp.json()
 
 
 @async_concurrency_limit()
 def async_page_api_call(method: str, path: str, params: dict | None = None) -> Any:
     """Async version: perform a raw Graph API call using the page-scoped token."""
+    import time
+
+    from src.utils import get_correlation_id
+
+    cid = get_correlation_id()
+    if cid:
+        params = dict(params or {})
+        params["_cid"] = cid
+    t0 = time.monotonic()
+    try:
+        from src.metrics import inc_api_call
+
+        inc_api_call(method)
+    except Exception:
+        pass
     api = get_page_api()
     resp = api.call(method, (path,), params=params or {})
+    try:
+        from src.metrics import observe_tool_duration
+
+        observe_tool_duration(f"page_api:{method}", time.monotonic() - t0)
+    except Exception:
+        pass
     return resp.json()
 
 
@@ -160,24 +203,48 @@ def _json_safe(value: Any) -> Any:
 def handle_error(e: Exception, context: str = "") -> dict[str, Any]:
     """Normalise an exception into an error dict with an Arabic-friendly message.
 
-    Returns a consistent contract: {error, context, code?, subcode?, retry_after?}.
+    Returns a consistent contract: {error, context, code?, subcode?, retry_after?, correlation_id?}.
     Handles FacebookRequestError (including rate-limit without exception),
     generic exceptions, and empty/invalid API responses.
     """
     from facebook_business.exceptions import FacebookRequestError
 
+    # Include correlation_id for tracing (Phase 4.2)
+    try:
+        from src.utils import get_correlation_id
+
+        cid = get_correlation_id() or ""
+    except Exception:
+        cid = ""
+
     if isinstance(e, FacebookRequestError):
         msg = e.api_error_message() or str(e)
         code = e.api_error_code()
         subcode = e.api_error_subcode()
+        # metrics
+        try:
+            from src.metrics import inc_api_error, inc_rate_limit
+
+            inc_api_error(str(code))
+            if code in RATE_LIMIT_CODES or subcode in RATE_LIMIT_SUBCODES:
+                inc_rate_limit(code or 0)
+        except Exception:
+            pass
         # Rate-limit without raising — surface it clearly
         if code in RATE_LIMIT_CODES or subcode in RATE_LIMIT_SUBCODES:
-            logger.warning("Rate limit hit in %s: code=%s subcode=%s", context, code, subcode)
+            logger.warning(
+                "Rate limit hit in %s: code=%s subcode=%s correlation_id=%s",
+                context,
+                code,
+                subcode,
+                cid or "-",
+            )
             return {
                 "error": f"تم تقييد الوصول من Meta (rate limit). كود: {code}/{subcode}",
                 "context": context,
                 "code": code,
                 "subcode": subcode,
+                "correlation_id": cid or None,
                 "retry_after": "إعادة المحاولة بعد 30-60 ثانية",
             }
         return {
@@ -185,9 +252,16 @@ def handle_error(e: Exception, context: str = "") -> dict[str, Any]:
             "context": context,
             "code": code,
             "subcode": subcode,
+            "correlation_id": cid or None,
         }
-    logger.exception("Unexpected error in %s", context)
-    return {"error": f"{context}: {e}".strip(": "), "context": context, "code": None, "subcode": None}
+    logger.exception("Unexpected error in %s correlation_id=%s", context, cid or "-")
+    return {
+        "error": f"{context}: {e}".strip(": "),
+        "context": context,
+        "code": None,
+        "subcode": None,
+        "correlation_id": cid or None,
+    }
 
 
 @concurrency_limit()
@@ -197,23 +271,79 @@ def api_call(method: str, path: str, params: dict | None = None) -> Any:
     Pass path as a tuple so the SDK prepends the versioned Graph base URL.
     Wrapped with a global concurrency limit and rate-limit retry so parallel
     tool invocations cannot overwhelm the Meta Graph API and stall the server.
+    Propagates X-Correlation-ID via params for tracing (Phase 4.2).
     """
+    import time
+
+    from src.utils import get_correlation_id
+
+    cid = get_correlation_id()
+    if cid:
+        params = dict(params or {})
+        # Add correlation header emulation (Meta ignores unknown params but we log it)
+        # SDK doesn't expose headers, so we inject as param for traceability
+        params["_cid"] = cid
+    t0 = time.monotonic()
+    try:
+        from src.metrics import inc_api_call
+
+        inc_api_call(method)
+    except Exception:
+        pass
     api = FacebookAdsApi.get_default_api()
+    # Add correlation header to underlying session if possible
+    try:
+        if cid and hasattr(api, "_session") and hasattr(api._session, "headers"):
+            api._session.headers["X-Correlation-ID"] = cid  # type: ignore
+    except Exception:
+        pass
     resp = api.call(method, (path,), params=params or {})
     data = resp.json()
     if not data:
-        logger.warning("Empty response from Graph API: %s %s", method, path)
+        logger.warning("Empty response from Graph API: %s %s correlation_id=%s", method, path, cid or "-")
+    try:
+        from src.metrics import observe_tool_duration
+
+        observe_tool_duration(f"api:{method}", time.monotonic() - t0)
+    except Exception:
+        pass
     return data
 
 
 @async_concurrency_limit()
 def async_api_call(method: str, path: str, params: dict | None = None) -> Any:
     """Async version: perform a raw Graph API call and return parsed JSON."""
+    import time
+
+    from src.utils import get_correlation_id
+
+    cid = get_correlation_id()
+    if cid:
+        params = dict(params or {})
+        params["_cid"] = cid
+    t0 = time.monotonic()
+    try:
+        from src.metrics import inc_api_call
+
+        inc_api_call(method)
+    except Exception:
+        pass
     api = FacebookAdsApi.get_default_api()
+    try:
+        if cid and hasattr(api, "_session") and hasattr(api._session, "headers"):
+            api._session.headers["X-Correlation-ID"] = cid  # type: ignore
+    except Exception:
+        pass
     resp = api.call(method, (path,), params=params or {})
     data = resp.json()
     if not data:
-        logger.warning("Empty response from Graph API: %s %s", method, path)
+        logger.warning("Empty response from Graph API: %s %s correlation_id=%s", method, path, cid or "-")
+    try:
+        from src.metrics import observe_tool_duration
+
+        observe_tool_duration(f"api:{method}", time.monotonic() - t0)
+    except Exception:
+        pass
     return data
 
 

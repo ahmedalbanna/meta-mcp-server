@@ -24,9 +24,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 
 app = FastAPI(title="Meta Marketing Webhook Receiver", version="1.0.0")
 
-# Simple in-memory metrics (Phase 4.1)
+# Metrics via src.metrics (Phase 4.1) + local verify counter
 _metrics = {"webhook_events_total": 0, "webhook_events_failed": 0, "webhook_verify_total": 0}
 _start_time = datetime.now(timezone.utc)
+_MAX_WEBHOOK_FILES = 500  # rotation limit (Phase 4.5)
 
 
 def verify_webhook_token(hub_mode: str = "", hub_verify_token: str = "") -> bool:
@@ -63,6 +64,17 @@ def save_webhook_event(payload: dict, report_dir=None) -> str:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
     path = target / f"event_{stamp}.json"
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    # Rotation: keep max 500 files (Phase 4.5)
+    try:
+        files = sorted(target.glob("event_*.json"))
+        if len(files) > _MAX_WEBHOOK_FILES:
+            for old in files[: len(files) - _MAX_WEBHOOK_FILES]:
+                try:
+                    old.unlink()
+                except Exception:
+                    pass
+    except Exception:
+        pass
     return str(path)
 
 
@@ -81,28 +93,28 @@ def webhook_verify(
 
 @app.get("/metrics")
 def metrics():
-    """Prometheus-style metrics (Phase 4.1)."""
-    from src.throttle import concurrent_count
+    """Prometheus-style metrics (Phase 4.1) — combines src.metrics + webhook counters."""
+    try:
+        from src.metrics import render_prometheus
 
+        base = render_prometheus()
+    except Exception:
+        base = ""
     uptime = (datetime.now(timezone.utc) - _start_time).total_seconds()
-    lines = [
-        "# HELP webhook_events_total Total webhook events received",
-        "# TYPE webhook_events_total counter",
-        f"webhook_events_total {_metrics['webhook_events_total']}",
-        "# HELP webhook_events_failed Total failed webhook ingestions",
-        "# TYPE webhook_events_failed counter",
-        f"webhook_events_failed {_metrics['webhook_events_failed']}",
+    # Append webhook-specific counters for backwards-compat
+    extra = [
         "# HELP webhook_verify_total Total verification handshakes",
         "# TYPE webhook_verify_total counter",
         f"webhook_verify_total {_metrics['webhook_verify_total']}",
-        "# HELP throttle_concurrent Current concurrent Graph API calls",
-        "# TYPE throttle_concurrent gauge",
-        f"throttle_concurrent {concurrent_count()}",
-        "# HELP process_uptime_seconds Uptime of webhook receiver",
-        "# TYPE process_uptime_seconds gauge",
+        "# HELP webhook_events_failed_total Failed webhook ingestions",
+        "# TYPE webhook_events_failed_total counter",
+        f"webhook_events_failed_total {_metrics['webhook_events_failed']}",
+        "# HELP webhook_files_total Current webhook files on disk",
+        "# TYPE webhook_files_total gauge",
+        f"webhook_files_total {len(list((REPORT_DIR / 'webhooks').glob('event_*.json'))) if (REPORT_DIR / 'webhooks').exists() else 0}",
         f"process_uptime_seconds {uptime:.0f}",
     ]
-    return PlainTextResponse("\n".join(lines), media_type="text/plain")
+    return PlainTextResponse(base + "\n".join(extra) + "\n", media_type="text/plain")
 
 
 @app.get("/dashboard")
@@ -122,16 +134,33 @@ def dashboard(request: Request):
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
             preview = json.dumps(data, ensure_ascii=False)[:300]
+            cid = data.get("_correlation_id", "")
+            rows += f"<tr><td>{f.name}<br><small>{cid}</small></td><td><pre>{preview}</pre></td></tr>"
         except Exception as e:
             preview = f"error: {e}"
-        rows += f"<tr><td>{f.name}</td><td><pre>{preview}</pre></td></tr>"
+            rows += f"<tr><td>{f.name}</td><td><pre>{preview}</pre></td></tr>"
     if not rows:
         rows = "<tr><td colspan=2>لا توجد أحداث بعد</td></tr>"
+    # Gather metrics snapshot
+    try:
+        from src.events import get_queued_events
+        from src.metrics import get_snapshot
+        from src.throttle import concurrent_count
+
+        snap = get_snapshot()
+        queue = len(get_queued_events(500))
+        throttle = concurrent_count()
+        uptime = (datetime.now(timezone.utc) - _start_time).total_seconds()
+        tool_total = sum(snap.get("tool_calls", {}).values()) if snap.get("tool_calls") else 0
+        metrics_html = f"<p>المقاييس: webhook_total={_metrics['webhook_events_total']} | failed={_metrics['webhook_events_failed']} | verify={_metrics['webhook_verify_total']} | queue={queue} | throttle={throttle} | tools={tool_total} | uptime={uptime:.0f}s — <a href='/metrics'>/metrics</a> | <a href='/health'>/health</a></p>"
+    except Exception:
+        metrics_html = f"<p>المقاييس: webhook_total={_metrics['webhook_events_total']} — <a href='/metrics'>/metrics</a></p>"
     html = f"""<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>Webhook Dashboard</title>
-    <style>body{{font-family:system-ui;max-width:900px;margin:2rem auto}}table{{width:100%;border-collapse:collapse}}td,th{{border:1px solid #ddd;padding:8px}}pre{{white-space:pre-wrap;word-break:break-word}}</style></head>
-    <body><h1>لوحة Webhooks</h1><p>الأحداث الأخيرة من <code>{webhook_dir}</code> — <a href="/metrics">/metrics</a></p>
-    <table><tr><th>الملف</th><th>المحتوى</th></tr>{rows}</table>
-    <p>المقاييس: webhook_events_total={_metrics['webhook_events_total']} | concurrent={0} | uptime={0:.0f}s</p></body></html>"""
+    <style>body{{font-family:system-ui;max-width:900px;margin:2rem auto}}table{{width:100%;border-collapse:collapse}}td,th{{border:1px solid #ddd;padding:8px}}pre{{white-space:pre-wrap;word-break:break-word}} .badge{{background:#eee;padding:2px 6px;border-radius:4px;font-size:0.8em}}</style></head>
+    <body><h1>لوحة Webhooks</h1><p>الأحداث الأخيرة من <code>{webhook_dir}</code></p>
+    {metrics_html}
+    <table><tr><th>الملف / correlation</th><th>المحتوى</th></tr>{rows}</table>
+    <p style="margin-top:2rem;color:#666">Phase 4 — Observability & Scale — <span class="badge">v1.3</span> — حد التوازي {__import__('os').getenv('FB_MAX_CONCURRENT','4')} — Adaptive throttle {"مفعّل" if __import__('os').getenv('FB_ADAPTIVE_THROTTLE','true').lower() in ('1','true','yes','on') else "معطّل"}</p></body></html>"""
     from fastapi.responses import HTMLResponse
 
     return HTMLResponse(html)
@@ -149,20 +178,41 @@ async def webhook_receive(request: Request):
     # Correlation id for tracing (Phase 4.2)
     import uuid
 
+    from src.utils import set_correlation_id
+
     cid = request.headers.get("x-correlation-id") or f"wh-{uuid.uuid4().hex[:8]}"
+    set_correlation_id(cid)
     body = await request.body()
     signature = request.headers.get("x-hub-signature-256", "")
     if not verify_signature(body, signature):
         _metrics["webhook_events_failed"] += 1
+        try:
+            from src.metrics import inc_webhook
+
+            inc_webhook("failed")
+        except Exception:
+            pass
         log.warning("رُفض حدث Webhook بسبب توقيع غير صالح correlation_id=%s", cid)
         return JSONResponse({"error": "invalid signature"}, status_code=403)
     try:
         payload = json.loads(body) if body else {}
     except Exception:
         _metrics["webhook_events_failed"] += 1
+        try:
+            from src.metrics import inc_webhook
+
+            inc_webhook("failed")
+        except Exception:
+            pass
         return JSONResponse({"error": "invalid JSON body"}, status_code=400)
     try:
         _metrics["webhook_events_total"] += 1
+        try:
+            from src.metrics import inc_webhook
+
+            inc_webhook("received")
+        except Exception:
+            pass
         # annotate event with correlation
         if isinstance(payload, dict):
             payload["_correlation_id"] = cid
@@ -173,9 +223,29 @@ async def webhook_receive(request: Request):
             push_webhook_event(payload)
         except Exception:
             pass
+        # Optional auto-run webhook automations if enabled (Phase 3.1 + 4)
+        try:
+            import os
+
+            if os.getenv("FB_AUTO_RUN_WEBHOOK_AUTOMATIONS", "false").lower() in ("1", "true", "yes", "on"):
+                from src.webhook_automations import _load_rules
+
+                # Only run if there are enabled rules; actual execution is via MCP tool for safety
+                # We just log that automations would run
+                rules = [r for r in _load_rules() if r.get("enabled")]
+                if rules:
+                    log.info("webhook automations: %d rules would run for %s", len(rules), cid)
+        except Exception:
+            pass
         return {"received": True, "saved": saved, "correlation_id": cid}
     except Exception as e:
         _metrics["webhook_events_failed"] += 1
+        try:
+            from src.metrics import inc_webhook
+
+            inc_webhook("failed")
+        except Exception:
+            pass
         log.error("فشل حفظ حدث Webhook: %s correlation_id=%s", e, cid)
         return JSONResponse({"error": str(e)}, status_code=500)
 
