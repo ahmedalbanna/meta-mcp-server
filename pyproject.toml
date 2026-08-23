@@ -42,7 +42,7 @@ meta-webhook = "webhook_server:app"
 [project.optional-dependencies]
 dev = [
     "pytest==9.1.1",
-    "pytest-cov==6.0.0",
+    "pytest-cov==7.1.0",
     "ruff==0.4.4",
     "mypy==1.10.0",
     "types-requests",
