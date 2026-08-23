@@ -14,7 +14,7 @@ import logging
 from datetime import datetime, timezone
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from src.config import APP_SECRET, MCP_HTTP_TOKEN, META_WEBHOOK_VERIFY_TOKEN, REPORT_DIR, WEBHOOK_PORT
@@ -112,9 +112,9 @@ def save_webhook_event(payload: dict, report_dir=None) -> str:
 
 @app.get("/webhook/meta")
 def webhook_verify(
-    hub_mode: str = "",
-    hub_verify_token: str = "",
-    hub_challenge: str = "",
+    hub_mode: str = Query("", alias="hub.mode"),
+    hub_verify_token: str = Query("", alias="hub.verify_token"),
+    hub_challenge: str = Query("", alias="hub.challenge"),
 ):
     """Meta subscription verification handshake."""
     _metrics["webhook_verify_total"] += 1

@@ -272,21 +272,21 @@ def register(mcp):
         """أتمتة webhook."""
         return "ساعد في أتمتة webhook لـ " + topic + " — صمم أتمتة لحدث {event} (وحدة webhook_automations)"
 
-    @mcp.resource("webhook_automations://templates")
+    @mcp.resource("webhook-automations://templates")
     async def webhook_automations_extra_resource() -> str:
         """قوالب الأتمتة."""
         try:
             return json_dumps(
                 {
                     "module": "webhook_automations",
-                    "resource": "webhook_automations://templates",
+                    "resource": "webhook-automations://templates",
                     "hint": "قوالب الأتمتة",
                 }
             )
         except Exception as e:
             from src.helpers import handle_error
 
-            return json_dumps(handle_error(e, "webhook_automations://templates"))
+            return json_dumps(handle_error(e, "webhook-automations://templates"))
 
     @mcp.prompt()
     def webhook_test_prompt(topic: str = "webhook_automations") -> str:

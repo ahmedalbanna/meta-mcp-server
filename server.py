@@ -40,7 +40,11 @@ from src.throttle import MAX_CONCURRENT
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("meta-mcp")
 
-mcp = FastMCP("meta-marketing-pro")
+mcp = FastMCP(
+    "meta-marketing-pro",
+    host=os.getenv("MCP_HOST", "0.0.0.0"),
+    port=int(os.getenv("MCP_PORT", os.getenv("PORT", "8000"))),
+)
 
 
 # Log + swallow unhandled tool exceptions so a single bad request can never take

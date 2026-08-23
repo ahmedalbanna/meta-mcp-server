@@ -127,7 +127,28 @@ FB_META_WEBHOOK_VERIFY_TOKEN=my_secret python webhook_server.py
 في Meta Developer، وعيّن `hub.verify_token` بنفس القيمة في `.env`.
 
 > **Scale knobs (Phase 4.4):** `FB_MAX_CONCURRENT` (افتراضي 4، 1–20) + `FB_ADAPTIVE_THROTTLE=true` (cooldown 5s×attempt عند Rate Limit). التوازي محصور بـ `src/throttle.py:24` semaphore ويُقاس عبر `throttle_concurrent` في `/metrics`. استخدم `get_metrics` (MCP) أو `GET /metrics` لمراقبة `meta_rate_limit_total`.
-> **Persistence (Phase 4.5):** `reports/webhooks/event_*.json` محفوظة بحد 500 ملف (أقدم ملف يُحذف تلقائيًا)، `reports/` و `media/` مربوطة كـ volume في `docker-compose.yml:20`.
+> **Persistence (Phase 4.5):** `reports/webhooks/event_*.json` محفوظة بحد 500 ملف (أقدم ملف يُحذف تلقائيًا)، `reports/` و `media/` مربوطة كـ volume في `docker-compose.yml` (volumes `reports/` + `media/`).
+
+## النشر باستخدام Docker
+
+```bash
+# بناء الصورة وتشغيل الحاوية (MCP + مستقبل Webhooks معًا)
+docker compose up -d --build
+```
+
+| الخدمة | المنفذ داخل الحاوية | المنفذ على المضيف |
+|---|---|---|
+| MCP server (streamable-http) | 8000 | **18000** |
+| Webhook receiver | 8080 | **18080** |
+
+- **MCP endpoint:** `http://<host>:18000/mcp`
+- **Webhook handshake:** `GET http://<host>:18080/webhook/meta?hub.mode=subscribe&hub.verify_token=...&hub.challenge=...`
+- **Webhook ingest:** `POST http://<host>:18080/webhook/meta`
+- عدّل تعيين المنافذ في `docker-compose.yml` إن كانت 18000/18080 مشغولة على مضيفك.
+
+المتغيرات تُقرأ من `.env` تلقائيًا (يُركَّب داخل الحاوية كـ `/app/.env:ro`)، ويجب ضبط `FB_META_WEBHOOK_VERIFY_TOKEN` و `FB_WEBHOOK_PORT=8080` فيه قبل تسجيل الـ Callback URL في Meta Developer.
+
+> ملاحظة: `.dockerignore` يستثني الأسرار (`*.env`) ولا تُنسخ أبدًا داخل الصورة.
 
 ## الربط مع Claude Desktop
 

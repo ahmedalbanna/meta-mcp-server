@@ -9,7 +9,7 @@
 ## Secrets
 
 - Never commit `.env`. It is git-ignored and docker-ignored (`.dockerignore`).
-- `Dockerfile:13` does not copy `.env`; inject via `docker-compose.yml:10 environment` or `--env-file`.
+- `Dockerfile` does not copy `.env`; inject via `docker-compose.yml environment` (interpolated from `.env`) or `--env-file`. The container also receives `.env` mounted read-only at `/app/.env:ro` for runtime loading.
 - Rotate a leaked System User token immediately via Meta Business Settings → System Users → Generate New Token; revoke old.
 
 ## Hardening in this repo

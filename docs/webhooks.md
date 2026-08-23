@@ -4,6 +4,8 @@
 
 `webhook_server.py` — FastAPI `:8080`
 
+> Query params use dotted names (`hub.mode`, `hub.verify_token`, `hub.challenge`) — mapped via `Query(alias=...)`; underscore args alone would never populate.
+
 - `GET /webhook/meta?hub.mode=subscribe&hub.verify_token=...&hub.challenge=...` — handshake
 - `POST /webhook/meta` — ingest, verify `X-Hub-Signature-256`, save to `reports/webhooks/event_*.json` (500 rotation), push to `src/events` queue
 - `GET /metrics` — Prometheus (`webhook_events_total`, `throttle_concurrent`)
@@ -13,6 +15,9 @@
 ```bash
 FB_META_WEBHOOK_VERIFY_TOKEN=my_secret python webhook_server.py
 curl http://localhost:8080/metrics
+
+# Docker: receiver runs alongside the MCP server; host port mapping in docker-compose.yml
+docker compose up -d --build   # MCP -> :18000, Webhooks -> :18080
 ```
 
 ## Automations (Phase 3.1)
