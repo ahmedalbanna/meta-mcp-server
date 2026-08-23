@@ -4,5 +4,5 @@ pytest-cov==6.0.0
 ruff==0.4.4
 mypy==1.10.0
 types-requests
-pip-audit==2.7.3
+pip-audit==2.10.1
 pre-commit==4.0.1
