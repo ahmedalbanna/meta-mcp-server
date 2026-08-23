@@ -470,6 +470,65 @@ def register(mcp):
         except Exception as e:
             return json_dumps(handle_error(e, "suggest_lookalike"))
 
+    @mcp.tool()
+    @concurrency_limit()
+    def suggest_targeting(
+        product: str,
+        country: str = "EG",
+        age_min: int = 18,
+        age_max: int = 65,
+        interests: str = "",
+        language: str = "ar",
+    ) -> str:
+        """
+        اقتراح استهداف مدعوم بـ LLM لمنتج معين.
+        interests: كلمات مفتاحية مفصولة بفواصل (مثال: fashion, shoes)
+        language: ar | en
+        """
+        try:
+            # Try LLM first
+            try:
+                from src.llm import call_llm
+
+                prompt = (
+                    f"Suggest Meta ads targeting for product '{product}' in {country}, age {age_min}-{age_max}, "
+                    f"interests: {interests or 'general'}. Language {language}. "
+                    "Return JSON with keys: geo_locations, age_min, age_max, gender, interests (list of {id,name}), "
+                    "behaviors, targeting_automation. Keep it valid for Graph API create_adset."
+                )
+                system = "You are a Meta ads targeting expert. Return valid JSON only."
+                llm_out = call_llm(prompt, system=system)
+                if llm_out:
+                    import json as _json2
+
+                    try:
+                        parsed = _json2.loads(llm_out)
+                        if isinstance(parsed, dict) and "geo_locations" in parsed:
+                            return json_dumps({"product": product, "targeting": parsed, "source": "llm"})
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            # Fallback heuristic template
+            interest_list = [i.strip() for i in interests.split(",") if i.strip()]
+            # Simple mapping: each interest -> id placeholder (would need real interest search in prod)
+            interests_payload = [{"id": f"interest_{i[:10]}", "name": i} for i in interest_list[:5]]
+            targeting: dict = {
+                "geo_locations": {"countries": [country.upper()]},
+                "age_min": age_min,
+                "age_max": age_max,
+                "targeting_automation": {"advantage_audience": 0},
+            }
+            if interests_payload:
+                targeting["interests"] = interests_payload
+            # Gender heuristic
+            if language == "ar":
+                targeting["genders"] = [0]  # 0=all
+            return json_dumps({"product": product, "targeting": targeting, "source": "template"})
+        except Exception as e:
+            return json_dumps(handle_error(e, "suggest_targeting"))
+
     @mcp.resource("audiences://overview")
     async def audiences_resource() -> str:
         """نظرة عامة على الجماهير."""

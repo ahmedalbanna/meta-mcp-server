@@ -6,7 +6,7 @@
 |---|---|---|---|
 | `ads` | 10 | 2 | 1 |
 | `adsets` | 8 | 2 | 2 |
-| `audiences` | 10 | 2 | 1 |
+| `audiences` | 11 | 2 | 1 |
 | `automation` | 5 | 2 | 3 |
 | `breakdowns` | 4 | 2 | 2 |
 | `business` | 5 | 2 | 2 |
@@ -16,7 +16,7 @@
 | `discovery` | 5 | 2 | 2 |
 | `events` | 3 | 2 | 2 |
 | `finance` | 9 | 2 | 1 |
-| `insights` | 5 | 2 | 3 |
+| `insights` | 6 | 2 | 3 |
 | `instagram` | 35 | 2 | 2 |
 | `leads` | 7 | 2 | 2 |
 | `messenger` | 7 | 2 | 2 |
@@ -27,7 +27,7 @@
 | `webhook_automations` | 5 | 2 | 2 |
 | `whatsapp` | 6 | 2 | 3 |
 
-**Total:** 199 tools + 44 resources + 44 prompts
+**Total:** 201 tools + 44 resources + 44 prompts
 
 
 ## `ads` — 10 tools
@@ -61,7 +61,7 @@
 - 📦 **resource** `active_adsets_resource` — قائمة المجموعات الإعلانية النشطة.
 - 💬 **prompt** `adset_targeting_prompt` — مساعد استهداف مجموعة إعلانية.
 
-## `audiences` — 10 tools
+## `audiences` — 11 tools
 
 - 🛠️ **tool** `list_custom_audiences` — قائمة الجماهير المخصصة في الحساب.
 - 🛠️ **tool** `create_custom_audience` — إنشاء جمهور مخصص جديد.
@@ -73,6 +73,7 @@
 - 🛠️ **tool** `get_audience_overlap` — تقدير التداخل بين جمهورين (overlap) عبر approximate_count.
 - 🛠️ **tool** `estimate_reach` — تقدير الوصول (Reach Estimate) لاستهداف معين.
 - 🛠️ **tool** `suggest_lookalike` — اقتراح إعدادات Lookalike بناءً على حجم الجمهور المصدر.
+- 🛠️ **tool** `suggest_targeting` — اقتراح استهداف مدعوم بـ LLM لمنتج معين.
 - 📦 **resource** `audiences_resource` — نظرة عامة على الجماهير.
 - 💬 **prompt** `audience_builder_prompt` — بناء جمهور.
 - 📦 **resource** `audiences_list_resource` — قائمة الجماهير المخصصة.
@@ -142,7 +143,7 @@
 - 🛠️ **tool** `create_product` — إنشاء منتج داخل كتالوج.
 - 🛠️ **tool** `update_product` — تعديل بيانات منتج. الحقول المُرسلة فقط تُحدّث. لمسح حقل أرسله كـ فارغ ("").
 - 🛠️ **tool** `delete_product` — حذف منتج من الكتالوج.
-- 🛠️ **tool** `batch_create_products` — إنشاء عدة منتجات دفعة واحدة عبر Batch API.
+- 🛠️ **tool** `batch_create_products` — إنشاء عدة منتجات دفعة واحدة عبر Batch API (يدعم حتى 1000 منتج، مقسم تلقائيًا).
 - 🛠️ **tool** `create_product_feed` — إنشاء خلاصة (Feed) لكتالوج منتجات.
 - 🛠️ **tool** `get_feed_uploads` — حالة رفع الخلاصة الأخيرة (أخطاء/تحديثات/حذف).
 - 🛠️ **tool** `delete_product_feed` — حذف خلاصة منتجات.
@@ -165,7 +166,7 @@
 - 🛠️ **tool** `generate_creative_preview` — توليد معاينة إعلان من معرّف الإبداع (AdCreative) مباشرة.
 - 🛠️ **tool** `generate_creative_template` — توليد قالب إبداعي جاهز (نص أساسي، عنوان، وصف، CTA، نوع الإبداع) بناءً على الهدف.
 - 🛠️ **tool** `generate_ad_copy` — توليد 5 نصوص إعلانية (primary_text) مع عناوين و CTA — مساعد إبداعي ذكي.
-- 🛠️ **tool** `generate_caption_from_image` — توليد كابشن من رابط صورة (يتطلب وصف الصورة — حاليًا قالب ذكي، مستقبلاً Vision LLM).
+- 🛠️ **tool** `generate_caption_from_image` — توليد كابشن من رابط صورة — Vision LLM (gpt-4o) إن وُجد، وإلا قالب ذكي.
 - 📦 **resource** `creatives_resource` — قوالب الإبداع.
 - 💬 **prompt** `creative_brief_prompt` — بريف إبداعي.
 - 💬 **prompt** `ad_copy_prompt` — إنشاء نصوص إعلانية جذابة.
@@ -209,13 +210,14 @@
 - 💬 **prompt** `finance_report_prompt` — تقرير مالي.
 - 📦 **resource** `account_summary_resource` — ملخص أداء الحساب الإعلاني.
 
-## `insights` — 5 tools
+## `insights` — 6 tools
 
 - 🛠️ **tool** `get_account_insights` — تحليلات على مستوى الحساب الإعلاني.
 - 🛠️ **tool** `get_campaign_insights` — تحليلات حملة معينة.
 - 🛠️ **tool** `get_adset_insights` — تحليلات مجموعة إعلانية معينة.
 - 🛠️ **tool** `get_ad_insights` — تحليلات إعلان معين.
 - 🛠️ **tool** `get_account_insights_trend` — تحليلات الحساب على مدار الفترة (يومية/أسبوعية).
+- 🛠️ **tool** `detect_insights_anomaly` — كشف الشذوذ في التحليلات (CTR/CPC drop > threshold%).
 - 📦 **resource** `insights_resource` — قوالب التحليلات.
 - 💬 **prompt** `insights_analysis_prompt` — تحليل رؤى.
 - 💬 **prompt** `report_insight_prompt` — تحليل تقرير وتوصيات.

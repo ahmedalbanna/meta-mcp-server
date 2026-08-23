@@ -151,6 +151,81 @@ def register(mcp):
         except Exception as e:
             return json_dumps(handle_error(e, "get_account_insights_trend"))
 
+    @mcp.tool()
+    @concurrency_limit()
+    def detect_insights_anomaly(
+        date_preset_current: str = "last_7d",
+        date_preset_previous: str = "last_14d",
+        metrics: str = "spend,impressions,clicks,ctr,cpc,reach",
+        threshold: float = 20.0,
+    ) -> str:
+        """
+        كشف الشذوذ في التحليلات (CTR/CPC drop > threshold%).
+        يقارن فترتين ويكشف انخفاض CTR أو ارتفاع CPC.
+        threshold: نسبة مئوية للتنبيه (افتراضي 20%)
+        """
+        try:
+            fields = _validate(date_preset_current, metrics)
+            account = AdAccount(AD_ACCOUNT_ID)
+            cur = account.get_insights(params={"date_preset": date_preset_current, "fields": fields})
+            cur_rows = [to_dict(i) for i in cur]
+            prev = account.get_insights(params={"date_preset": date_preset_previous, "fields": fields})
+            prev_rows = [to_dict(i) for i in prev]
+
+            def avg(m, rows):
+                vals = []
+                for r in rows:
+                    try:
+                        vals.append(float(r.get(m, 0)))
+                    except Exception:
+                        pass
+                return sum(vals) / len(vals) if vals else 0
+
+            anomalies = []
+            for m in fields:
+                c = avg(m, cur_rows)
+                p = avg(m, prev_rows)
+                if p == 0:
+                    continue
+                change = ((c - p) / p) * 100
+                is_anomaly = False
+                if (
+                    m == "ctr"
+                    and change < -threshold
+                    or m == "cpc"
+                    and change > threshold
+                    or (m == "cpm" and change > threshold or abs(change) > threshold * 1.5)
+                ):
+                    is_anomaly = True
+                if is_anomaly:
+                    anomalies.append(
+                        {"metric": m, "current": round(c, 3), "previous": round(p, 3), "change_pct": round(change, 1)}
+                    )
+
+            llm_summary = None
+            if anomalies:
+                try:
+                    from src.llm import call_llm
+
+                    prompt = f"Analyze Meta ads anomalies: {anomalies} between {date_preset_previous} and {date_preset_current}. Provide 2-3 concise recommendations in Arabic."
+                    llm_summary = call_llm(prompt, system="You are a Meta ads analyst. Be concise and actionable.")
+                except Exception:
+                    pass
+
+            return json_dumps(
+                {
+                    "current_period": date_preset_current,
+                    "previous_period": date_preset_previous,
+                    "anomalies": anomalies,
+                    "anomaly_count": len(anomalies),
+                    "threshold": threshold,
+                    "llm_summary": llm_summary,
+                    "note": "إيجابي يعني ارتفاع، سلبي انخفاض. CTR ↓ و CPC ↑ يعتبران شذوذ.",
+                }
+            )
+        except Exception as e:
+            return json_dumps(handle_error(e, "detect_insights_anomaly"))
+
     @mcp.resource("insights://overview")
     async def insights_resource() -> str:
         """قوالب التحليلات."""

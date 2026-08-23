@@ -176,6 +176,7 @@ def register(mcp):
         توليد 5 نصوص إعلانية (primary_text) مع عناوين و CTA — مساعد إبداعي ذكي.
         tone: friendly | professional | playful | urgent | luxurious
         language: ar | en
+        يستخدم LLM حقيقي إن وُجد OPENAI_API_KEY/ANTHROPIC_API_KEY، وإلا يعود للقوالب.
         """
         try:
             obj = objective.strip().upper()
@@ -183,7 +184,62 @@ def register(mcp):
                 obj = "OUTCOME_SALES"
             tone = tone.strip().lower()
             lang = language.strip().lower()
-            # Lightweight deterministic template — in prod this would call an LLM
+
+            # Try real LLM first (Phase 7.1)
+            try:
+                from src.llm import call_llm
+
+                llm_prompt = (
+                    f"Generate 5 ad copies for product '{product}' for audience '{audience or 'general'}' "
+                    f"with objective {obj}, tone {tone}, language {lang}. "
+                    "Return JSON array of 5 objects with keys: primary_text, headline, description, cta. "
+                    "Make each variation distinct, include CTA from "
+                    + ", ".join(CTA_OPTIONS.get(obj, []))
+                    + ". Keep primary_text <=120 chars."
+                )
+                llm_result = call_llm(
+                    llm_prompt,
+                    system="You are a senior Meta ads copywriter. Return valid JSON only.",
+                )
+                if llm_result:
+                    import json as _json2
+
+                    # Try to parse LLM JSON
+                    try:
+                        parsed = _json2.loads(llm_result)
+                        if isinstance(parsed, list) and len(parsed) >= 1:
+                            # Normalize to our schema
+                            copies = []
+                            for i, item in enumerate(parsed[:5], 1):
+                                copies.append(
+                                    {
+                                        "variation": i,
+                                        "primary_text": item.get("primary_text", "")[:180],
+                                        "headline": item.get("headline", "")[:60],
+                                        "description": item.get("description", "")[:120],
+                                        "cta": item.get("cta", _TEMPLATES.get(obj, _TEMPLATES["OUTCOME_SALES"])["cta"]),
+                                        "tone": tone,
+                                        "source": "llm",
+                                    }
+                                )
+                            return json_dumps(
+                                {
+                                    "product": product,
+                                    "audience": audience or "الجمهور المستهدف",
+                                    "objective": obj,
+                                    "tone": tone,
+                                    "language": lang,
+                                    "copies": copies,
+                                    "suggested_ctas": CTA_OPTIONS.get(obj, []),
+                                    "source": "llm",
+                                }
+                            )
+                    except Exception:
+                        pass  # fallback to template
+            except Exception:
+                pass
+
+            # Fallback deterministic template (offline / no key)
             base_tpl = _TEMPLATES.get(obj, _TEMPLATES["OUTCOME_SALES"])
             tones_ar = {
                 "friendly": "بأسلوب ودود",
@@ -220,6 +276,7 @@ def register(mcp):
                         "description": desc,
                         "cta": base_tpl["cta"],
                         "tone": tone,
+                        "source": "template",
                     }
                 )
             return json_dumps(
@@ -231,6 +288,7 @@ def register(mcp):
                     "language": lang,
                     "copies": copies,
                     "suggested_ctas": CTA_OPTIONS.get(obj, []),
+                    "source": "template",
                 }
             )
         except Exception as e:
@@ -240,7 +298,7 @@ def register(mcp):
     @concurrency_limit()
     def generate_caption_from_image(image_url: str, style: str = "engaging", language: str = "ar") -> str:
         """
-        توليد كابشن من رابط صورة (يتطلب وصف الصورة — حاليًا قالب ذكي، مستقبلاً Vision LLM).
+        توليد كابشن من رابط صورة — Vision LLM (gpt-4o) إن وُجد، وإلا قالب ذكي.
         style: engaging | descriptive | minimal | sales
         """
         try:
@@ -248,7 +306,33 @@ def register(mcp):
                 return json_dumps({"error": "image_url مطلوب"})
             style = style.strip().lower()
             lang = language.strip().lower()
-            # Deterministic stub — in prod call vision model and then LLM
+
+            # Try Vision LLM first (Phase 7.2)
+            try:
+                from src.llm import call_vision
+
+                prompt = f"Generate an Instagram caption in {lang} with style {style} for this image. Include 3 hashtags and a CTA."
+                vision_caption = call_vision(image_url, prompt=prompt)
+                if vision_caption:
+                    # Extract hashtags if present
+                    import re
+
+                    tags = re.findall(r"#\w+", vision_caption)
+                    hashtags = tags[:5] if tags else (["#sale", "#new"] if style == "sales" else ["#photo"])
+                    return json_dumps(
+                        {
+                            "image_url": image_url,
+                            "style": style,
+                            "language": lang,
+                            "caption": vision_caption,
+                            "hashtags": hashtags,
+                            "source": "vision_llm",
+                        }
+                    )
+            except Exception:
+                pass
+
+            # Fallback template
             if lang == "en":
                 templates = {
                     "engaging": f"✨ Look at this! {image_url.split('/')[-1][:20]} — what do you think? Drop a comment 👇 #instagood",
@@ -274,7 +358,8 @@ def register(mcp):
                     "language": lang,
                     "caption": caption,
                     "hashtags": hashtags,
-                    "note": "قالب ذكي محلي — للوصول لـ Vision LLM اربط مفتاح LLM خارجي",
+                    "source": "template",
+                    "note": "قالب محلي — اربط OPENAI_API_KEY للـ Vision",
                 }
             )
         except Exception as e:
