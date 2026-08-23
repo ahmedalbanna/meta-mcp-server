@@ -51,7 +51,7 @@ dev = [
 ]
 sheets = [
     "gspread==6.2.1",
-    "google-auth==2.35.0",
+    "google-auth==2.56.3",
 ]
 docs = [
     "mkdocs==1.6.1",
