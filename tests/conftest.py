@@ -115,7 +115,6 @@ def mock_meta_sdk_recorded():
     api_call_patches = [
         "src.helpers.api_call",
         "src.whatsapp.api_call",
-        "src.finance.api_call",
         "src.instagram.api_call",
         "src.discovery.api_call",
     ]

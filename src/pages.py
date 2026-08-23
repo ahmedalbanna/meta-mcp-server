@@ -141,7 +141,7 @@ def register(mcp):
     @concurrency_limit()
     def get_page_post_insights(
         post_id: str,
-        metrics: str = "post_impressions,post_engaged_users,post_reactions_by_type_total,post_comments,post_shares,post_saves",
+        metrics: str = "post_media_view,post_engaged_users,post_reactions_by_type_total,post_comments,post_shares,post_saves",
     ) -> str:
         """تحليلات منشور صفحة فيسبوك واحد (تفاعل، انطباعات، ردود فعل)."""
         try:
@@ -250,34 +250,21 @@ def register(mcp):
         page_id: str = "",
         period: str = "day",
         days: int = 7,
-        metrics: str = "page_impressions,page_engaged_users,page_fans",
+        metrics: str = "page_views_total,page_post_engagements,page_actions_post_reactions_total",
     ) -> str:
-        """تحليلات صفحة فيسبوك (انطباعات، تفاعل، متابعون)."""
+        """تحليلات صفحة فيسبوك (مشاهدات، تفاعل، تفاعلات المنشورات). ملاحظة: مقاييس impressions/page_fans أُوقفت من Meta في 2025-11."""
         try:
             import time
 
             since = int(time.time()) - days * SECONDS_PER_DAY
-            metric_list = [m.strip() for m in metrics.split(",") if m.strip()]
-
-            def fetch(metric_group, period_value):
-                return _page(page_id).get_insights(
-                    params={
-                        "metric": metric_group,
-                        "period": period_value,
-                        "since": since,
-                    }
-                )
-
-            results = []
-            page_fans = [m for m in metric_list if m == "page_fans"]
-            rest = [m for m in metric_list if m != "page_fans"]
-            if rest:
-                for i in fetch(",".join(rest), period):
-                    results.append(to_dict(i))
-            if page_fans:
-                for i in fetch(",".join(page_fans), "lifetime"):
-                    results.append(to_dict(i))
-            return json_dumps(results)
+            results = _page(page_id).get_insights(
+                params={
+                    "metric": [m.strip() for m in metrics.split(",") if m.strip()],
+                    "period": period,
+                    "since": since,
+                }
+            )
+            return json_dumps([to_dict(i) for i in results])
         except Exception as e:
             return json_dumps(handle_error(e, "get_page_insights"))
 
@@ -407,7 +394,7 @@ def register(mcp):
 
             rows = paginate(
                 lambda params: _page(page_id).get_roles(params=params),
-                fields=["user", "role", "tasks"],
+                fields=["id", "name", "admin_notes", "business_persona", "permitted_tasks"],
                 limit=limit,
             )
             return json_dumps(rows)

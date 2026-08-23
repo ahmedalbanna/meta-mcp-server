@@ -7,7 +7,7 @@ import time
 from src.config import AD_ACCOUNT_ID, BUSINESS_ID, resolve_ad_account_id
 
 logger = logging.getLogger(__name__)
-from src.helpers import api_call, handle_error, json_dumps, to_dict, write_guard
+from src.helpers import handle_error, json_dumps, to_dict, write_guard
 from src.throttle import concurrency_limit
 
 BALANCE_FIELDS = [
@@ -71,24 +71,18 @@ def register(mcp):
     @mcp.tool()
     @concurrency_limit()
     def get_transactions(limit: int = 25) -> str:
-        """آخر المعاملات المالية للحساب الإعلاني (فواتير/مدفوعات/إضافات)."""
+        """سجل معاملات الحساب الإعلاني. ملاحظة: أزالت Meta حافة /transactions من Graph API بالكامل — الفواتير متاحة من Business Manager > Billing."""
         try:
-            data = api_call(
-                "GET",
-                f"{AD_ACCOUNT_ID}/transactions",
-                {
-                    "fields": "type,amount,date,status,billing_reference_number",
-                    "limit": limit,
-                },
-            )
-            return json_dumps(data)
-        except Exception as e:
+            account = AdAccount(AD_ACCOUNT_ID)
+            info = account.api_get(fields=["funding_source_details", "spend_cap", "balance"])
             return json_dumps(
-                handle_error(
-                    e,
-                    "get_transactions: قد يتطلب صلاحية business_management ودور إداري. إن فشل، تحقق من صلاحية الحساب في Business Manager",
-                )
+                {
+                    "account_financials": to_dict(info),
+                    "note": "حافة act_x/transactions أزيلت من Graph API من Meta (تعود بـ error 100 في كل الإصدارات). المعاملات التفصيلية متاحة يدويًا من Business Manager > Billing > Transactions.",
+                }
             )
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_transactions"))
 
     @mcp.tool()
     @concurrency_limit()
@@ -139,7 +133,10 @@ def register(mcp):
         """المستخدمون المرتبطون بالحساب الإعلاني وصلاحياتهم."""
         try:
             account = AdAccount(AD_ACCOUNT_ID)
-            users = account.get_assigned_users(params={"fields": ["name", "role", "tasks", "id"]})
+            params = {"fields": ["id", "name", "tasks"]}
+            if BUSINESS_ID:
+                params["business"] = BUSINESS_ID
+            users = account.get_assigned_users(params=params)
             return json_dumps([to_dict(u) for u in users])
         except Exception as e:
             return json_dumps(handle_error(e, "list_account_users"))

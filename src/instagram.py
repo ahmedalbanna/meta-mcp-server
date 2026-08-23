@@ -113,7 +113,7 @@ def register(mcp):
             ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
             data = api_call(
                 "GET",
-                f"{ig_id}/mentions",
+                f"{ig_id}/tags",
                 {
                     "fields": "id,media_type,media_url,permalink,timestamp,caption,like_count,comments_count",
                     "limit": limit,
@@ -202,12 +202,31 @@ def register(mcp):
         """تحليلات على مستوى حساب إنستغرام. period: day | week | days_28."""
         try:
             ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
-            data = api_call(
-                "GET",
-                f"{ig_id}/insights",
-                {"metric": metric, "period": period},
-            )
-            return json_dumps(data)
+            # Graph v22+: لكل مقياس قيود فترة/نوع مختلفة — نجرب الاستراتيجيتين لكل مقياس
+            requested = [m.strip() for m in metric.split(",") if m.strip()]
+            results = []
+            unavailable = {}
+            for m in requested:
+                attempts = [
+                    {"metric": m, "period": period},
+                    {"metric": m, "period": "day", "metric_type": "total_value"},
+                ]
+                fetched = False
+                last_err = None
+                for params in attempts:
+                    try:
+                        data = api_call("GET", f"{ig_id}/insights", params)
+                        results.extend(data.get("data", []))
+                        fetched = True
+                        break
+                    except Exception as err:
+                        last_err = err
+                if not fetched and last_err is not None:
+                    unavailable[m] = handle_error(last_err, f"get_instagram_account_insights:{m}")
+            out = {"data": results}
+            if unavailable:
+                out["unavailable"] = unavailable
+            return json_dumps(out)
         except Exception as e:
             return json_dumps(handle_error(e, "get_instagram_account_insights"))
 
