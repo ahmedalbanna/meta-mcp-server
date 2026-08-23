@@ -789,6 +789,72 @@ def register(mcp):
         except Exception as e:
             return json_dumps(handle_error(e, "get_instagram_reels_insights"))
 
+    def _host_local_for_ig(file_path: str) -> str:
+        """رفع صورة محلية لإنستغرام (يتطلب رابط عام) عبر uguu.se."""
+        import requests
+        from pathlib import Path
+
+        p = Path(file_path)
+        if not p.exists():
+            # try relative to media dir
+            alt = Path(__file__).resolve().parent.parent / file_path
+            if alt.exists():
+                p = alt
+            else:
+                raise FileNotFoundError(f"الملف غير موجود: {file_path}")
+        with open(p, "rb") as f:
+            r = requests.post("https://uguu.se/upload.php", files={"files[]": f}, timeout=60)
+            r.raise_for_status()
+            data = r.json()
+            if not data.get("success"):
+                raise RuntimeError(f"فشل الرفع: {data}")
+            return data["files"][0]["url"].replace("http://", "https://")
+
+    @mcp.tool()
+    @concurrency_limit()
+    @write_guard
+    def publish_instagram_carousel_from_media(caption: str = "", media_dir: str = "media", instagram_business_id: str = "") -> str:
+        """نشر كاروسيل إنستغرام مباشرة من مجلد محلي (media/*.jpeg) بدون رابط عام.
+
+        caption: النص + هاشتاغ
+        media_dir: مجلد الصور المحلي (افتراضي "media")
+        instagram_business_id: معرف إنستغرام (افتراضي FB_IG_USER_ID)
+        يقرأ 2-10 صور من المجلد، يرفعها لاستضافة مؤقتة ثم ينشر كاروسيل.
+        حل لمشكلة 'image_url يتطلب رابط عام' عند المستخدمين الجدد (Yemen).
+        """
+        try:
+            from pathlib import Path
+
+            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            base = Path(__file__).resolve().parent.parent / media_dir
+            if not base.exists():
+                return json_dumps({"error": f"المجلد غير موجود: {base}"})
+            exts = {".jpg", ".jpeg", ".png", ".webp"}
+            files = sorted([p for p in base.iterdir() if p.suffix.lower() in exts])
+            if len(files) < 2:
+                return json_dumps({"error": f"وجد {len(files)} صور في {base} — الكاروسيل يتطلب 2-10"})
+            if len(files) > 10:
+                files = files[:10]
+            urls = []
+            for f in files:
+                urls.append(_host_local_for_ig(str(f)))
+            # reuse existing carousel logic
+            child_ids = []
+            for url in urls:
+                child = api_call("POST", f"{ig_id}/media", {"image_url": url, "is_carousel_item": "true"})
+                cid = child.get("id")
+                if not cid:
+                    return json_dumps(child)
+                child_ids.append(cid)
+            container = api_call("POST", f"{ig_id}/media", {"media_type": "CAROUSEL", "children": ",".join(child_ids), "caption": caption})
+            creation_id = container.get("id")
+            if not creation_id:
+                return json_dumps(container)
+            result = api_call("POST", f"{ig_id}/media_publish", {"creation_id": creation_id})
+            return json_dumps({"success": True, "children": child_ids, "container": container, "publish": result, "hosted_urls": urls})
+        except Exception as e:
+            return json_dumps(handle_error(e, "publish_instagram_carousel_from_media"))
+
     @mcp.tool()
     @concurrency_limit()
     @write_guard

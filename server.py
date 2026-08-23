@@ -32,6 +32,7 @@ from src import (
     scheduler,
     webhook_automations,
     whatsapp,
+    yemen_bundle,
 )
 from src.config import validate_config
 from src.helpers import init_meta_api
@@ -93,6 +94,7 @@ def main() -> None:
         webhook_automations,
         scheduler,
         metrics,
+        yemen_bundle,
     ):
         module.register(mcp)
         log.info("تم تسجيل وحدة %s", module.__name__.split(".")[-1])

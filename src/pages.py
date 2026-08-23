@@ -87,6 +87,108 @@ def register(mcp):
         except Exception as e:
             return json_dumps(handle_error(e, "publish_page_photo"))
 
+    def _host_local_image_via_uguu(file_path: str) -> str:
+        """رفع صورة محلية إلى استضافة مؤقتة وإرجاع رابط عام (لإنستغرام)."""
+        import requests
+        from pathlib import Path
+
+        p = Path(file_path)
+        if not p.exists():
+            raise FileNotFoundError(f"الملف غير موجود: {file_path}")
+        with open(p, "rb") as f:
+            r = requests.post("https://uguu.se/upload.php", files={"files[]": f}, timeout=60)
+            r.raise_for_status()
+            data = r.json()
+            if not data.get("success") or not data.get("files"):
+                raise RuntimeError(f"فشل الرفع: {data}")
+            url = data["files"][0]["url"]
+            # ensure https
+            return url.replace("http://", "https://")
+
+    @mcp.tool()
+    @concurrency_limit()
+    @write_guard
+    def publish_page_album(image_urls: str, message: str = "", page_id: str = "") -> str:
+        """نشر ألبوم (2-10 صور في بوست واحد) على صفحة فيسبوك — حل لمشكلة multi-image.
+
+        image_urls: روابط الصور مفصولة بفواصل (مثال "https://a.jpg,https://b.jpg")
+        message: نص المنشور (يدعم العربية + هاشتاغ)
+        page_id: معرف الصفحة (افتراضي FB_PAGE_ID)
+        يتطلب FB_ENABLE_WRITES=true. الحد 2-10 صور.
+        """
+        try:
+            pid = page_id or PAGE_ID
+            if not pid:
+                return json_dumps({"error": "PAGE_ID غير مضبوط في .env"})
+            urls = [u.strip() for u in image_urls.split(",") if u.strip()]
+            if len(urls) < 2:
+                return json_dumps({"error": "الألبوم يتطلب 2-10 صور. لصورة واحدة استخدم publish_page_photo"})
+            if len(urls) > 10:
+                return json_dumps({"error": "الحد الأقصى 10 صور للألبوم (أرسلت {})".format(len(urls))})
+            import time
+
+            photo_ids = []
+            for url in urls:
+                # Support local path: if url is local file path, host it first
+                if url.startswith("media/") or url.startswith("/") or url.endswith((".jpg", ".jpeg", ".png", ".webp")) and not url.startswith("http"):
+                    try:
+                        url = _host_local_image_via_uguu(url)
+                    except Exception as e:
+                        return json_dumps({"error": f"فشل رفع الصورة المحلية {url}: {e}"})
+                photo = _page(pid).create_photo(params={"url": url, "published": False})
+                d = to_dict(photo)
+                pid_photo = d.get("id")
+                if not pid_photo:
+                    return json_dumps({"error": f"فشل رفع الصورة {url}", "response": d})
+                photo_ids.append(pid_photo)
+                time.sleep(0.5)
+            attached = [{"media_fbid": p} for p in photo_ids]
+            post = _page(pid).create_feed(params={"message": message, "attached_media": attached})
+            res = to_dict(post)
+            return json_dumps({"success": True, "post_id": res.get("id"), "permalink": f"https://www.facebook.com/{res.get('id','')}", "photo_ids": photo_ids, "result": res})
+        except Exception as e:
+            return json_dumps(handle_error(e, "publish_page_album"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    @write_guard
+    def publish_page_album_from_media(message: str, media_dir: str = "media", page_id: str = "") -> str:
+        """نشر ألبوم مباشرة من مجلد محلي (media/*.jpeg) بدون رابط عام — يرفع الصور تلقائيا.
+
+        message: نص المنشور
+        media_dir: مجلد الصور المحلي (افتراضي "media" → media/image1.jpeg ...)
+        page_id: معرف الصفحة
+        يقرأ كل الصور jpeg/png/webp في المجلد (2-10) وينشرها كألبوم فيسبوك.
+        """
+        try:
+            from pathlib import Path
+
+            import requests
+
+            pid = page_id or PAGE_ID
+            base = Path(__file__).resolve().parent.parent / media_dir
+            # sanitize
+            if not base.exists():
+                return json_dumps({"error": f"المجلد غير موجود: {base}"})
+            exts = {".jpg", ".jpeg", ".png", ".webp"}
+            files = sorted([p for p in base.iterdir() if p.suffix.lower() in exts])
+            if len(files) < 2:
+                return json_dumps({"error": f"وجد {len(files)} صور فقط في {base} — الألبوم يتطلب 2-10"})
+            if len(files) > 10:
+                files = files[:10]
+            # host each via uguu, then reuse publish_page_album logic
+            urls = []
+            for f in files:
+                with open(f, "rb") as fh:
+                    r = requests.post("https://uguu.se/upload.php", files={"files[]": fh}, timeout=60)
+                    r.raise_for_status()
+                    data = r.json()
+                    url = data["files"][0]["url"].replace("http://", "https://")
+                    urls.append(url)
+            return publish_page_album(",".join(urls), message, pid)
+        except Exception as e:
+            return json_dumps(handle_error(e, "publish_page_album_from_media"))
+
     @mcp.tool()
     @concurrency_limit()
     @write_guard
