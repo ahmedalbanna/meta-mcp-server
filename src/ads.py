@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 
-from src.config import AD_ACCOUNT_ID, BASE_DIR
+from src.config import AD_ACCOUNT_ID, BASE_DIR, resolve_ad_account_id
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ def register(mcp):
 
     @mcp.tool()
     @concurrency_limit()
-    def list_ads(adset_id: str = "", limit: int = 25) -> str:
+    def list_ads(adset_id: str = "", limit: int = 25, ad_account_id: str = "") -> str:
         """قائمة الإعلانات (يمكن تحديد مجموعة إعلانية معينة)."""
         try:
             from src.utils import paginate
@@ -68,7 +68,7 @@ def register(mcp):
             def _getter(params):
                 if adset_id:
                     return AdSet(adset_id).get_ads(params=params)
-                return AdAccount(AD_ACCOUNT_ID).get_ads(params=params)
+                return AdAccount(resolve_ad_account_id(ad_account_id)).get_ads(params=params)
 
             rows = paginate(_getter, fields=fields, limit=limit)
             return json_dumps(rows)
@@ -199,7 +199,8 @@ def register(mcp):
         call_to_action مثل: LEARN_MORE, SHOP_NOW, BUY_NOW, SIGN_UP
         """
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
+            acct = resolve_ad_account_id("")
+            account = AdAccount(acct)
             object_story_spec = _build_object_story_spec(
                 page_id, message, image_hash, image_url, video_id, link, headline, call_to_action
             )
@@ -257,13 +258,13 @@ def register(mcp):
 
     @mcp.tool()
     @concurrency_limit()
-    def list_ad_creatives(limit: int = 25) -> str:
+    def list_ad_creatives(limit: int = 25, ad_account_id: str = "") -> str:
         """قائمة الإبداعات (Ad Creatives) في الحساب الإعلاني."""
         try:
             from src.utils import paginate
 
             rows = paginate(
-                lambda params: AdAccount(AD_ACCOUNT_ID).get_ad_creatives(params=params),
+                lambda params: AdAccount(resolve_ad_account_id(ad_account_id)).get_ad_creatives(params=params),
                 limit=limit,
             )
             return json_dumps(rows)

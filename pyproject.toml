@@ -1,6 +1,6 @@
 [project]
 name = "meta-mcp-server"
-version = "1.6.0"
+version = "1.7.0"
 description = "Meta Marketing MCP Server — 201 tools for Facebook/Instagram/WhatsApp advertising"
 requires-python = ">=3.10"
 readme = "README.md"
@@ -62,6 +62,10 @@ ai = [
     "openai==1.40.0",
     "anthropic==0.40.0",
 ]
+scheduler = [
+    "apscheduler==3.10.4",
+    "sqlalchemy==2.0.30",
+]
 
 [tool.ruff]
 target-version = "py310"
@@ -95,6 +99,8 @@ ignore = [
 "src/discovery.py" = ["F401"]
 "src/insights.py" = ["F401", "SIM105"]
 "src/metrics.py" = ["F401"]
+"src/helpers.py" = ["SIM102"]
+"src/scheduler.py" = ["SIM105"]
 "src/llm.py" = ["UP007"]
 
 [tool.mypy]

@@ -3,6 +3,8 @@
 Supports both FB_* (primary, matching env.md) and META_* (legacy alias) names.
 """
 
+from __future__ import annotations
+
 import os
 from pathlib import Path
 
@@ -37,6 +39,25 @@ META_ACCESS_TOKEN = _get("FB_ACCESS_TOKEN", "META_ACCESS_TOKEN")
 # Optional explicit page-scoped token (usually auto-derived from META_ACCESS_TOKEN via me/accounts)
 PAGE_ACCESS_TOKEN = _get("FB_PAGE_ACCESS_TOKEN", "PAGE_ACCESS_TOKEN")
 AD_ACCOUNT_ID = _get("FB_AD_ACCOUNT_ID", "AD_ACCOUNT_ID")
+# Multi-account (Phase 8.1): FB_AD_ACCOUNT_IDS=act_1,act_2  — per-tool ad_account_id override
+_raw_ids = _get("FB_AD_ACCOUNT_IDS", default="")
+if _raw_ids:
+    AD_ACCOUNT_IDS: list[str] = [s.strip() for s in _raw_ids.split(",") if s.strip()]
+    if AD_ACCOUNT_ID and AD_ACCOUNT_ID not in AD_ACCOUNT_IDS:
+        AD_ACCOUNT_IDS.insert(0, AD_ACCOUNT_ID)
+else:
+    AD_ACCOUNT_IDS = [AD_ACCOUNT_ID] if AD_ACCOUNT_ID else []
+
+
+def resolve_ad_account_id(override: str = "") -> str:
+    """Resolve effective ad account id: override > first of AD_ACCOUNT_IDS > AD_ACCOUNT_ID."""
+    if override and override.strip():
+        return override.strip()
+    if AD_ACCOUNT_IDS:
+        return AD_ACCOUNT_IDS[0]
+    return AD_ACCOUNT_ID
+
+
 PAGE_ID = _get("FB_PAGE_ID", "PAGE_ID")
 INSTAGRAM_BUSINESS_ID = _get("FB_IG_USER_ID", "INSTAGRAM_BUSINESS_ID")
 BUSINESS_ID = _get("FB_BUSINESS_ID", "BUSINESS_ID")
@@ -76,6 +97,11 @@ MAX_LIFETIME_BUDGET = _get_int("FB_ADS_MAX_LIFETIME_BUDGET")
 CONFIRM_WRITES = _get_bool("FB_CONFIRM_WRITES", default=False)
 
 MCP_HTTP_TOKEN = _get("FB_MCP_TOKEN")
+# RBAC (Phase 8.2): tasks allowed for this token — ADVERTISE, ANALYZE, MANAGE, DRAFT
+MCP_ALLOWED_TASKS: list[str] = [
+    s.strip().upper() for s in _get("FB_MCP_ALLOWED_TASKS", default="ADVERTISE,ANALYZE,MANAGE,DRAFT").split(",") if s.strip()
+]
+AUDIT_LOG_FILE = REPORT_DIR / "audit.jsonl"
 
 # Webhook receiver (webhook_server.py)
 META_WEBHOOK_VERIFY_TOKEN = _get("FB_META_WEBHOOK_VERIFY_TOKEN", "META_WEBHOOK_VERIFY_TOKEN")
@@ -84,6 +110,11 @@ WEBHOOK_PORT = _get_int("FB_WEBHOOK_PORT", default=8080)
 # Observability & scale (Phase 4)
 ADAPTIVE_THROTTLE = _get_bool("FB_ADAPTIVE_THROTTLE", default=True)
 AUTO_RUN_WEBHOOK_AUTOMATIONS = _get_bool("FB_AUTO_RUN_WEBHOOK_AUTOMATIONS", default=False)
+
+# Scheduler persistence (Phase 8.3): APScheduler with SQLAlchemy at reports/scheduler.db
+SCHEDULER_DB_URL = _get("FB_SCHEDULER_DB_URL", default="")  # e.g. sqlite:///reports/scheduler.db
+if not SCHEDULER_DB_URL:
+    SCHEDULER_DB_URL = f"sqlite:///{(REPORT_DIR / 'scheduler.db').as_posix()}"
 
 REQUIRED_KEYS = {
     "FB_ACCESS_TOKEN": META_ACCESS_TOKEN,

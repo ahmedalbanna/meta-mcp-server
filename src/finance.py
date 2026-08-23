@@ -4,7 +4,7 @@ import asyncio
 import logging
 import time
 
-from src.config import AD_ACCOUNT_ID, BUSINESS_ID
+from src.config import AD_ACCOUNT_ID, BUSINESS_ID, resolve_ad_account_id
 
 logger = logging.getLogger(__name__)
 from src.helpers import api_call, handle_error, json_dumps, to_dict, write_guard
@@ -32,10 +32,10 @@ def register(mcp):
 
     @mcp.tool()
     @concurrency_limit()
-    def get_account_balance() -> str:
+    def get_account_balance(ad_account_id: str = "") -> str:
         """رصيد الحساب الإعلاني والإنفاق وحد الإنفاق والعملة."""
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
+            account = AdAccount(resolve_ad_account_id(ad_account_id))
             info = account.api_get(fields=BALANCE_FIELDS)
             return json_dumps(to_dict(info))
         except Exception as e:
@@ -43,7 +43,7 @@ def register(mcp):
 
     @mcp.tool()
     @concurrency_limit()
-    def get_spend_cap() -> str:
+    def get_spend_cap(ad_account_id: str = "") -> str:
         """حدود الإنفاق الحالية للحساب الإعلاني."""
         try:
             account = AdAccount(AD_ACCOUNT_ID)

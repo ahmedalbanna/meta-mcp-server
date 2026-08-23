@@ -379,6 +379,44 @@ def evaluate_guard(
     return True, ""
 
 
+def _audit_log(tool: str, params: dict, correlation_id: str = "") -> None:
+    """Append audit entry to REPORT_DIR/audit.jsonl (Phase 8.2)."""
+    try:
+        from src.config import AUDIT_LOG_FILE, REPORT_DIR
+
+        REPORT_DIR.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "ts": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+            "tool": tool,
+            "params": {k: v for k, v in params.items() if "token" not in k.lower()},
+            "correlation_id": correlation_id or None,
+        }
+        with open(AUDIT_LOG_FILE, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def _check_rbac(tool: str) -> tuple[bool, str]:
+    """Check if current MCP_ALLOWED_TASKS allows this tool (Phase 8.2)."""
+    try:
+        from src.config import MCP_ALLOWED_TASKS
+
+        # Map tool to required task
+        required = "ANALYZE"
+        if any(x in tool for x in ("create", "update", "delete", "remove", "add_", "ban", "publish", "upload", "send_")):
+            required = "ADVERTISE"
+        elif "lead" in tool or "audience" in tool:
+            required = "MANAGE"
+        if required not in MCP_ALLOWED_TASKS and "ADMIN" not in MCP_ALLOWED_TASKS:
+            # Allow if wildcard
+            if "*" not in MCP_ALLOWED_TASKS:
+                return False, f"مهمة {tool} تتطلب صلاحية {required}. المسموح: {', '.join(MCP_ALLOWED_TASKS)}"
+        return True, ""
+    except Exception:
+        return True, ""
+
+
 def write_guard(fn):
     """Guard mutating tools: enforce write enable, dry-run, activate & budget caps.
 
@@ -386,6 +424,8 @@ def write_guard(fn):
     Rejections include a machine-readable guard code for clients.
     FB_CONFIRM_WRITES: when true, DELETE/remove tools require confirm="yes".
     DRY_RUN: when true, shows diff preview instead of executing.
+    RBAC (Phase 8.2): checks MCP_ALLOWED_TASKS.
+    Audit (Phase 8.2): logs to audit.jsonl.
     """
     sig = inspect.signature(fn)
     is_destructive = "delete" in fn.__name__.lower() or "remove" in fn.__name__.lower() or "ban" in fn.__name__.lower()
@@ -408,6 +448,10 @@ def write_guard(fn):
             elif "الميزانية الإجمالية" in msg:
                 code = "GUARD_LIFETIME_BUDGET_EXCEEDED"
             return json_dumps({"error": msg, "guard": True, "code": code, "subcode": None})
+        # RBAC (Phase 8.2)
+        ok_rbac, rbac_msg = _check_rbac(fn.__name__)
+        if not ok_rbac:
+            return json_dumps({"error": rbac_msg, "guard": True, "code": "GUARD_RBAC_DENIED"})
         # Safety rails v2: confirm required for destructive ops when FB_CONFIRM_WRITES=true
         if CONFIRM_WRITES and is_destructive:
             confirm = bound.arguments.get("confirm", "")
@@ -444,6 +488,14 @@ def write_guard(fn):
                     "note": "محاكاة فقط — لم يتم تنفيذ أي عملية فعلية (FB_DRY_RUN=true)",
                 }
             )
+        # Audit log (Phase 8.2) — before execution
+        try:
+            from src.utils import get_correlation_id
+
+            cid = get_correlation_id()
+        except Exception:
+            cid = ""
+        _audit_log(fn.__name__, {k: v for k, v in bound.arguments.items() if k != "self"}, cid)
         # Strip confirm before dispatching to functions that don't expect it
         if "confirm" in kwargs:
             kwargs.pop("confirm")

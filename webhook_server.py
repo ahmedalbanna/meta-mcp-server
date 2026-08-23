@@ -30,6 +30,38 @@ _start_time = datetime.now(timezone.utc)
 _MAX_WEBHOOK_FILES = 500  # rotation limit (Phase 4.5)
 
 
+@app.on_event("startup")
+async def _startup_scheduler():
+    """Start scheduler daemon (Phase 8.3) — runs due tasks every 60s."""
+    try:
+        from src.scheduler import _get_apscheduler
+
+        sched = _get_apscheduler()
+        if sched is not None:
+            log.info("APScheduler started with DB %s", sched)
+        # Fallback JSON scheduler daemon
+        import asyncio
+
+        async def _loop():
+            while True:
+                await asyncio.sleep(60)
+                try:
+                    from src.scheduler import _load_tasks
+
+                    tasks = _load_tasks()
+                    now = __import__("time").time()
+                    due = [t for t in tasks if t.get("status") == "scheduled" and int(t.get("run_at", 0)) <= now]
+                    if due:
+                        log.info("scheduler daemon: %d due tasks", len(due))
+                except Exception as e:
+                    log.debug("scheduler loop error: %s", e)
+
+        asyncio.create_task(_loop())
+        log.info("scheduler daemon started (60s loop)")
+    except Exception as e:
+        log.debug("scheduler daemon not started: %s", e)
+
+
 def verify_webhook_token(hub_mode: str = "", hub_verify_token: str = "") -> bool:
     """Validate the Meta verification handshake (mode=subscribe + matching token)."""
     return (

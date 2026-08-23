@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 
-from src.config import AD_ACCOUNT_ID
+from src.config import AD_ACCOUNT_ID, resolve_ad_account_id
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +18,11 @@ def register(mcp):
 
     @mcp.tool()
     @concurrency_limit()
-    def list_campaigns(status: str = "", limit: int = 25) -> str:
+    def list_campaigns(status: str = "", limit: int = 25, ad_account_id: str = "") -> str:
         """
         قائمة الحملات الإعلانية في الحساب.
         status اختياري: ACTIVE, PAUSED, DELETED, ARCHIVED
+        ad_account_id: معرف حساب إعلاني بديل (اختياري — افتراضي FB_AD_ACCOUNT_ID / الأول في FB_AD_ACCOUNT_IDS)
         """
         try:
             from src.utils import paginate
@@ -38,8 +39,9 @@ def register(mcp):
             extra = {}
             if status:
                 extra["filtering"] = json_dumps([{"field": "status", "operator": "EQUAL", "value": status}])
+            acct = resolve_ad_account_id(ad_account_id)
             rows = paginate(
-                lambda params: AdAccount(AD_ACCOUNT_ID).get_campaigns(params=params),
+                lambda params: AdAccount(acct).get_campaigns(params=params),
                 fields=fields,
                 params=extra or None,
                 limit=limit,
@@ -92,12 +94,14 @@ def register(mcp):
         daily_budget: int = 0,
         lifetime_budget: int = 0,
         status: str = "PAUSED",
+        ad_account_id: str = "",
     ) -> str:
         """
         إنشاء حملة جديدة.
         objective: OUTCOME_TRAFFIC, OUTCOME_ENGAGEMENT, OUTCOME_AWARENESS,
                    CONVERSIONS, LEAD_GENERATION, OUTCOME_SALES... (يدعم أسماء قديمة مع تحويل تلقائي)
         الميزانية بالعملة الصغرى (مثال 1000 = 10 دولار). حدد daily_budget أو lifetime_budget.
+        ad_account_id: معرف حساب إعلاني بديل (اختياري)
         """
         try:
             # v27 deprecation: map old objectives to new OUTCOME_* with warning
@@ -112,7 +116,8 @@ def register(mcp):
                     objective,
                     __import__("src.config", fromlist=["GRAPH_VERSION"]).GRAPH_VERSION,
                 )
-            account = AdAccount(AD_ACCOUNT_ID)
+            acct = resolve_ad_account_id(ad_account_id)
+            account = AdAccount(acct)
             params = {
                 Campaign.Field.name: name,
                 Campaign.Field.objective: objective,

@@ -61,6 +61,7 @@ pip install -r requirements.txt
 | `FB_API_VERSION` | إصدار Graph API (افتراضي `v26.0`) |
 | `FB_PAGE_ID` | معرف الصفحة — اكتشفه بأداة `list_pages` |
 | `FB_AD_ACCOUNT_ID` | معرف الحساب الإعلاني (مثال `act_...`) — اكتشفه بأداة `list_ad_accounts` |
+| `FB_AD_ACCOUNT_IDS` | قائمة حسابات إعلانية مفصولة بفواصل لـ multi-account (Phase 8.1) — مثال `act_1,act_2` |
 | `FB_IG_USER_ID` | معرف Instagram Business — اكتشفه بأداة `discover_ig_user` |
 | `FB_WABA_ID` | معرف حساب واتساب للأعمال (WABA) — مطلوب لأدوات `whatsapp` |
 | `FB_WHATSAPP_PHONE_NUMBER_ID` | معرف رقم الهاتف المرسل في واتساب — مطلوب لإرسال الرسائل |
@@ -76,6 +77,8 @@ pip install -r requirements.txt
 | `FB_CONFIRM_WRITES` | `true` = طلب `confirm='yes'` للعمليات الحذفية (حماية إضافية) |
 | `FB_ADAPTIVE_THROTTLE` | `true` = تروق تكيفي عند Rate Limit (نوم إضافي + cooldown) |
 | `FB_AUTO_RUN_WEBHOOK_AUTOMATIONS` | `true` = تشغيل أتمتة Webhook تلقائيًا عند استقبال حدث |
+| `FB_MCP_ALLOWED_TASKS` | قائمة مهام RBAC مفصولة بفواصل (Phase 8.2) — مثال `ADVERTISE,ANALYZE` (افتراضي `ADVERTISE,ANALYZE,MANAGE,DRAFT`) |
+| `FB_SCHEDULER_DB_URL` | رابط قاعدة بيانات المجدول (Phase 8.3) — افتراضي `sqlite:///reports/scheduler.db` |
 
 > كل عمليات الكتابة تتجاوز 5 حراس أمان: تفعيل الكتابة، حدّ الميزانية، وسماح التفعيل، ودراي-رن مع معاينة الفروق، وتأكيد الحذف (`FB_CONFIRM_WRITES`).
 > اكتشاف المعرفات: `list_pages` ← `list_ad_accounts` ← `discover_ig_user` ثم عبّئ `.env` وأعد تشغيل الخادم.

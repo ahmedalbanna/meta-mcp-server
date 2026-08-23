@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 
-from src.config import AD_ACCOUNT_ID
+from src.config import AD_ACCOUNT_ID, resolve_ad_account_id
 
 logger = logging.getLogger(__name__)
 from src.utils import normalize_pii
@@ -50,7 +50,7 @@ def register(mcp):
 
     @mcp.tool()
     @concurrency_limit()
-    def list_custom_audiences(limit: int = 25) -> str:
+    def list_custom_audiences(limit: int = 25, ad_account_id: str = "") -> str:
         """قائمة الجماهير المخصصة في الحساب."""
         try:
             from src.utils import paginate
@@ -62,7 +62,7 @@ def register(mcp):
                 CustomAudience.Field.id,
             ]
             rows = paginate(
-                lambda params: AdAccount(AD_ACCOUNT_ID).get_custom_audiences(params=params),
+                lambda params: AdAccount(resolve_ad_account_id(ad_account_id)).get_custom_audiences(params=params),
                 fields=fields,
                 limit=limit,
             )
@@ -74,11 +74,11 @@ def register(mcp):
     @concurrency_limit()
     @write_guard
     def create_custom_audience(
-        name: str, description: str = "", customer_file_source: str = "BOTH_USER_AND_PARTNER_PROVIDED"
+        name: str, description: str = "", customer_file_source: str = "BOTH_USER_AND_PARTNER_PROVIDED", ad_account_id: str = ""
     ) -> str:
         """إنشاء جمهور مخصص جديد."""
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
+            account = AdAccount(resolve_ad_account_id(ad_account_id))
             audience = account.create_custom_audience(
                 params={
                     CustomAudience.Field.name: name,

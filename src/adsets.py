@@ -5,7 +5,7 @@ import time
 
 logger = logging.getLogger(__name__)
 
-from src.config import AD_ACCOUNT_ID
+from src.config import AD_ACCOUNT_ID, resolve_ad_account_id
 
 
 def register(mcp):
@@ -20,7 +20,7 @@ def register(mcp):
 
     @mcp.tool()
     @concurrency_limit()
-    def list_adsets(campaign_id: str = "", limit: int = 25) -> str:
+    def list_adsets(campaign_id: str = "", limit: int = 25, ad_account_id: str = "") -> str:
         """قائمة المجموعات الإعلانية (يمكن تحديد حملة معينة)."""
         try:
             from src.utils import paginate
@@ -39,7 +39,7 @@ def register(mcp):
             def _getter(params):
                 if campaign_id:
                     return Campaign(campaign_id).get_ad_sets(params=params)
-                return AdAccount(AD_ACCOUNT_ID).get_ad_sets(params=params)
+                return AdAccount(resolve_ad_account_id(ad_account_id)).get_ad_sets(params=params)
 
             rows = paginate(_getter, fields=fields, limit=limit)
             return json_dumps(rows)
@@ -84,6 +84,7 @@ def register(mcp):
         status: str = "PAUSED",
         bid_amount: int = 0,
         advantage_audience: bool = False,
+        ad_account_id: str = "",
     ) -> str:
         """
         إنشاء مجموعة إعلانية داخل حملة.
@@ -98,7 +99,7 @@ def register(mcp):
             # Phase 2.3: explicit Advantage+ toggle (default 0 = off for deterministic tests)
             target["targeting_automation"] = {"advantage_audience": 1 if advantage_audience else 0}
             targeting = json_dumps(target)
-            account = AdAccount(AD_ACCOUNT_ID)
+            account = AdAccount(resolve_ad_account_id(ad_account_id))
             params = {
                 AdSet.Field.name: name,
                 AdSet.Field.optimization_goal: optimization_goal,

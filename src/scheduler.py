@@ -1,8 +1,9 @@
 """Scheduler: local cron-like task scheduling via reports/schedule.json.
 
 Phase 3.2 — MCP tools schedule_task / list_scheduled_tasks / cancel / run_due
+Phase 8.3 — APScheduler + SQLAlchemy persistence (reports/scheduler.db)
 
-Persistence: REPORT_DIR/schedule.json
+Persistence: REPORT_DIR/schedule.json (fallback) + REPORT_DIR/scheduler.db via APScheduler
 Execution: via `throttle.concurrent_count` semaphore; actual tool dispatch is via
 dynamic lookup in the MCP Recorder (for tests) or via direct import for prod.
 For now execution is simulated as dry-run unless FB_ENABLE_WRITES true.
@@ -20,9 +21,31 @@ import time
 import uuid
 from typing import Any
 
-from src.config import REPORT_DIR, ensure_report_dir
+from src.config import REPORT_DIR, SCHEDULER_DB_URL, ensure_report_dir
 
 SCHEDULE_FILE = REPORT_DIR / "schedule.json"
+SCHEDULER_DB_FILE = REPORT_DIR / "scheduler.db"
+
+
+def _get_apscheduler():
+    """Return APScheduler instance with SQLAlchemy store if available, else None (Phase 8.3)."""
+    try:
+        from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore  # type: ignore
+        from apscheduler.schedulers.background import BackgroundScheduler  # type: ignore
+
+        jobstores = {"default": SQLAlchemyJobStore(url=SCHEDULER_DB_URL)}
+        scheduler = BackgroundScheduler(jobstores=jobstores, daemon=True)
+        # Start if not running
+        if not scheduler.running:
+            try:
+                scheduler.start()
+            except Exception:
+                pass
+        return scheduler
+    except ImportError:
+        return None
+    except Exception:
+        return None
 
 
 def _load_tasks() -> list[dict[str, Any]]:
@@ -104,7 +127,27 @@ def register(mcp):
             tasks = _load_tasks()
             tasks.append(task)
             _save_tasks(tasks)
-            return json_dumps({"success": True, "task": task, "total": len(tasks)})
+            # Phase 8.3: also persist to APScheduler if available
+            try:
+                sched = _get_apscheduler()
+                if sched is not None:
+                    from datetime import datetime as _dt
+
+                    if cron:
+                        sched.add_job(
+                            lambda: None,
+                            "cron",
+                            id=task_id,
+                            name=name,
+                            kwargs={"tool": tool_name, "params": params},
+                            replace_existing=True,
+                        )
+                    elif run_at:
+                        run_date = _dt.fromtimestamp(run_at)
+                        sched.add_job(lambda: None, "date", run_date=run_date, id=task_id, name=name, replace_existing=True)
+            except Exception as e:
+                logger.debug("APScheduler persist failed (fallback to JSON): %s", e)
+            return json_dumps({"success": True, "task": task, "total": len(tasks), "apscheduler": _get_apscheduler() is not None})
         except Exception as e:
             return json_dumps(handle_error(e, "schedule_task"))
 
@@ -132,6 +175,15 @@ def register(mcp):
             if len(tasks) == orig:
                 return json_dumps({"error": f"المهمة {task_id} غير موجودة"})
             _save_tasks(tasks)
+            try:
+                sched = _get_apscheduler()
+                if sched is not None:
+                    try:
+                        sched.remove_job(task_id)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
             return json_dumps({"success": True, "cancelled": task_id, "remaining": len(tasks)})
         except Exception as e:
             return json_dumps(handle_error(e, "cancel_scheduled_task"))
