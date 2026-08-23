@@ -88,32 +88,43 @@ def register(mcp):
             return json_dumps(handle_error(e, "publish_page_photo"))
 
     def _host_local_image_via_uguu(file_path: str) -> str:
-        """رفع صورة محلية إلى استضافة مؤقتة وإرجاع رابط عام (لإنستغرام)."""
-        import requests
-        from pathlib import Path
+        """رفع صورة محلية → رابط عام دائم (Cloudinary) أو مؤقت (uguu.se fallback).
 
-        p = Path(file_path)
-        if not p.exists():
-            raise FileNotFoundError(f"الملف غير موجود: {file_path}")
-        with open(p, "rb") as f:
-            r = requests.post("https://uguu.se/upload.php", files={"files[]": f}, timeout=60)
-            r.raise_for_status()
-            data = r.json()
-            if not data.get("success") or not data.get("files"):
-                raise RuntimeError(f"فشل الرفع: {data}")
-            url = data["files"][0]["url"]
-            # ensure https
-            return url.replace("http://", "https://")
+        يحاول Cloudinary أولاً (سنوات) عبر src/media_hosting.py، وإن لم يكن CLOUDINARY_URL
+        مضبوطاً يعود تلقائياً إلى uguu.se (72 ساعة). يصلح مشكلة انتهاء صور الكتالوج.
+        """
+        try:
+            from src.media_hosting import host_image
+
+            return host_image(file_path)
+        except Exception:
+            # Fallback direct uguu (legacy)
+            import requests
+            from pathlib import Path
+
+            p = Path(file_path)
+            if not p.exists():
+                raise FileNotFoundError(f"الملف غير موجود: {file_path}")
+            with open(p, "rb") as f:
+                r = requests.post("https://uguu.se/upload.php", files={"files[]": f}, timeout=60)
+                r.raise_for_status()
+                data = r.json()
+                if not data.get("success") or not data.get("files"):
+                    raise RuntimeError(f"فشل الرفع: {data}")
+                url = data["files"][0]["url"]
+                return url.replace("http://", "https://")
 
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def publish_page_album(image_urls: str, message: str = "", page_id: str = "") -> str:
-        """نشر ألبوم (2-10 صور في بوست واحد) على صفحة فيسبوك — حل لمشكلة multi-image.
+    def publish_page_album(image_urls: str, message: str = "", page_id: str = "", product_ids: str = "") -> str:
+        """نشر ألبوم (2-10 صور في بوست واحد) على صفحة فيسبوك — يدعم Product Tagging (اختياري).
 
         image_urls: روابط الصور مفصولة بفواصل (مثال "https://a.jpg,https://b.jpg")
         message: نص المنشور (يدعم العربية + هاشتاغ)
         page_id: معرف الصفحة (افتراضي FB_PAGE_ID)
+        product_ids: معرفات منتجات الكتالوج للـ Shopping Tags (اختياري) — مثال "38981123561474624"
+                      إنستغرام يدعم Tagging مباشر، فيسبوك يضيف روابط المنتجات كتعليق تلقائي.
         يتطلب FB_ENABLE_WRITES=true. الحد 2-10 صور.
         """
         try:
@@ -145,19 +156,43 @@ def register(mcp):
             attached = [{"media_fbid": p} for p in photo_ids]
             post = _page(pid).create_feed(params={"message": message, "attached_media": attached})
             res = to_dict(post)
-            return json_dumps({"success": True, "post_id": res.get("id"), "permalink": f"https://www.facebook.com/{res.get('id','')}", "photo_ids": photo_ids, "result": res})
+            # Product Tagging للفيسبوك: لا يدعم product_tags مباشر، نضيف روابط المنتجات كتعليق تلقائي
+            pids = [p.strip() for p in (product_ids or "").split(",") if p.strip()]
+            if pids and res.get("id"):
+                try:
+                    from facebook_business.adobjects.productitem import ProductItem
+
+                    links = []
+                    for pid_prod in pids[:3]:
+                        try:
+                            prod = ProductItem(pid_prod).api_get(fields=["id", "name", "url", "price"])
+                            d = to_dict(prod)
+                            name = d.get("name", pid_prod)
+                            url = d.get("url", "")
+                            links.append(f"{name}: {url}" if url else name)
+                        except Exception:
+                            links.append(pid_prod)
+                    if links:
+                        comment = "🛍️ المنتجات الموسومة:\n" + "\n".join(links)
+                        from facebook_business.adobjects.post import Post
+
+                        Post(res.get("id"), api=get_page_api()).create_comment(params={"message": comment})
+                except Exception:
+                    pass
+            return json_dumps({"success": True, "post_id": res.get("id"), "permalink": f"https://www.facebook.com/{res.get('id','')}", "photo_ids": photo_ids, "product_ids": pids, "result": res})
         except Exception as e:
             return json_dumps(handle_error(e, "publish_page_album"))
 
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def publish_page_album_from_media(message: str, media_dir: str = "media", page_id: str = "") -> str:
-        """نشر ألبوم مباشرة من مجلد محلي (media/*.jpeg) بدون رابط عام — يرفع الصور تلقائيا.
+    def publish_page_album_from_media(message: str, media_dir: str = "media", page_id: str = "", product_ids: str = "") -> str:
+        """نشر ألبوم مباشرة من مجلد محلي (media/*.jpeg) بدون رابط عام — يدعم Product Tagging.
 
         message: نص المنشور
         media_dir: مجلد الصور المحلي (افتراضي "media" → media/image1.jpeg ...)
         page_id: معرف الصفحة
+        product_ids: معرفات منتجات للـ Shopping Tags (اختياري)
         يقرأ كل الصور jpeg/png/webp في المجلد (2-10) وينشرها كألبوم فيسبوك.
         """
         try:
@@ -176,16 +211,13 @@ def register(mcp):
                 return json_dumps({"error": f"وجد {len(files)} صور فقط في {base} — الألبوم يتطلب 2-10"})
             if len(files) > 10:
                 files = files[:10]
-            # host each via uguu, then reuse publish_page_album logic
+            # host each via Cloudinary (permanent) then reuse publish_page_album logic
+            from src.media_hosting import host_image
+
             urls = []
             for f in files:
-                with open(f, "rb") as fh:
-                    r = requests.post("https://uguu.se/upload.php", files={"files[]": fh}, timeout=60)
-                    r.raise_for_status()
-                    data = r.json()
-                    url = data["files"][0]["url"].replace("http://", "https://")
-                    urls.append(url)
-            return publish_page_album(",".join(urls), message, pid)
+                urls.append(host_image(str(f)))
+            return publish_page_album(",".join(urls), message, pid, product_ids)
         except Exception as e:
             return json_dumps(handle_error(e, "publish_page_album_from_media"))
 
@@ -563,6 +595,41 @@ def register(mcp):
             return json_dumps({"page_id": pid, "result": to_dict(result)})
         except Exception as e:
             return json_dumps(handle_error(e, "publish_page_reel"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    @write_guard
+    def publish_page_reel_from_media(description: str = "", video_path: str = "media/reel.mp4", page_id: str = "") -> str:
+        """نشر ريلز فيسبوك من ملف فيديو محلي (media/*.mp4) — يرفع تلقائيا لاستضافة دائمة ثم ينشر.
+
+        video_path: مسار ملف الفيديو المحلي (مثال "media/video.mp4") — أو مجلد "media" سيختار أول .mp4
+        description: وصف الريلز
+        page_id: معرف الصفحة
+        يدعم Cloudinary للاستضافة الدائمة.
+        """
+        try:
+            from pathlib import Path
+
+            from src.media_hosting import host_video
+
+            pid = page_id or PAGE_ID
+            p = Path(video_path)
+            if p.is_dir():
+                vids = sorted([x for x in p.iterdir() if x.suffix.lower() in {".mp4", ".mov", ".avi", ".mkv"}])
+                if not vids:
+                    return json_dumps({"error": f"لا يوجد فيديو في {p}"})
+                p = vids[0]
+            if not p.exists():
+                alt = Path(__file__).resolve().parent.parent / video_path
+                if alt.exists():
+                    p = alt
+                else:
+                    return json_dumps({"error": f"ملف الفيديو غير موجود: {video_path}"})
+            video_url = host_video(str(p))
+            result = page_api_call("POST", f"{pid}/video_reels", {"file_url": video_url, "description": description})
+            return json_dumps({"success": True, "page_id": pid, "video_url": video_url, "result": to_dict(result)})
+        except Exception as e:
+            return json_dumps(handle_error(e, "publish_page_reel_from_media"))
 
     @mcp.tool()
     @concurrency_limit()

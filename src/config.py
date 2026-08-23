@@ -118,6 +118,16 @@ SCHEDULER_DB_URL = _get("FB_SCHEDULER_DB_URL", default="")  # e.g. sqlite:///rep
 if not SCHEDULER_DB_URL:
     SCHEDULER_DB_URL = f"sqlite:///{(REPORT_DIR / 'scheduler.db').as_posix()}"
 
+# Permanent media hosting (Phase 10) — Cloudinary/S3 for years, fallback uguu.se 72h
+CLOUDINARY_URL = _get("CLOUDINARY_URL", "CLOUDINARY_URL")
+# Format: cloudinary://api_key:api_secret@cloud_name  (also supports CLOUDINARY_CLOUD_NAME etc.)
+CLOUDINARY_CLOUD_NAME = _get("CLOUDINARY_CLOUD_NAME")
+CLOUDINARY_API_KEY = _get("CLOUDINARY_API_KEY")
+CLOUDINARY_API_SECRET = _get("CLOUDINARY_API_SECRET")
+# S3 alternative
+S3_BUCKET = _get("S3_BUCKET", "AWS_S3_BUCKET")
+S3_REGION = _get("S3_REGION", default="us-east-1")
+
 REQUIRED_KEYS = {
     "FB_ACCESS_TOKEN": META_ACCESS_TOKEN,
 }

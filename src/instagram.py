@@ -233,18 +233,24 @@ def register(mcp):
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def publish_instagram_photo(image_url: str, caption: str = "", instagram_business_id: str = "") -> str:
+    def publish_instagram_photo(
+        image_url: str, caption: str = "", instagram_business_id: str = "", product_ids: str = "", product_x: float = 0.5, product_y: float = 0.5
+    ) -> str:
         """
-        نشر صورة على إنستغرام.
-        يتطلب صلاحية instagram_content_publish و Instagram Business Account مرتبط بصفحة.
+        نشر صورة على إنستغرام — يدعم Product Tagging.
+        product_ids: معرفات منتجات الكتالوج للـ Shopping Tags (اختياري) — مثال "38981123561474624"
+                     يتطلب instagram_shopping_tag_products + Shop معتمد. الحد 20 تاغ.
         """
         try:
+            import json as _json
+
             ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
-            container = api_call(
-                "POST",
-                f"{ig_id}/media",
-                {"image_url": image_url, "caption": caption},
-            )
+            params = {"image_url": image_url, "caption": caption}
+            pids = [p.strip() for p in (product_ids or "").split(",") if p.strip()]
+            if pids:
+                tags = [{"product_id": pid, "x": product_x, "y": product_y} for pid in pids[:20]]
+                params["product_tags"] = _json.dumps(tags)
+            container = api_call("POST", f"{ig_id}/media", params)
             creation_id = container.get("id")
             if not creation_id:
                 return json_dumps(container)
@@ -340,10 +346,16 @@ def register(mcp):
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def publish_instagram_carousel(image_urls: str, caption: str = "", instagram_business_id: str = "") -> str:
+    def publish_instagram_carousel(
+        image_urls: str, caption: str = "", instagram_business_id: str = "", product_ids: str = "", product_x: float = 0.5, product_y: float = 0.5
+    ) -> str:
         """
-        نشر ألبوم كاروسيل على إنستغرام.
+        نشر ألبوم كاروسيل على إنستغرام — يدعم Product Tagging (IG Shopping).
+
         image_urls: روابط الصور مفصولة بفواصل (مثال "url1,url2,url3").
+        product_ids: معرفات منتجات الكتالوج مفصولة بفواصل للـ Product Tagging (اختياري) — مثال "38981123561474624,27936390912693771"
+                      يتطلب instagram_shopping_tag_products + Shop معتمد. الحد 5 لكل شريحة، 20 لكل كاروسيل.
+        product_x/product_y: إحداثيات التاغ (0.0-1.0) — افتراضي 0.5,0.5 (منتصف الصورة)
         """
         try:
             ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
@@ -355,13 +367,32 @@ def register(mcp):
                         "context": "publish_instagram_carousel",
                     }
                 )
+            # Parse product_ids for tagging (IG Shopping — requires catalog_management + instagram_shopping_tag_products)
+            import json as _json
+
+            pids = [p.strip() for p in (product_ids or "").split(",") if p.strip()]
+            # Product Tagging: up to 5 per slide, 20 total — map products to slides round-robin
             child_ids = []
-            for url in urls:
-                child = api_call(
-                    "POST",
-                    f"{ig_id}/media",
-                    {"image_url": url, "is_carousel_item": "true"},
-                )
+            for idx, url in enumerate(urls):
+                params = {"image_url": url, "is_carousel_item": "true"}
+                if pids:
+                    # Assign products to this slide (max 5 per slide)
+                    per_slide = 5
+                    start = (idx * per_slide) % len(pids) if pids else 0
+                    # Simple: if single product, tag same product on every slide; if multiple, distribute
+                    if len(pids) == 1:
+                        tags = [{"product_id": pids[0], "x": product_x, "y": product_y}]
+                    else:
+                        # distribute distinct products across slides
+                        tags = []
+                        for j in range(min(per_slide, len(pids))):
+                            pid_idx = (idx * per_slide + j) % len(pids)
+                            tags.append({"product_id": pids[pid_idx], "x": product_x, "y": product_y})
+                        # For multi-product case, take slice
+                        if len(urls) <= len(pids):
+                            tags = [{"product_id": pids[idx % len(pids)], "x": product_x, "y": product_y}]
+                    params["product_tags"] = _json.dumps(tags)
+                child = api_call("POST", f"{ig_id}/media", params)
                 cid = child.get("id")
                 if not cid:
                     return json_dumps(child)
@@ -790,37 +821,43 @@ def register(mcp):
             return json_dumps(handle_error(e, "get_instagram_reels_insights"))
 
     def _host_local_for_ig(file_path: str) -> str:
-        """رفع صورة محلية لإنستغرام (يتطلب رابط عام) عبر uguu.se."""
-        import requests
-        from pathlib import Path
+        """رفع صورة محلية لإنستغرام → رابط دائم (Cloudinary) أو مؤقت (uguu.se fallback)."""
+        try:
+            from src.media_hosting import host_image
 
-        p = Path(file_path)
-        if not p.exists():
-            # try relative to media dir
-            alt = Path(__file__).resolve().parent.parent / file_path
-            if alt.exists():
-                p = alt
-            else:
-                raise FileNotFoundError(f"الملف غير موجود: {file_path}")
-        with open(p, "rb") as f:
-            r = requests.post("https://uguu.se/upload.php", files={"files[]": f}, timeout=60)
-            r.raise_for_status()
-            data = r.json()
-            if not data.get("success"):
-                raise RuntimeError(f"فشل الرفع: {data}")
-            return data["files"][0]["url"].replace("http://", "https://")
+            return host_image(file_path)
+        except Exception:
+            import requests
+            from pathlib import Path
+
+            p = Path(file_path)
+            if not p.exists():
+                alt = Path(__file__).resolve().parent.parent / file_path
+                if alt.exists():
+                    p = alt
+                else:
+                    raise FileNotFoundError(f"الملف غير موجود: {file_path}")
+            with open(p, "rb") as f:
+                r = requests.post("https://uguu.se/upload.php", files={"files[]": f}, timeout=60)
+                r.raise_for_status()
+                data = r.json()
+                if not data.get("success"):
+                    raise RuntimeError(f"فشل الرفع: {data}")
+                return data["files"][0]["url"].replace("http://", "https://")
 
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def publish_instagram_carousel_from_media(caption: str = "", media_dir: str = "media", instagram_business_id: str = "") -> str:
-        """نشر كاروسيل إنستغرام مباشرة من مجلد محلي (media/*.jpeg) بدون رابط عام.
+    def publish_instagram_carousel_from_media(
+        caption: str = "", media_dir: str = "media", instagram_business_id: str = "", product_ids: str = "", product_x: float = 0.5, product_y: float = 0.5
+    ) -> str:
+        """نشر كاروسيل إنستغرام مباشرة من مجلد محلي (media/*.jpeg) بدون رابط عام — يدعم Product Tagging.
 
         caption: النص + هاشتاغ
         media_dir: مجلد الصور المحلي (افتراضي "media")
         instagram_business_id: معرف إنستغرام (افتراضي FB_IG_USER_ID)
-        يقرأ 2-10 صور من المجلد، يرفعها لاستضافة مؤقتة ثم ينشر كاروسيل.
-        حل لمشكلة 'image_url يتطلب رابط عام' عند المستخدمين الجدد (Yemen).
+        product_ids: معرفات منتجات للـ Shopping Tags (اختياري) — مثال "38981123561474624"
+        يقرأ 2-10 صور من المجلد، يرفعها لاستضافة دائمة (Cloudinary) ثم ينشر كاروسيل مع تاغ المنتجات.
         """
         try:
             from pathlib import Path
@@ -838,10 +875,20 @@ def register(mcp):
             urls = []
             for f in files:
                 urls.append(_host_local_for_ig(str(f)))
-            # reuse existing carousel logic
+            # reuse existing carousel logic with optional product tagging
+            import json as _json
+
+            pids = [p.strip() for p in (product_ids or "").split(",") if p.strip()]
             child_ids = []
-            for url in urls:
-                child = api_call("POST", f"{ig_id}/media", {"image_url": url, "is_carousel_item": "true"})
+            for idx, url in enumerate(urls):
+                params = {"image_url": url, "is_carousel_item": "true"}
+                if pids:
+                    if len(pids) == 1:
+                        tags = [{"product_id": pids[0], "x": product_x, "y": product_y}]
+                    else:
+                        tags = [{"product_id": pids[idx % len(pids)], "x": product_x, "y": product_y}]
+                    params["product_tags"] = _json.dumps(tags)
+                child = api_call("POST", f"{ig_id}/media", params)
                 cid = child.get("id")
                 if not cid:
                     return json_dumps(child)
@@ -854,6 +901,60 @@ def register(mcp):
             return json_dumps({"success": True, "children": child_ids, "container": container, "publish": result, "hosted_urls": urls})
         except Exception as e:
             return json_dumps(handle_error(e, "publish_instagram_carousel_from_media"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    @write_guard
+    def publish_instagram_reel_from_media(
+        caption: str = "", video_path: str = "media/reel.mp4", thumb_offset: int = 0, share_to_feed: bool = True, instagram_business_id: str = ""
+    ) -> str:
+        """نشر ريلز إنستغرام من ملف فيديو محلي (media/*.mp4) — يرفع تلقائيا لاستضافة دائمة ثم ينشر.
+
+        video_path: مسار ملف الفيديو المحلي (مثال "media/video.mp4" أو "media/reel.mp4") — أو مجلد "media" سيختار أول .mp4
+        caption: النص + هاشتاغ
+        thumb_offset: إزاحة صورة الغلاف بالميلي ثانية
+        share_to_feed: مشاركة في الخلاصة أيضاً
+        يدعم Cloudinary للاستضافة الدائمة (سنة) أو uguu fallback.
+        """
+        try:
+            from pathlib import Path
+
+            from src.media_hosting import host_video
+
+            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            p = Path(video_path)
+            if p.is_dir():
+                # pick first video in dir
+                vids = sorted([x for x in p.iterdir() if x.suffix.lower() in {".mp4", ".mov", ".avi", ".mkv"}])
+                if not vids:
+                    return json_dumps({"error": f"لا يوجد فيديو في {p}"})
+                p = vids[0]
+            if not p.exists():
+                alt = Path(__file__).resolve().parent.parent / video_path
+                if alt.exists():
+                    p = alt
+                else:
+                    return json_dumps({"error": f"ملف الفيديو غير موجود: {video_path}"})
+            video_url = host_video(str(p))
+            params = {
+                "media_type": "REELS",
+                "video_url": video_url,
+                "caption": caption,
+                "share_to_feed": str(share_to_feed).lower(),
+                "thumb_offset_ms": thumb_offset,
+            }
+            container = api_call("POST", f"{ig_id}/media", params)
+            creation_id = container.get("id")
+            if not creation_id:
+                return json_dumps(container)
+            # Reels need processing wait
+            import time
+
+            time.sleep(5)
+            result = api_call("POST", f"{ig_id}/media_publish", {"creation_id": creation_id})
+            return json_dumps({"success": True, "video_url": video_url, "container": container, "publish": result})
+        except Exception as e:
+            return json_dumps(handle_error(e, "publish_instagram_reel_from_media"))
 
     @mcp.tool()
     @concurrency_limit()

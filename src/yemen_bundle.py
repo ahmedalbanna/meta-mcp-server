@@ -22,15 +22,21 @@ def register(mcp):
     from facebook_business.adobjects.productitem import ProductItem
 
     def _host_local(path: Path) -> str:
-        import requests
+        """استضافة دائمة (Cloudinary) مع fallback مؤقت — يصلح expiry الكتالوج."""
+        try:
+            from src.media_hosting import host_image
 
-        with open(path, "rb") as f:
-            r = requests.post("https://uguu.se/upload.php", files={"files[]": f}, timeout=60)
-            r.raise_for_status()
-            data = r.json()
-            if not data.get("success"):
-                raise RuntimeError(f"host fail: {data}")
-            return data["files"][0]["url"].replace("http://", "https://")
+            return host_image(path)
+        except Exception:
+            import requests
+
+            with open(path, "rb") as f:
+                r = requests.post("https://uguu.se/upload.php", files={"files[]": f}, timeout=60)
+                r.raise_for_status()
+                data = r.json()
+                if not data.get("success"):
+                    raise RuntimeError(f"host fail: {data}")
+                return data["files"][0]["url"].replace("http://", "https://")
 
     def _collect_media(media_dir: str = "media", limit: int = 10):
         base = Path(__file__).resolve().parent.parent / media_dir
@@ -56,8 +62,10 @@ def register(mcp):
         instagram_business_id: str = "",
         offer_days: int = 3,
         caption_style: str = "luxury",
+        product_ids: str = "",
+        tag_products: bool = True,
     ) -> str:
-        """نشر منتج يمني (حزمة كاملة) — كتالوج + فيسبوك ألبوم 6 صور + إنستغرام كاروسيل بضغطة واحدة.
+        """نشر منتج يمني (حزمة كاملة) — كتالوج + فيسبوك ألبوم 6 صور + إنستغرام كاروسيل بضغطة واحدة — يدعم Product Tagging + استضافة دائمة.
 
         name: اسم المنتج (افتراضي "تشكيلات ديور و كارتير")
         description: وصف المنتج + المواصفات
@@ -68,8 +76,10 @@ def register(mcp):
         page_id: صفحة فيسبوك (افتراضي FB_PAGE_ID)
         instagram_business_id: حساب إنستغرام (افتراضي FB_IG_USER_ID)
         offer_days: مدة العرض بالأيام (يظهر في الكابشن + custom_label)
-        caption_style: luxury | interactive | direct (يختار من الخيارات الثلاثة المقترحة)
-        ينشئ: 1) منتج في الكتالوج 2) ألبوم فيسبوك 3) كاروسيل إنستغرام بنفس الصور.
+        caption_style: luxury | interactive | direct
+        product_ids: معرفات منتجات للـ Product Tagging (اختياري) — إن تركت فارغ و tag_products=true سيتم تاغ المنتج المنشأ حديثاً تلقائياً
+        tag_products: true يفعل IG Shopping Tags (يتطلب Shop معتمد + instagram_shopping_tag_products)
+        ينشئ: 1) منتج في الكتالوج (صورة دائمة Cloudinary) 2) ألبوم فيسبوك 3) كاروسيل إنستغرام مع تاغ المنتج.
         """
         try:
             pid = page_id or PAGE_ID
@@ -175,12 +185,25 @@ def register(mcp):
             except Exception as e:
                 results["facebook_album"] = handle_error(e, "publish_yemen_product_bundle:facebook")
 
-            # 5) Instagram carousel
+            # 5) Instagram carousel — with optional Product Tagging (IG Shopping)
             ig_result = None
             try:
+                import json as _json
+
+                # Determine product IDs to tag: explicit product_ids or auto-tag newly created catalog product
+                _pids = [p.strip() for p in (product_ids or "").split(",") if p.strip()]
+                if not _pids and tag_products and catalog_result and catalog_result.get("id"):
+                    _pids = [catalog_result.get("id")]
                 child_ids = []
-                for url in hosted:
-                    child = api_call("POST", f"{ig_id}/media", {"image_url": url, "is_carousel_item": "true"})
+                for idx, url in enumerate(hosted):
+                    params = {"image_url": url, "is_carousel_item": "true"}
+                    if _pids and tag_products:
+                        if len(_pids) == 1:
+                            tags = [{"product_id": _pids[0], "x": 0.5, "y": 0.5}]
+                        else:
+                            tags = [{"product_id": _pids[idx % len(_pids)], "x": 0.5, "y": 0.5}]
+                        params["product_tags"] = _json.dumps(tags)
+                    child = api_call("POST", f"{ig_id}/media", params)
                     cid_child = child.get("id")
                     if not cid_child:
                         raise RuntimeError(f"IG child fail: {child}")
