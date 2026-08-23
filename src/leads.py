@@ -141,3 +141,40 @@ def register(mcp):
             return json_dumps(to_dict(form))
         except Exception as e:
             return json_dumps(handle_error(e, "create_lead_gen_form"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    @write_guard
+    def subscribe_leadgen_webhook(page_id: str = "", subscribed_fields: str = "leadgen") -> str:
+        """اشتراك الصفحة في Webhook الرصاص (leadgen). يتطلب صلاحيات pages_manage_metadata."""
+        try:
+            from src.helpers import page_api_call
+
+            pid = page_id or PAGE_ID
+            if not pid:
+                return json_dumps({"error": "page_id مطلوب (أو حدد FB_PAGE_ID في .env)"})
+            result = page_api_call("POST", f"{pid}/subscribed_apps", {"subscribed_fields": subscribed_fields})
+            return json_dumps({"page_id": pid, "subscribed_fields": subscribed_fields, "result": to_dict(result)})
+        except Exception as e:
+            return json_dumps(handle_error(e, "subscribe_leadgen_webhook"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    def get_lead_field_mapping(lead_id: str) -> str:
+        """تحويل field_data لرصاصة إلى قاموس مسطح {field_name: values} لتسهيل المعالجة."""
+        try:
+            info = Lead(lead_id, api=get_page_api()).api_get(fields=LEAD_FIELDS)
+            data = to_dict(info)
+            field_data = data.get("field_data", [])
+            mapping = {}
+            for item in field_data:
+                name = item.get("name", "unknown")
+                values = item.get("values", [])
+                # Meta returns values as list of strings; flatten single values
+                if len(values) == 1:
+                    mapping[name] = values[0]
+                else:
+                    mapping[name] = values
+            return json_dumps({"lead_id": lead_id, "mapping": mapping, "raw": data})
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_lead_field_mapping"))

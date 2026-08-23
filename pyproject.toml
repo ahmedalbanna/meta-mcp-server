@@ -1,7 +1,7 @@
 [project]
 name = "meta-mcp-server"
 version = "1.1.0"
-description = "Meta Marketing MCP Server — 174 tools for Facebook/Instagram/WhatsApp advertising"
+description = "Meta Marketing MCP Server — 185 tools for Facebook/Instagram/WhatsApp advertising"
 requires-python = ">=3.10"
 readme = "README.md"
 license = { text = "MIT" }
@@ -29,6 +29,11 @@ dev = [
     "pytest==9.1.1",
     "ruff==0.4.4",
     "mypy==1.10.0",
+    "types-requests",
+]
+sheets = [
+    "gspread==6.2.1",
+    "google-auth==2.35.0",
 ]
 
 [tool.ruff]

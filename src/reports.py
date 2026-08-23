@@ -299,3 +299,92 @@ def register(mcp):
             return json_dumps({"success": True, "file": str(path), "rows": len(rows)})
         except Exception as e:
             return json_dumps(handle_error(e, "generate_page_report"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    def export_report_to_google_sheets(
+        filename: str,
+        spreadsheet_id: str,
+        worksheet: str = "Sheet1",
+        credentials_path: str = "",
+    ) -> str:
+        """
+        تصدير تقرير CSV موجود إلى Google Sheets.
+        filename: اسم الملف داخل reports/ (مثال campaign_report_last_30d.csv) أو مسار نسبي
+        spreadsheet_id: معرف جدول Google Sheets (من الرابط)
+        worksheet: اسم الورقة الهدف (تُنشأ إن لم توجد)
+        credentials_path: مسار JSON لحساب الخدمة (اختياري — افتراضي GOOGLE_APPLICATION_CREDENTIALS)
+        يتطلب: pip install gspread google-auth
+        """
+        try:
+            from src.helpers import sanitize_path
+
+            if not filename:
+                return json_dumps({"error": "filename مطلوب"})
+            if not spreadsheet_id:
+                return json_dumps({"error": "spreadsheet_id مطلوب"})
+            # Resolve CSV inside REPORT_DIR
+            try:
+                csv_path = sanitize_path(filename, REPORT_DIR)
+            except ValueError as e:
+                return json_dumps({"error": f"مسار غير صالح: {e}"})
+            if not csv_path.is_file():
+                # Try with .csv extension fallback
+                alt = sanitize_path(filename + ".csv", REPORT_DIR) if not filename.endswith(".csv") else None
+                if alt and alt.is_file():
+                    csv_path = alt
+                else:
+                    return json_dumps({"error": f"الملف غير موجود: {csv_path}"})
+            # Read CSV
+            import csv as _csv
+
+            with csv_path.open("r", encoding="utf-8", newline="") as fh:
+                reader = list(_csv.reader(fh))
+            if not reader:
+                return json_dumps({"error": "الملف فارغ"})
+
+            # Try importing gspread
+            try:
+                import gspread  # type: ignore
+                from google.oauth2.service_account import Credentials  # type: ignore
+            except ImportError:
+                return json_dumps(
+                    {
+                        "error": "gspread غير مثبت. ثبّت: pip install gspread google-auth",
+                        "hint": "أو صدّر يدويًا عبر تحميل CSV إلى Sheets",
+                        "csv_file": str(csv_path),
+                        "rows": len(reader) - 1,
+                    }
+                )
+
+            cred_path = credentials_path or __import__("os").getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+            if not cred_path or not Path(cred_path).is_file():
+                return json_dumps(
+                    {
+                        "error": "ملف credentials غير موجود. حدد credentials_path أو اضبط GOOGLE_APPLICATION_CREDENTIALS",
+                        "hint": "أنشئ Service Account في Google Cloud > APIs & Services > Credentials",
+                    }
+                )
+
+            creds = Credentials.from_service_account_file(
+                cred_path, scopes=["https://www.googleapis.com/auth/spreadsheets"]
+            )
+            client = gspread.authorize(creds)
+            sh = client.open_by_key(spreadsheet_id)
+            try:
+                ws = sh.worksheet(worksheet)
+                ws.clear()
+            except Exception:
+                ws = sh.add_worksheet(title=worksheet, rows=len(reader) + 10, cols=len(reader[0]) + 5)
+            ws.update(reader)
+            return json_dumps(
+                {
+                    "success": True,
+                    "spreadsheet_id": spreadsheet_id,
+                    "worksheet": worksheet,
+                    "rows": len(reader) - 1,
+                    "csv_source": str(csv_path),
+                }
+            )
+        except Exception as e:
+            return json_dumps(handle_error(e, "export_report_to_google_sheets"))

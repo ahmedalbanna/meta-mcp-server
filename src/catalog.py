@@ -448,6 +448,45 @@ def register(mcp):
 
     @mcp.tool()
     @concurrency_limit()
+    def get_product_feed_diagnostics(feed_id: str, limit: int = 5) -> str:
+        """تشخيص خلاصة منتجات: ملخص أخطاء وتحذيرات آخر رفع + تفاصيل الخلاصة."""
+        try:
+            feed_info = ProductFeed(feed_id).api_get(fields=["id", "name", "schedule", "latest_upload", "file_type"])
+            feed_dict = to_dict(feed_info)
+            uploads = paginate(
+                lambda params: ProductFeed(feed_id).get_uploads(params=params),
+                fields=[
+                    "id",
+                    "status",
+                    "start_time",
+                    "end_time",
+                    "error_count",
+                    "warning_count",
+                    "num_deleted_items",
+                    "num_updated_items",
+                    "num_hidden_items",
+                    "error_report",
+                ],
+                limit=limit,
+            )
+            total_errors = sum(int(u.get("error_count") or 0) for u in uploads)
+            total_warnings = sum(int(u.get("warning_count") or 0) for u in uploads)
+            return json_dumps(
+                {
+                    "feed": feed_dict,
+                    "uploads": uploads,
+                    "summary": {
+                        "total_errors": total_errors,
+                        "total_warnings": total_warnings,
+                        "last_status": uploads[0].get("status") if uploads else "unknown",
+                    },
+                }
+            )
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_product_feed_diagnostics"))
+
+    @mcp.tool()
+    @concurrency_limit()
     @write_guard
     def update_product_feed_schedule(feed_id: str, url: str = "", interval: str = "DAILY") -> str:
         """تحديث جدولة خلاصة منتجات (الرابط والفترة). interval: HOURLY | DAILY | WEEKLY"""

@@ -448,3 +448,62 @@ def register(mcp):
             )
         except Exception as e:
             return json_dumps(handle_error(e, "update_page_cta"))
+
+    # ------------------------------------------------------------------
+    # Phase 2.2 — نشر ريلز وتحليلات الفيديو
+    # ------------------------------------------------------------------
+
+    @mcp.tool()
+    @concurrency_limit()
+    @write_guard
+    def publish_page_reel(video_url: str, description: str = "", page_id: str = "") -> str:
+        """نشر ريلز على صفحة فيسبوك (Page Reel)."""
+        try:
+            pid = page_id or PAGE_ID
+            if not video_url:
+                return json_dumps({"error": "video_url مطلوب"})
+            result = page_api_call(
+                "POST",
+                f"{pid}/video_reels",
+                {"file_url": video_url, "description": description},
+            )
+            return json_dumps({"page_id": pid, "result": to_dict(result)})
+        except Exception as e:
+            return json_dumps(handle_error(e, "publish_page_reel"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    def get_page_video_insights(
+        video_id: str, metrics: str = "post_video_views,post_video_complete_views,post_video_avg_time_watched"
+    ) -> str:
+        """تحليلات فيديو صفحة فيسبوك (views, completes, avg watch)."""
+        try:
+            from facebook_business.adobjects.post import Post
+
+            insights = Post(video_id, api=get_page_api()).get_insights(params={"metric": metrics})
+            return json_dumps([to_dict(i) for i in insights])
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_page_video_insights"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    def list_page_post_reactions(post_id: str, limit: int = 25) -> str:
+        """قائمة تفاعلات (Reactions) على منشور صفحة."""
+        try:
+            from facebook_business.adobjects.post import Post
+
+            from src.utils import paginate
+
+            rows = paginate(
+                lambda params: Post(post_id, api=get_page_api()).get_reactions(params=params),
+                fields=["id", "name", "type", "pic"],
+                limit=limit,
+            )
+            return json_dumps({"post_id": post_id, "reactions": rows, "count": len(rows)})
+        except Exception as e:
+            # Fallback to raw api_call if SDK edge not available
+            try:
+                data = page_api_call("GET", f"{post_id}/reactions", {"limit": limit, "fields": "id,name,type"})
+                return json_dumps(data)
+            except Exception:
+                return json_dumps(handle_error(e, "list_page_post_reactions"))

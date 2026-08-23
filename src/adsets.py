@@ -78,17 +78,20 @@ def register(mcp):
         targeting: str = "",
         status: str = "PAUSED",
         bid_amount: int = 0,
+        advantage_audience: bool = False,
     ) -> str:
         """
         إنشاء مجموعة إعلانية داخل حملة.
         targeting: JSON نصي مثل {"geo_locations":{"countries":["US"]},"age_min":18,"age_max":65}
         bid_amount: سقف عرض إلزامي لهذه الحسابات (بالعملة الصغرى). 0 يستخدم LOWEST_COST_WITHOUT_CAP.
+        advantage_audience: تفعيل Advantage+ Audience (توسيع الاستهداف تلقائيًا) — افتراضي false للتحكم الدقيق.
         """
         try:
             if not targeting:
                 targeting = json_dumps({"geo_locations": {"countries": ["US"]}})
             target = json.loads(targeting)
-            target.setdefault("targeting_automation", {"advantage_audience": 0})
+            # Phase 2.3: explicit Advantage+ toggle (default 0 = off for deterministic tests)
+            target["targeting_automation"] = {"advantage_audience": 1 if advantage_audience else 0}
             targeting = json_dumps(target)
             account = AdAccount(AD_ACCOUNT_ID)
             params = {
@@ -149,19 +152,41 @@ def register(mcp):
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def update_adset_targeting(adset_id: str, targeting: str) -> str:
+    def update_adset_targeting(adset_id: str, targeting: str, advantage_audience: bool | None = None) -> str:
         """
         تعديل استهداف مجموعة إعلانية.
         targeting: JSON نصي مثل {"geo_locations":{"countries":["EG"]},"age_min":18,"interests":[]}
+        advantage_audience: None=عدم تغيير، true/false لضبط Advantage+ Audience
         """
         try:
             target = json.loads(targeting)
-            target.setdefault("targeting_automation", {"advantage_audience": 0})
+            if advantage_audience is not None:
+                target["targeting_automation"] = {"advantage_audience": 1 if advantage_audience else 0}
+            else:
+                target.setdefault("targeting_automation", {"advantage_audience": 0})
             adset = AdSet(adset_id)
             adset.api_update(params={AdSet.Field.targeting: json_dumps(target)})
             return json_dumps({"success": True, "adset_id": adset_id, "targeting": target})
         except Exception as e:
             return json_dumps(handle_error(e, "update_adset_targeting"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    def get_adset_delivery_insights(
+        adset_id: str,
+        date_preset: str = "last_7d",
+        metrics: str = "spend,impressions,reach,frequency,cpm,ctr,cpc",
+    ) -> str:
+        """تحليلات التسليم لمجموعة إعلانية (delivery insights: spend/reach/frequency)."""
+        try:
+            fields = [m.strip() for m in metrics.split(",") if m.strip()]
+            insights = AdSet(adset_id).get_insights(params={"date_preset": date_preset, "fields": fields})
+            rows = [__import__("src.helpers", fromlist=["to_dict"]).to_dict(i) for i in insights]
+            if not rows:
+                return json_dumps({"data": [], "count": 0, "message": "لا توجد بيانات"})
+            return json_dumps({"data": rows, "count": len(rows), "adset_id": adset_id})
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_adset_delivery_insights"))
 
     @mcp.tool()
     @concurrency_limit()

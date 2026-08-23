@@ -724,3 +724,80 @@ def register(mcp):
             return json_dumps({"recipient_id": recipient_ig_id, "result": result})
         except Exception as e:
             return json_dumps(handle_error(e, "send_instagram_dm_with_image"))
+
+    # ------------------------------------------------------------------
+    # Phase 2.1 — Instagram completeness
+    # ------------------------------------------------------------------
+
+    @mcp.tool()
+    @concurrency_limit()
+    def list_instagram_comments(media_id: str, limit: int = 25) -> str:
+        """قائمة تعليقات منشور إنستغرام مع ترقيم الصفحات (paginate)."""
+        try:
+            from src.utils import paginate
+
+            rows = paginate(
+                lambda params: api_call("GET", f"{media_id}/comments", params),
+                fields=["id", "text", "timestamp", "username", "like_count", "replies"],
+                limit=limit,
+            )
+            return json_dumps({"data": rows, "count": len(rows), "media_id": media_id})
+        except Exception as e:
+            return json_dumps(handle_error(e, "list_instagram_comments"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    def get_instagram_reels_insights(
+        media_id: str,
+        metric: str = "plays,reach,likes,comments,saved,shares,total_interactions",
+    ) -> str:
+        """تحليلات ريلز إنستغرام (plays + reach + engagement) — مخصص لفيديوهات Reels."""
+        try:
+            # Reels use same IGMedia insights but metrics differ (plays, etc.)
+            insights = IGMedia(media_id).get_insights(params={"metric": metric})
+            out = []
+            for i in insights:
+                d = i.export_all_data()
+                out.append({"name": d.get("name"), "values": d.get("values")})
+            if not out:
+                return json_dumps({"message": "لا توجد بيانات Reels", "media_id": media_id})
+            return json_dumps({"media_id": media_id, "insights": out})
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_instagram_reels_insights"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    @write_guard
+    def publish_threads_post(text: str, media_url: str = "") -> str:
+        """
+        نشر منشور Threads (عبر Graph API v19+ إن كان متاحًا).
+        إن لم تكن Threads API مفعّلة للحساب، تُعاد رسالة إرشادية.
+        """
+        try:
+            # Threads is tied to Instagram Business ID; try the threads endpoint
+            ig_id = INSTAGRAM_BUSINESS_ID
+            if not ig_id:
+                return json_dumps({"error": "FB_IG_USER_ID غير مضبوط"})
+            params: dict = {"text": text}
+            if media_url:
+                params["media_url"] = media_url
+            # Attempt threads via Instagram endpoint; if not supported, API returns error
+            data = api_call("POST", f"{ig_id}/threads_profile", params)
+            # Fallback try generic threads endpoint
+            if not data or "error" in str(data).lower():
+                return json_dumps(
+                    {
+                        "message": "Threads API غير متاحة لهذا الحساب/التوكن. راجع https://developers.facebook.com/docs/threads/",
+                        "attempted_params": params,
+                        "response": data,
+                    }
+                )
+            return json_dumps({"success": True, "result": data})
+        except Exception as e:
+            # Return guidance instead of raw error for better DX
+            return json_dumps(
+                handle_error(
+                    e,
+                    "publish_threads_post: Threads API قد تتطلب صلاحيات إضافية (threads_basic, threads_content_publish)",
+                )
+            )
