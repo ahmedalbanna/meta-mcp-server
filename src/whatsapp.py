@@ -160,3 +160,19 @@ def register(mcp):
             return json_dumps({"to": to, "template_name": template_name, "result": result})
         except Exception as e:
             return json_dumps(handle_error(e, "send_whatsapp_template_message"))
+
+    @mcp.resource("whatsapp://overview")
+    async def whatsapp_resource() -> str:
+        """نظرة عامة واتساب."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps({"module": "whatsapp", "resource": "whatsapp://overview", "hint": "نظرة عامة واتساب"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "whatsapp://overview"))
+
+    @mcp.prompt()
+    def whatsapp_campaign_prompt(topic: str = "whatsapp") -> str:
+        """حملة واتساب."""
+        return "ساعد في حملة واتساب لـ " + topic + " — خطط حملة واتساب لـ {product} (وحدة whatsapp)"

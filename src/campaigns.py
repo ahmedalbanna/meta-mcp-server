@@ -176,3 +176,29 @@ def register(mcp):
             return json_dumps({"success": True, "campaign_id": campaign_id, "result": to_dict(result)})
         except Exception as e:
             return json_dumps(handle_error(e, "delete_campaign"))
+
+    @mcp.resource("campaigns://overview")
+    async def campaigns_resource() -> str:
+        """نظرة عامة على الحملات مع ملخص سريع."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps(
+                {
+                    "module": "campaigns",
+                    "resource": "campaigns://overview",
+                    "hint": "نظرة عامة على الحملات مع ملخص سريع",
+                }
+            )
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "campaigns://overview"))
+
+    @mcp.prompt()
+    def campaign_strategy_prompt(topic: str = "campaigns") -> str:
+        """استراتيجية حملة."""
+        return (
+            "ساعد في استراتيجية حملة لـ "
+            + topic
+            + " — اكتب استراتيجية حملة لمنتج {product} بهدف {objective} (وحدة campaigns)"
+        )

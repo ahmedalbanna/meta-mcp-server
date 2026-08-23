@@ -250,3 +250,21 @@ def register(mcp):
             )
         except Exception as e:
             return json_dumps(handle_error(e, "run_webhook_automations"))
+
+    @mcp.resource("webhooks://overview")
+    async def webhook_automations_resource() -> str:
+        """نظرة عامة الأتمتة."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps(
+                {"module": "webhook_automations", "resource": "webhooks://overview", "hint": "نظرة عامة الأتمتة"}
+            )
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "webhooks://overview"))
+
+    @mcp.prompt()
+    def webhook_automation_prompt(topic: str = "webhook_automations") -> str:
+        """أتمتة webhook."""
+        return "ساعد في أتمتة webhook لـ " + topic + " — صمم أتمتة لحدث {event} (وحدة webhook_automations)"

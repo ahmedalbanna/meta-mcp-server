@@ -801,3 +801,19 @@ def register(mcp):
                     "publish_threads_post: Threads API قد تتطلب صلاحيات إضافية (threads_basic, threads_content_publish)",
                 )
             )
+
+    @mcp.resource("instagram://overview")
+    async def instagram_resource() -> str:
+        """نظرة عامة إنستغرام."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps({"module": "instagram", "resource": "instagram://overview", "hint": "نظرة عامة إنستغرام"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "instagram://overview"))
+
+    @mcp.prompt()
+    def instagram_strategy_prompt(topic: str = "instagram") -> str:
+        """استراتيجية إنستغرام."""
+        return "ساعد في استراتيجية إنستغرام لـ " + topic + " — خطط محتوى إنستغرام لـ {product} (وحدة instagram)"

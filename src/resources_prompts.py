@@ -144,6 +144,7 @@ def register(mcp):
     async def active_ads_resource() -> str:
         """قائمة الإعلانات النشطة."""
         try:
+
             def _fetch():
                 account = AdAccount(AD_ACCOUNT_ID)
                 return account.get_ads(

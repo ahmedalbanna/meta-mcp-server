@@ -155,3 +155,19 @@ def register(mcp):
                 "hint": "استخدم list_pages و list_ad_accounts و discover_ig_user لاكتشاف المعرفات ثم عبّئ .env وأعد التشغيل",
             }
         )
+
+    @mcp.resource("discovery://status")
+    async def discovery_resource() -> str:
+        """حالة الاكتشاف."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps({"module": "discovery", "resource": "discovery://status", "hint": "حالة الاكتشاف"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "discovery://status"))
+
+    @mcp.prompt()
+    def discovery_guide_prompt(topic: str = "discovery") -> str:
+        """دليل اكتشاف."""
+        return "ساعد في دليل اكتشاف لـ " + topic + " — اشرح كيفية اكتشاف {what} (وحدة discovery)"

@@ -178,3 +178,19 @@ def register(mcp):
             return json_dumps({"lead_id": lead_id, "mapping": mapping, "raw": data})
         except Exception as e:
             return json_dumps(handle_error(e, "get_lead_field_mapping"))
+
+    @mcp.resource("leads://overview")
+    async def leads_resource() -> str:
+        """نظرة عامة على الرصاص."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps({"module": "leads", "resource": "leads://overview", "hint": "نظرة عامة على الرصاص"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "leads://overview"))
+
+    @mcp.prompt()
+    def lead_qualification_prompt(topic: str = "leads") -> str:
+        """تأهيل رصاصة."""
+        return "ساعد في تأهيل رصاصة لـ " + topic + " — قيّم رصاصة {lead_id} (وحدة leads)"

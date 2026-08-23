@@ -200,3 +200,21 @@ def register(mcp):
             return _respond(insights)
         except Exception as e:
             return json_dumps(handle_error(e, "get_ad_insights_breakdown"))
+
+    @mcp.resource("breakdowns://overview")
+    async def breakdowns_resource() -> str:
+        """قوالب التحليلات المجزأة."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps(
+                {"module": "breakdowns", "resource": "breakdowns://overview", "hint": "قوالب التحليلات المجزأة"}
+            )
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "breakdowns://overview"))
+
+    @mcp.prompt()
+    def breakdown_analysis_prompt(topic: str = "breakdowns") -> str:
+        """تحليل مجزأ."""
+        return "ساعد في تحليل مجزأ لـ " + topic + " — حلل breakdown {breakdown} (وحدة breakdowns)"

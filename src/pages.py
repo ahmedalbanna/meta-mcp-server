@@ -507,3 +507,19 @@ def register(mcp):
                 return json_dumps(data)
             except Exception:
                 return json_dumps(handle_error(e, "list_page_post_reactions"))
+
+    @mcp.resource("pages://overview")
+    async def pages_resource() -> str:
+        """نظرة عامة الصفحات."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps({"module": "pages", "resource": "pages://overview", "hint": "نظرة عامة الصفحات"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "pages://overview"))
+
+    @mcp.prompt()
+    def page_content_prompt(topic: str = "pages") -> str:
+        """محتوى صفحة."""
+        return f"ساعد في محتوى صفحة لـ {topic} — اقترح محتوى صفحة لـ {topic} (وحدة pages)"

@@ -213,3 +213,21 @@ def register(mcp):
             return json_dumps({"success": True, "adset_id": adset_id, "scheduled": params})
         except Exception as e:
             return json_dumps(handle_error(e, "schedule_adset"))
+
+    @mcp.resource("adsets://overview")
+    async def adsets_resource() -> str:
+        """نظرة عامة على المجموعات الإعلانية."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps(
+                {"module": "adsets", "resource": "adsets://overview", "hint": "نظرة عامة على المجموعات الإعلانية"}
+            )
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "adsets://overview"))
+
+    @mcp.prompt()
+    def adset_strategy_prompt(topic: str = "adsets") -> str:
+        """استراتيجية مجموعة إعلانية."""
+        return "ساعد في استراتيجية مجموعة إعلانية لـ " + topic + " — اقترح مجموعة إعلانية لمنتج {product} (وحدة adsets)"

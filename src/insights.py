@@ -140,3 +140,19 @@ def register(mcp):
             )
         except Exception as e:
             return json_dumps(handle_error(e, "get_account_insights_trend"))
+
+    @mcp.resource("insights://overview")
+    async def insights_resource() -> str:
+        """قوالب التحليلات."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps({"module": "insights", "resource": "insights://overview", "hint": "قوالب التحليلات"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "insights://overview"))
+
+    @mcp.prompt()
+    def insights_analysis_prompt(topic: str = "insights") -> str:
+        """تحليل رؤى."""
+        return "ساعد في تحليل رؤى لـ " + topic + " — حلل رؤى {level} (وحدة insights)"

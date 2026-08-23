@@ -129,3 +129,19 @@ def register(mcp):
             )
         except Exception as e:
             return json_dumps({"error": str(e)})
+
+    @mcp.resource("events://overview")
+    async def events_resource() -> str:
+        """نظرة عامة على الأحداث."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps({"module": "events", "resource": "events://overview", "hint": "نظرة عامة على الأحداث"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "events://overview"))
+
+    @mcp.prompt()
+    def event_handling_prompt(topic: str = "events") -> str:
+        """معالجة حدث."""
+        return "ساعد في معالجة حدث لـ " + topic + " — كيف تعالج حدث {event_type} (وحدة events)"

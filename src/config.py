@@ -61,7 +61,9 @@ if GRAPH_VERSION not in SUPPORTED_API_VERSIONS and GRAPH_VERSION not in DEPRECAT
 if GRAPH_VERSION in DEPRECATED_API_VERSIONS:
     import logging as _log2
 
-    _log2.getLogger(__name__).warning("FB_API_VERSION %s deprecated — حدّث إلى %s", GRAPH_VERSION, SUPPORTED_API_VERSIONS[-1])
+    _log2.getLogger(__name__).warning(
+        "FB_API_VERSION %s deprecated — حدّث إلى %s", GRAPH_VERSION, SUPPORTED_API_VERSIONS[-1]
+    )
 
 REPORT_DIR = BASE_DIR / "reports"
 

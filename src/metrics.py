@@ -195,3 +195,19 @@ def register(mcp):
             return json_dumps({"success": True, "message": "تم تصفير المقاييس"})
         except Exception as e:
             return json_dumps(handle_error(e, "reset_metrics"))
+
+    @mcp.resource("metrics://overview")
+    async def metrics_resource() -> str:
+        """نظرة عامة المقاييس."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps({"module": "metrics", "resource": "metrics://overview", "hint": "نظرة عامة المقاييس"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "metrics://overview"))
+
+    @mcp.prompt()
+    def metrics_analysis_prompt(topic: str = "metrics") -> str:
+        """تحليل مقاييس."""
+        return "ساعد في تحليل مقاييس لـ " + topic + " — حلل مقاييس {tool} (وحدة metrics)"

@@ -127,3 +127,21 @@ def register(mcp):
             return json_dumps([to_dict(h) for h in history])
         except Exception as e:
             return json_dumps(handle_error(e, "get_auto_rules_history"))
+
+    @mcp.resource("automation://overview")
+    async def automation_resource() -> str:
+        """نظرة عامة على القواعد."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps(
+                {"module": "automation", "resource": "automation://overview", "hint": "نظرة عامة على القواعد"}
+            )
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "automation://overview"))
+
+    @mcp.prompt()
+    def automation_design_prompt(topic: str = "automation") -> str:
+        """تصميم أتمتة."""
+        return "ساعد في تصميم أتمتة لـ " + topic + " — صمم قاعدة أتمتة لمقياس {metric} (وحدة automation)"

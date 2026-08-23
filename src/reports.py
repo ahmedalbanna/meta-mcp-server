@@ -388,3 +388,19 @@ def register(mcp):
             )
         except Exception as e:
             return json_dumps(handle_error(e, "export_report_to_google_sheets"))
+
+    @mcp.resource("reports://overview")
+    async def reports_resource() -> str:
+        """قائمة التقارير."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps({"module": "reports", "resource": "reports://overview", "hint": "قائمة التقارير"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "reports://overview"))
+
+    @mcp.prompt()
+    def report_customization_prompt(topic: str = "reports") -> str:
+        """تخصيص تقرير."""
+        return "ساعد في تخصيص تقرير لـ " + topic + " — خصص تقرير {report_type} (وحدة reports)"

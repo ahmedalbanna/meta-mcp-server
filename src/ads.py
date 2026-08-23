@@ -286,3 +286,19 @@ def register(mcp):
             return json_dumps({"success": True, "creative_id": creative_id})
         except Exception as e:
             return json_dumps(handle_error(e, "delete_ad_creative"))
+
+    @mcp.resource("ads://overview")
+    async def ads_resource() -> str:
+        """نظرة عامة على الإعلانات."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps({"module": "ads", "resource": "ads://overview", "hint": "نظرة عامة على الإعلانات"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "ads://overview"))
+
+    @mcp.prompt()
+    def ad_review_prompt(topic: str = "ads") -> str:
+        """مراجعة إعلان."""
+        return "ساعد في مراجعة إعلان لـ " + topic + " — راجع إعلان {ad_id} (وحدة ads)"

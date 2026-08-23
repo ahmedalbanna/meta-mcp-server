@@ -178,3 +178,19 @@ def register(mcp):
             return json_dumps({"due": len(due), "dry_run": dry_run, "results": results})
         except Exception as e:
             return json_dumps(handle_error(e, "run_due_tasks"))
+
+    @mcp.resource("scheduler://overview")
+    async def scheduler_resource() -> str:
+        """نظرة عامة المجدولة."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps({"module": "scheduler", "resource": "scheduler://overview", "hint": "نظرة عامة المجدولة"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "scheduler://overview"))
+
+    @mcp.prompt()
+    def scheduler_design_prompt(topic: str = "scheduler") -> str:
+        """تصميم جدولة."""
+        return "ساعد في تصميم جدولة لـ " + topic + " — جدول مهمة {task} (وحدة scheduler)"

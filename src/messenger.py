@@ -134,3 +134,19 @@ def register(mcp):
             return json_dumps({"recipient_id": recipient_id, "action": action, "result": result})
         except Exception as e:
             return json_dumps(handle_error(e, "set_messenger_typing"))
+
+    @mcp.resource("messenger://overview")
+    async def messenger_resource() -> str:
+        """نظرة عامة ماسنجر."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps({"module": "messenger", "resource": "messenger://overview", "hint": "نظرة عامة ماسنجر"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "messenger://overview"))
+
+    @mcp.prompt()
+    def messenger_reply_prompt(topic: str = "messenger") -> str:
+        """رد ماسنجر."""
+        return "ساعد في رد ماسنجر لـ " + topic + " — اكتب رد ماسنجر لـ {message} (وحدة messenger)"

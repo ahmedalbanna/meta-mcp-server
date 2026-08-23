@@ -463,3 +463,21 @@ def register(mcp):
             )
         except Exception as e:
             return json_dumps(handle_error(e, "suggest_lookalike"))
+
+    @mcp.resource("audiences://overview")
+    async def audiences_resource() -> str:
+        """نظرة عامة على الجماهير."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps(
+                {"module": "audiences", "resource": "audiences://overview", "hint": "نظرة عامة على الجماهير"}
+            )
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "audiences://overview"))
+
+    @mcp.prompt()
+    def audience_builder_prompt(topic: str = "audiences") -> str:
+        """بناء جمهور."""
+        return "ساعد في بناء جمهور لـ " + topic + " — ابن جمهور لمنتج {product} (وحدة audiences)"

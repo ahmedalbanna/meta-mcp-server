@@ -111,3 +111,21 @@ def register(mcp):
             return json_dumps({"user_id": user_id, "deleted": True, "result": to_dict(result)})
         except Exception as e:
             return json_dumps(handle_error(e, "delete_business_user"))
+
+    @mcp.resource("business://overview")
+    async def business_resource() -> str:
+        """نظرة عامة على الأعمال."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps(
+                {"module": "business", "resource": "business://overview", "hint": "نظرة عامة على الأعمال"}
+            )
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "business://overview"))
+
+    @mcp.prompt()
+    def business_user_prompt(topic: str = "business") -> str:
+        """إدارة مستخدمي الأعمال."""
+        return "ساعد في إدارة مستخدمي الأعمال لـ " + topic + " — أضف مستخدم {email} بدور {role} (وحدة business)"

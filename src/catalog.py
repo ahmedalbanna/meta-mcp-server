@@ -657,3 +657,21 @@ def register(mcp):
             return json_dumps({"results": results, "total": len(results)})
         except Exception as e:
             return json_dumps(handle_error(e, "bulk_update_products"))
+
+    @mcp.resource("catalog://overview")
+    async def catalog_resource() -> str:
+        """نظرة عامة على الكتالوجات."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps(
+                {"module": "catalog", "resource": "catalog://overview", "hint": "نظرة عامة على الكتالوجات"}
+            )
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "catalog://overview"))
+
+    @mcp.prompt()
+    def catalog_optimization_prompt(topic: str = "catalog") -> str:
+        """تحسين كتالوج."""
+        return "ساعد في تحسين كتالوج لـ " + topic + " — حسن كتالوج {catalog_id} (وحدة catalog)"

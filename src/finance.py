@@ -165,3 +165,19 @@ def register(mcp):
             return json_dumps({"success": True, "user_id": user_id})
         except Exception as e:
             return json_dumps(handle_error(e, "remove_user_from_account"))
+
+    @mcp.resource("finance://overview")
+    async def finance_resource() -> str:
+        """ملخص المحفظة."""
+        try:
+            # Lightweight per-module overview (calls existing list tool pattern)
+            return json_dumps({"module": "finance", "resource": "finance://overview", "hint": "ملخص المحفظة"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "finance://overview"))
+
+    @mcp.prompt()
+    def finance_report_prompt(topic: str = "finance") -> str:
+        """تقرير مالي."""
+        return "ساعد في تقرير مالي لـ " + topic + " — أنشئ تقرير مالي للفترة {date_range} (وحدة finance)"

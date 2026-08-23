@@ -4,31 +4,31 @@
 
 | Module | Tools | Resources | Prompts |
 |---|---|---|---|
-| `ads` | 10 | 0 | 0 |
-| `adsets` | 8 | 0 | 0 |
-| `audiences` | 10 | 0 | 0 |
-| `automation` | 5 | 0 | 0 |
-| `breakdowns` | 4 | 0 | 0 |
-| `business` | 5 | 0 | 0 |
-| `campaigns` | 6 | 0 | 0 |
-| `catalog` | 26 | 0 | 0 |
-| `creatives` | 5 | 0 | 0 |
-| `discovery` | 5 | 0 | 0 |
-| `events` | 3 | 0 | 0 |
-| `finance` | 9 | 0 | 0 |
-| `insights` | 5 | 0 | 0 |
-| `instagram` | 35 | 0 | 0 |
-| `leads` | 7 | 0 | 0 |
-| `messenger` | 7 | 0 | 0 |
-| `metrics` | 3 | 0 | 0 |
-| `pages` | 25 | 0 | 0 |
-| `reports` | 5 | 0 | 0 |
+| `ads` | 10 | 1 | 1 |
+| `adsets` | 8 | 1 | 1 |
+| `audiences` | 10 | 1 | 1 |
+| `automation` | 5 | 1 | 1 |
+| `breakdowns` | 4 | 1 | 1 |
+| `business` | 5 | 1 | 1 |
+| `campaigns` | 6 | 1 | 1 |
+| `catalog` | 26 | 1 | 1 |
+| `creatives` | 5 | 1 | 1 |
+| `discovery` | 5 | 1 | 1 |
+| `events` | 3 | 1 | 1 |
+| `finance` | 9 | 1 | 1 |
+| `insights` | 5 | 1 | 1 |
+| `instagram` | 35 | 1 | 1 |
+| `leads` | 7 | 1 | 1 |
+| `messenger` | 7 | 1 | 1 |
+| `metrics` | 3 | 1 | 1 |
+| `pages` | 25 | 1 | 1 |
+| `reports` | 5 | 1 | 1 |
 | `resources_prompts` | 0 | 10 | 10 |
-| `scheduler` | 5 | 0 | 0 |
-| `webhook_automations` | 5 | 0 | 0 |
-| `whatsapp` | 6 | 0 | 0 |
+| `scheduler` | 5 | 1 | 1 |
+| `webhook_automations` | 5 | 1 | 1 |
+| `whatsapp` | 6 | 1 | 1 |
 
-**Total:** 199 tools + 10 resources + 10 prompts
+**Total:** 199 tools + 32 resources + 32 prompts
 
 
 ## `ads` — 10 tools
@@ -43,6 +43,8 @@
 - 🛠️ **tool** `list_ad_creatives` — قائمة الإبداعات (Ad Creatives) في الحساب الإعلاني.
 - 🛠️ **tool** `get_ad_creative` — تفاصيل إبداع (Ad Creative) واحد.
 - 🛠️ **tool** `delete_ad_creative` — حذف إبداع (Ad Creative) نهائيًا.
+- 📦 **resource** `ads_resource` — نظرة عامة على الإعلانات.
+- 💬 **prompt** `ad_review_prompt` — مراجعة إعلان.
 
 ## `adsets` — 8 tools
 
@@ -54,6 +56,8 @@
 - 🛠️ **tool** `update_adset_targeting` — تعديل استهداف مجموعة إعلانية.
 - 🛠️ **tool** `get_adset_delivery_insights` — تحليلات التسليم لمجموعة إعلانية (delivery insights: spend/reach/frequency).
 - 🛠️ **tool** `schedule_adset` — جدولة مجموعة إعلانية: تعيين وقت بدء و/أو انتهاء.
+- 📦 **resource** `adsets_resource` — نظرة عامة على المجموعات الإعلانية.
+- 💬 **prompt** `adset_strategy_prompt` — استراتيجية مجموعة إعلانية.
 
 ## `audiences` — 10 tools
 
@@ -67,6 +71,8 @@
 - 🛠️ **tool** `get_audience_overlap` — تقدير التداخل بين جمهورين (overlap) عبر approximate_count.
 - 🛠️ **tool** `estimate_reach` — تقدير الوصول (Reach Estimate) لاستهداف معين.
 - 🛠️ **tool** `suggest_lookalike` — اقتراح إعدادات Lookalike بناءً على حجم الجمهور المصدر.
+- 📦 **resource** `audiences_resource` — نظرة عامة على الجماهير.
+- 💬 **prompt** `audience_builder_prompt` — بناء جمهور.
 
 ## `automation` — 5 tools
 
@@ -75,6 +81,8 @@
 - 🛠️ **tool** `create_simple_auto_rule` — إنشاء قاعدة تلقائية بسيطة: عند تجاوز مؤشر معين، نفّذ إجراءً.
 - 🛠️ **tool** `delete_auto_rule` — حذف قاعدة تلقائية.
 - 🛠️ **tool** `get_auto_rules_history` — سجل تنفيذ القواعد التلقائية خلال الأيام الأخيرة.
+- 📦 **resource** `automation_resource` — نظرة عامة على القواعد.
+- 💬 **prompt** `automation_design_prompt` — تصميم أتمتة.
 
 ## `breakdowns` — 4 tools
 
@@ -82,6 +90,8 @@
 - 🛠️ **tool** `get_campaign_insights_breakdown` — تحليلات حملة مجزأة.
 - 🛠️ **tool** `get_adset_insights_breakdown` — تحليلات مجموعة إعلانية مجزأة.
 - 🛠️ **tool** `get_ad_insights_breakdown` — تحليلات إعلان مجزأة.
+- 📦 **resource** `breakdowns_resource` — قوالب التحليلات المجزأة.
+- 💬 **prompt** `breakdown_analysis_prompt` — تحليل مجزأ.
 
 ## `business` — 5 tools
 
@@ -90,6 +100,8 @@
 - 🛠️ **tool** `invite_business_user` — دعوة مستخدم جديد إلى Business Manager.
 - 🛠️ **tool** `update_business_user_role` — تغيير دور مستخدم في Business Manager.
 - 🛠️ **tool** `delete_business_user` — إزالة مستخدم من Business Manager نهائيًا.
+- 📦 **resource** `business_resource` — نظرة عامة على الأعمال.
+- 💬 **prompt** `business_user_prompt` — إدارة مستخدمي الأعمال.
 
 ## `campaigns` — 6 tools
 
@@ -99,6 +111,8 @@
 - 🛠️ **tool** `update_campaign_status` — تغيير حالة حملة.
 - 🛠️ **tool** `update_campaign_budget` — تعديل ميزانية حملة (بالعملة الصغرى).
 - 🛠️ **tool** `delete_campaign` — حذف حملة نهائيًا.
+- 📦 **resource** `campaigns_resource` — نظرة عامة على الحملات مع ملخص سريع.
+- 💬 **prompt** `campaign_strategy_prompt` — استراتيجية حملة.
 
 ## `catalog` — 26 tools
 
@@ -128,6 +142,8 @@
 - 🛠️ **tool** `get_commerce_order` — تفاصيل طلب واحد (منتجات، عنوان شحن، حالة).
 - 🛠️ **tool** `get_catalog_insights` — تحليلات الكتالوج (مقاييس الأداء).
 - 🛠️ **tool** `bulk_update_products` — تعديل عدة منتجات دفعة واحدة.
+- 📦 **resource** `catalog_resource` — نظرة عامة على الكتالوجات.
+- 💬 **prompt** `catalog_optimization_prompt` — تحسين كتالوج.
 
 ## `creatives` — 5 tools
 
@@ -136,6 +152,8 @@
 - 🛠️ **tool** `generate_creative_template` — توليد قالب إبداعي جاهز (نص أساسي، عنوان، وصف، CTA، نوع الإبداع) بناءً على الهدف.
 - 🛠️ **tool** `generate_ad_copy` — توليد 5 نصوص إعلانية (primary_text) مع عناوين و CTA — مساعد إبداعي ذكي.
 - 🛠️ **tool** `generate_caption_from_image` — توليد كابشن من رابط صورة (يتطلب وصف الصورة — حاليًا قالب ذكي، مستقبلاً Vision LLM).
+- 📦 **resource** `creatives_resource` — قوالب الإبداع.
+- 💬 **prompt** `creative_brief_prompt` — بريف إبداعي.
 
 ## `discovery` — 5 tools
 
@@ -144,12 +162,16 @@
 - 🛠️ **tool** `discover_ig_user` — اكتشاف حساب إنستغرام المرتبط بصفحة فيسبوك.
 - 🛠️ **tool** `debug_access_token` — فحص نوع التوكن وصلاحياته وتاريخ انتهائه.
 - 🛠️ **tool** `config_status` — حالة الإعداد الحالية (أي معرفات مملوءة في .env) بدون كشف الأسرار.
+- 📦 **resource** `discovery_resource` — حالة الاكتشاف.
+- 💬 **prompt** `discovery_guide_prompt` — دليل اكتشاف.
 
 ## `events` — 3 tools
 
 - 🛠️ **tool** `get_webhook_events` — استقبال أحداث Webhook المخزنة (من الذاكرة أو الملفات).
 - 🛠️ **tool** `pop_webhook_events` — استخراج أحداث Webhook من الذاكرة (تُحذف بعد الاستخراج).
 - 🛠️ **tool** `get_webhook_event_count` — عدد أحداث Webhook المخزنة حالياً في الذاكرة والملفات.
+- 📦 **resource** `events_resource` — نظرة عامة على الأحداث.
+- 💬 **prompt** `event_handling_prompt` — معالجة حدث.
 
 ## `finance` — 9 tools
 
@@ -162,6 +184,8 @@
 - 🛠️ **tool** `list_account_users` — المستخدمون المرتبطون بالحساب الإعلاني وصلاحياتهم.
 - 🛠️ **tool** `assign_user_to_account` — إضافة مستخدم إلى الحساب الإعلاني بصلاحيات محددة.
 - 🛠️ **tool** `remove_user_from_account` — إزالة مستخدم من الحساب الإعلاني.
+- 📦 **resource** `finance_resource` — ملخص المحفظة.
+- 💬 **prompt** `finance_report_prompt` — تقرير مالي.
 
 ## `insights` — 5 tools
 
@@ -170,6 +194,8 @@
 - 🛠️ **tool** `get_adset_insights` — تحليلات مجموعة إعلانية معينة.
 - 🛠️ **tool** `get_ad_insights` — تحليلات إعلان معين.
 - 🛠️ **tool** `get_account_insights_trend` — تحليلات الحساب على مدار الفترة (يومية/أسبوعية).
+- 📦 **resource** `insights_resource` — قوالب التحليلات.
+- 💬 **prompt** `insights_analysis_prompt` — تحليل رؤى.
 
 ## `instagram` — 35 tools
 
@@ -208,6 +234,8 @@
 - 🛠️ **tool** `list_instagram_comments` — قائمة تعليقات منشور إنستغرام مع ترقيم الصفحات (paginate).
 - 🛠️ **tool** `get_instagram_reels_insights` — تحليلات ريلز إنستغرام (plays + reach + engagement) — مخصص لفيديوهات Reels.
 - 🛠️ **tool** `publish_threads_post` — نشر منشور Threads (عبر Graph API v19+ إن كان متاحًا).
+- 📦 **resource** `instagram_resource` — نظرة عامة إنستغرام.
+- 💬 **prompt** `instagram_strategy_prompt` — استراتيجية إنستغرام.
 
 ## `leads` — 7 tools
 
@@ -218,6 +246,8 @@
 - 🛠️ **tool** `create_lead_gen_form` — إنشاء نموذج جذب عملاء على صفحة.
 - 🛠️ **tool** `subscribe_leadgen_webhook` — اشتراك الصفحة في Webhook الرصاص (leadgen). يتطلب صلاحيات pages_manage_metadata.
 - 🛠️ **tool** `get_lead_field_mapping` — تحويل field_data لرصاصة إلى قاموس مسطح {field_name: values} لتسهيل المعالجة.
+- 📦 **resource** `leads_resource` — نظرة عامة على الرصاص.
+- 💬 **prompt** `lead_qualification_prompt` — تأهيل رصاصة.
 
 ## `messenger` — 7 tools
 
@@ -228,12 +258,16 @@
 - 🛠️ **tool** `send_messenger_message` — إرسال رد عبر Messenger إلى المستخدم الذي بدأ المحادثة.
 - 🛠️ **tool** `mark_messenger_seen` — وضع علامة "تمت القراءة" على رسائل المستخدم (mark_seen).
 - 🛠️ **tool** `set_messenger_typing` — إرسال مؤشر الكتابة (typing_on/typing_off) داخل محادثة Messenger.
+- 📦 **resource** `messenger_resource` — نظرة عامة ماسنجر.
+- 💬 **prompt** `messenger_reply_prompt` — رد ماسنجر.
 
 ## `metrics` — 3 tools
 
 - 🛠️ **tool** `get_metrics` — مقاييس الأداء الحالية (Prometheus أو JSON). format: json | prometheus
 - 🛠️ **tool** `get_metrics_prometheus` — مقاييس بصيغة Prometheus exposition (مغلفة كـ JSON).
 - 🛠️ **tool** `reset_metrics` — تصفير جميع المقاييس (للتطوير/الاختبار).
+- 📦 **resource** `metrics_resource` — نظرة عامة المقاييس.
+- 💬 **prompt** `metrics_analysis_prompt` — تحليل مقاييس.
 
 ## `pages` — 25 tools
 
@@ -262,6 +296,8 @@
 - 🛠️ **tool** `publish_page_reel` — نشر ريلز على صفحة فيسبوك (Page Reel).
 - 🛠️ **tool** `get_page_video_insights` — تحليلات فيديو صفحة فيسبوك (views, completes, avg watch).
 - 🛠️ **tool** `list_page_post_reactions` — قائمة تفاعلات (Reactions) على منشور صفحة.
+- 📦 **resource** `pages_resource` — نظرة عامة الصفحات.
+- 💬 **prompt** `page_content_prompt` — محتوى صفحة.
 
 ## `reports` — 5 tools
 
@@ -270,6 +306,8 @@
 - 🛠️ **tool** `generate_instagram_report` — توليد تقرير أداء منشورات إنستغرام كملف CSV أو Excel.
 - 🛠️ **tool** `generate_page_report` — توليد تقرير معلومات صفحة فيسبوك كملف CSV أو Excel.
 - 🛠️ **tool** `export_report_to_google_sheets` — تصدير تقرير CSV موجود إلى Google Sheets.
+- 📦 **resource** `reports_resource` — قائمة التقارير.
+- 💬 **prompt** `report_customization_prompt` — تخصيص تقرير.
 
 ## `resources_prompts` — 0 tools
 
@@ -301,6 +339,8 @@
 - 🛠️ **tool** `cancel_scheduled_task` — إلغاء مهمة مجدولة حسب المعرف.
 - 🛠️ **tool** `get_scheduled_task` — تفاصيل مهمة مجدولة واحدة.
 - 🛠️ **tool** `run_due_tasks` — تشغيل المهام المستحقة (run_at <= الآن).
+- 📦 **resource** `scheduler_resource` — نظرة عامة المجدولة.
+- 💬 **prompt** `scheduler_design_prompt` — تصميم جدولة.
 
 ## `webhook_automations` — 5 tools
 
@@ -309,6 +349,8 @@
 - 🛠️ **tool** `delete_webhook_automation` — حذف قاعدة أتمتة محلية حسب المعرف.
 - 🛠️ **tool** `evaluate_webhook_automations` — محاكاة مطابقة حدث Webhook ضد القواعد المخزنة (dry-run).
 - 🛠️ **tool** `run_webhook_automations` — تنفيذ القواعد المطابقة لحدث Webhook فعليًا (أو محاكاة إذا dry_run=true).
+- 📦 **resource** `webhook_automations_resource` — نظرة عامة الأتمتة.
+- 💬 **prompt** `webhook_automation_prompt` — أتمتة webhook.
 
 ## `whatsapp` — 6 tools
 
@@ -318,3 +360,5 @@
 - 🛠️ **tool** `create_whatsapp_message_template` — إنشاء قالب رسالة واتساب جديد (يتطلب موافقة ميتا).
 - 🛠️ **tool** `send_whatsapp_text_message` — إرسال رسالة نصية واتساب (رقم المستخدم يجب أن يكون بدأ محادثة).
 - 🛠️ **tool** `send_whatsapp_template_message` — إرسال قالب رسالة واتساب معتمد. body_params_json: مصفوفة JSON من النصوص.
+- 📦 **resource** `whatsapp_resource` — نظرة عامة واتساب.
+- 💬 **prompt** `whatsapp_campaign_prompt` — حملة واتساب.
