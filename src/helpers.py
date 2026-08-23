@@ -52,7 +52,7 @@ def sanitize_path(path_str: str, allowed_root: Path) -> Path:
     return resolved
 
 
-from src.throttle import (  # noqa: E402
+from src.throttle import (
     RATE_LIMIT_CODES,
     RATE_LIMIT_SUBCODES,
     async_concurrency_limit,

@@ -145,3 +145,18 @@ def register(mcp):
     def event_handling_prompt(topic: str = "events") -> str:
         """معالجة حدث."""
         return "ساعد في معالجة حدث لـ " + topic + " — كيف تعالج حدث {event_type} (وحدة events)"
+
+    @mcp.resource("events://templates")
+    async def events_extra_resource() -> str:
+        """قوالب الأحداث."""
+        try:
+            return json_dumps({"module": "events", "resource": "events://templates", "hint": "قوالب الأحداث"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "events://templates"))
+
+    @mcp.prompt()
+    def event_filter_prompt(topic: str = "events") -> str:
+        """فلترة أحداث."""
+        return "ساعد في فلترة أحداث لـ " + topic + " — فلتر أحداث {event_type} (وحدة events)"

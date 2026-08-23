@@ -1,4 +1,10 @@
+import asyncio
+import logging
+import time
+
 from src.config import AD_ACCOUNT_ID
+
+logger = logging.getLogger(__name__)
 
 
 def register(mcp):
@@ -201,4 +207,52 @@ def register(mcp):
             "ساعد في استراتيجية حملة لـ "
             + topic
             + " — اكتب استراتيجية حملة لمنتج {product} بهدف {objective} (وحدة campaigns)"
+        )
+
+    @mcp.resource("campaigns://active")
+    async def active_campaigns_resource() -> str:
+        """قائمة الحملات النشطة كـ JSON."""
+        try:
+
+            def _fetch():
+                account = AdAccount(AD_ACCOUNT_ID)
+                return account.get_campaigns(
+                    params={
+                        "fields": ["name", "status", "id"],
+                        "filtering": json_dumps(
+                            [
+                                {
+                                    "field": "status",
+                                    "operator": "EQUAL",
+                                    "value": "ACTIVE",
+                                }
+                            ]
+                        ),
+                    }
+                )
+
+            t0 = time.monotonic()
+            campaigns = await asyncio.to_thread(_fetch)
+            elapsed = time.monotonic() - t0
+            logger.info(
+                "campaigns://active fetched %d campaigns in %.2fs",
+                len(list(campaigns)),
+                elapsed,
+            )
+            return json_dumps([to_dict(c) for c in campaigns])
+        except Exception as e:
+            from src.helpers import handle_error
+
+            logger.exception("campaigns://active failed")
+            return json_dumps(handle_error(e, "campaigns://active"))
+
+    @mcp.prompt()
+    def campaign_creation_prompt(objective: str, product: str, budget: str = "") -> str:
+        """مساعد إنشاء حملة كاملة (objective → adset → ad)."""
+        budget_line = f" بميزانية {budget}" if budget else ""
+        return (
+            f"أنشئ حملة جديدة بهدف {objective} لمنتج {product}{budget_line}. "
+            "حدد: الاسم، الميزانية، الاستهداف (الدولة/العمر/الاهتمامات)، "
+            "والمجموعة الإعلانية (Advantage+ Audience)، ثم الإبداع (صورة/فيديو + نص + CTA). "
+            "استخدم create_campaign → create_adset → create_ad."
         )

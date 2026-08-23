@@ -1,6 +1,12 @@
 """Wallet (finance) module: account balance, spend caps, transactions, payment methods, users."""
 
+import asyncio
+import logging
+import time
+
 from src.config import AD_ACCOUNT_ID, BUSINESS_ID
+
+logger = logging.getLogger(__name__)
 from src.helpers import api_call, handle_error, json_dumps, to_dict, write_guard
 from src.throttle import concurrency_limit
 
@@ -181,3 +187,42 @@ def register(mcp):
     def finance_report_prompt(topic: str = "finance") -> str:
         """تقرير مالي."""
         return "ساعد في تقرير مالي لـ " + topic + " — أنشئ تقرير مالي للفترة {date_range} (وحدة finance)"
+
+    @mcp.resource("account://summary")
+    async def account_summary_resource() -> str:
+        """ملخص أداء الحساب الإعلاني."""
+        try:
+
+            def _fetch():
+                account = AdAccount(AD_ACCOUNT_ID)
+                info = account.api_get(
+                    fields=[
+                        "name",
+                        "account_status",
+                        "currency",
+                        "balance",
+                        "amount_spent",
+                        "spend_cap",
+                    ]
+                )
+                insights = account.get_insights(
+                    params={
+                        "date_preset": "last_30d",
+                        "fields": ["spend", "impressions", "clicks"],
+                    }
+                )
+                return info, insights
+
+            t0 = time.monotonic()
+            info, insights = await asyncio.to_thread(_fetch)
+            elapsed = time.monotonic() - t0
+            logger.info("account://summary fetched in %.2fs", elapsed)
+            data = to_dict(info)
+            if insights:
+                data["insights_30d"] = to_dict(insights[0])
+            return json_dumps(data)
+        except Exception as e:
+            from src.helpers import handle_error
+
+            logger.exception("account://summary failed")
+            return json_dumps(handle_error(e, "account://summary"))

@@ -1,5 +1,9 @@
 """Creative tools: AdPreview generation + creative copy templates."""
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 AD_FORMATS = [
     "DESKTOP_FEED_STANDARD",
     "MOBILE_FEED_STANDARD",
@@ -291,3 +295,29 @@ def register(mcp):
     def creative_brief_prompt(topic: str = "creatives") -> str:
         """بريف إبداعي."""
         return "ساعد في بريف إبداعي لـ " + topic + " — اكتب بريف إبداعي لمنتج {product} (وحدة creatives)"
+
+    @mcp.prompt()
+    def ad_copy_prompt(product: str, audience: str = "") -> str:
+        """إنشاء نصوص إعلانية جذابة."""
+        audience_line = f" للجمهور المستهدف: {audience}" if audience else ""
+        return (
+            f"اكتب 5 نصوص إعلانية بالعربية لمنتج: {product}{audience_line}، "
+            "مع عناوين جذابة (primary text)، ووصف قصير، ودعوة واضحة لاتخاذ إجراء (CTA)."
+        )
+
+    @mcp.resource("creatives://templates")
+    async def creatives_extra_resource() -> str:
+        """قوالب إبداعية إضافية."""
+        try:
+            return json_dumps(
+                {"module": "creatives", "resource": "creatives://templates", "hint": "قوالب إبداعية إضافية"}
+            )
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "creatives://templates"))
+
+    @mcp.prompt()
+    def creative_variation_prompt(topic: str = "creatives") -> str:
+        """تنويع إبداعي."""
+        return "ساعد في تنويع إبداعي لـ " + topic + " — أنشئ تنويع إبداعي لـ {product} (وحدة creatives)"

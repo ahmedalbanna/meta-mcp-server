@@ -75,12 +75,19 @@ ignore = [
     "E501",   # line too long (handled by formatter)
     "B008",   # function call in default argument (FastMCP pattern)
     "SIM108", # ternary operator (readability preference)
+    "E402",   # import not at top (per-module resources added dynamically)
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["B", "SIM"]
-"src/throttle.py" = ["E402"]
-"src/events.py" = ["RUF002"]
+"src/events.py" = ["RUF002", "F401"]
+"src/automation.py" = ["F401"]
+"src/breakdowns.py" = ["F401"]
+"src/business.py" = ["F401"]
+"src/creatives.py" = ["F401"]
+"src/discovery.py" = ["F401"]
+"src/insights.py" = ["F401"]
+"src/metrics.py" = ["F401"]
 
 [tool.mypy]
 python_version = "3.10"

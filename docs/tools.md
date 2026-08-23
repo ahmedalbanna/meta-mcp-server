@@ -4,31 +4,30 @@
 
 | Module | Tools | Resources | Prompts |
 |---|---|---|---|
-| `ads` | 10 | 1 | 1 |
-| `adsets` | 8 | 1 | 1 |
-| `audiences` | 10 | 1 | 1 |
-| `automation` | 5 | 1 | 1 |
-| `breakdowns` | 4 | 1 | 1 |
-| `business` | 5 | 1 | 1 |
-| `campaigns` | 6 | 1 | 1 |
-| `catalog` | 26 | 1 | 1 |
-| `creatives` | 5 | 1 | 1 |
-| `discovery` | 5 | 1 | 1 |
-| `events` | 3 | 1 | 1 |
-| `finance` | 9 | 1 | 1 |
-| `insights` | 5 | 1 | 1 |
-| `instagram` | 35 | 1 | 1 |
-| `leads` | 7 | 1 | 1 |
-| `messenger` | 7 | 1 | 1 |
-| `metrics` | 3 | 1 | 1 |
-| `pages` | 25 | 1 | 1 |
-| `reports` | 5 | 1 | 1 |
-| `resources_prompts` | 0 | 10 | 10 |
-| `scheduler` | 5 | 1 | 1 |
-| `webhook_automations` | 5 | 1 | 1 |
-| `whatsapp` | 6 | 1 | 1 |
+| `ads` | 10 | 2 | 1 |
+| `adsets` | 8 | 2 | 2 |
+| `audiences` | 10 | 2 | 1 |
+| `automation` | 5 | 2 | 3 |
+| `breakdowns` | 4 | 2 | 2 |
+| `business` | 5 | 2 | 2 |
+| `campaigns` | 6 | 2 | 2 |
+| `catalog` | 26 | 2 | 2 |
+| `creatives` | 5 | 2 | 3 |
+| `discovery` | 5 | 2 | 2 |
+| `events` | 3 | 2 | 2 |
+| `finance` | 9 | 2 | 1 |
+| `insights` | 5 | 2 | 3 |
+| `instagram` | 35 | 2 | 2 |
+| `leads` | 7 | 2 | 2 |
+| `messenger` | 7 | 2 | 2 |
+| `metrics` | 3 | 2 | 1 |
+| `pages` | 25 | 2 | 2 |
+| `reports` | 5 | 2 | 3 |
+| `scheduler` | 5 | 2 | 1 |
+| `webhook_automations` | 5 | 2 | 2 |
+| `whatsapp` | 6 | 2 | 3 |
 
-**Total:** 199 tools + 32 resources + 32 prompts
+**Total:** 199 tools + 44 resources + 44 prompts
 
 
 ## `ads` — 10 tools
@@ -45,6 +44,7 @@
 - 🛠️ **tool** `delete_ad_creative` — حذف إبداع (Ad Creative) نهائيًا.
 - 📦 **resource** `ads_resource` — نظرة عامة على الإعلانات.
 - 💬 **prompt** `ad_review_prompt` — مراجعة إعلان.
+- 📦 **resource** `active_ads_resource` — قائمة الإعلانات النشطة.
 
 ## `adsets` — 8 tools
 
@@ -58,6 +58,8 @@
 - 🛠️ **tool** `schedule_adset` — جدولة مجموعة إعلانية: تعيين وقت بدء و/أو انتهاء.
 - 📦 **resource** `adsets_resource` — نظرة عامة على المجموعات الإعلانية.
 - 💬 **prompt** `adset_strategy_prompt` — استراتيجية مجموعة إعلانية.
+- 📦 **resource** `active_adsets_resource` — قائمة المجموعات الإعلانية النشطة.
+- 💬 **prompt** `adset_targeting_prompt` — مساعد استهداف مجموعة إعلانية.
 
 ## `audiences` — 10 tools
 
@@ -73,6 +75,7 @@
 - 🛠️ **tool** `suggest_lookalike` — اقتراح إعدادات Lookalike بناءً على حجم الجمهور المصدر.
 - 📦 **resource** `audiences_resource` — نظرة عامة على الجماهير.
 - 💬 **prompt** `audience_builder_prompt` — بناء جمهور.
+- 📦 **resource** `audiences_list_resource` — قائمة الجماهير المخصصة.
 
 ## `automation` — 5 tools
 
@@ -83,6 +86,9 @@
 - 🛠️ **tool** `get_auto_rules_history` — سجل تنفيذ القواعد التلقائية خلال الأيام الأخيرة.
 - 📦 **resource** `automation_resource` — نظرة عامة على القواعد.
 - 💬 **prompt** `automation_design_prompt` — تصميم أتمتة.
+- 💬 **prompt** `automation_rule_prompt` — شرح قاعدة أتمتة إعلانات.
+- 📦 **resource** `automation_extra_resource` — قوالب الأتمتة.
+- 💬 **prompt** `automation_test_prompt` — اختبار أتمتة.
 
 ## `breakdowns` — 4 tools
 
@@ -92,6 +98,8 @@
 - 🛠️ **tool** `get_ad_insights_breakdown` — تحليلات إعلان مجزأة.
 - 📦 **resource** `breakdowns_resource` — قوالب التحليلات المجزأة.
 - 💬 **prompt** `breakdown_analysis_prompt` — تحليل مجزأ.
+- 📦 **resource** `breakdowns_extra_resource` — قوالب التحليلات.
+- 💬 **prompt** `breakdown_comparison_prompt` — مقارنة تحليلات.
 
 ## `business` — 5 tools
 
@@ -102,6 +110,8 @@
 - 🛠️ **tool** `delete_business_user` — إزالة مستخدم من Business Manager نهائيًا.
 - 📦 **resource** `business_resource` — نظرة عامة على الأعمال.
 - 💬 **prompt** `business_user_prompt` — إدارة مستخدمي الأعمال.
+- 📦 **resource** `business_extra_resource` — قوالب الأعمال.
+- 💬 **prompt** `business_invite_prompt` — دعوة أعمال.
 
 ## `campaigns` — 6 tools
 
@@ -113,6 +123,8 @@
 - 🛠️ **tool** `delete_campaign` — حذف حملة نهائيًا.
 - 📦 **resource** `campaigns_resource` — نظرة عامة على الحملات مع ملخص سريع.
 - 💬 **prompt** `campaign_strategy_prompt` — استراتيجية حملة.
+- 📦 **resource** `active_campaigns_resource` — قائمة الحملات النشطة كـ JSON.
+- 💬 **prompt** `campaign_creation_prompt` — مساعد إنشاء حملة كاملة (objective → adset → ad).
 
 ## `catalog` — 26 tools
 
@@ -144,6 +156,8 @@
 - 🛠️ **tool** `bulk_update_products` — تعديل عدة منتجات دفعة واحدة.
 - 📦 **resource** `catalog_resource` — نظرة عامة على الكتالوجات.
 - 💬 **prompt** `catalog_optimization_prompt` — تحسين كتالوج.
+- 📦 **resource** `catalogs_list_resource` — قائمة كتالوجات المنتجات.
+- 💬 **prompt** `catalog_product_prompt` — وصف منتج لكتالوج.
 
 ## `creatives` — 5 tools
 
@@ -154,6 +168,9 @@
 - 🛠️ **tool** `generate_caption_from_image` — توليد كابشن من رابط صورة (يتطلب وصف الصورة — حاليًا قالب ذكي، مستقبلاً Vision LLM).
 - 📦 **resource** `creatives_resource` — قوالب الإبداع.
 - 💬 **prompt** `creative_brief_prompt` — بريف إبداعي.
+- 💬 **prompt** `ad_copy_prompt` — إنشاء نصوص إعلانية جذابة.
+- 📦 **resource** `creatives_extra_resource` — قوالب إبداعية إضافية.
+- 💬 **prompt** `creative_variation_prompt` — تنويع إبداعي.
 
 ## `discovery` — 5 tools
 
@@ -164,6 +181,8 @@
 - 🛠️ **tool** `config_status` — حالة الإعداد الحالية (أي معرفات مملوءة في .env) بدون كشف الأسرار.
 - 📦 **resource** `discovery_resource` — حالة الاكتشاف.
 - 💬 **prompt** `discovery_guide_prompt` — دليل اكتشاف.
+- 📦 **resource** `discovery_extra_resource` — قوالب الاكتشاف.
+- 💬 **prompt** `discovery_check_prompt` — فحص اكتشاف.
 
 ## `events` — 3 tools
 
@@ -172,6 +191,8 @@
 - 🛠️ **tool** `get_webhook_event_count` — عدد أحداث Webhook المخزنة حالياً في الذاكرة والملفات.
 - 📦 **resource** `events_resource` — نظرة عامة على الأحداث.
 - 💬 **prompt** `event_handling_prompt` — معالجة حدث.
+- 📦 **resource** `events_extra_resource` — قوالب الأحداث.
+- 💬 **prompt** `event_filter_prompt` — فلترة أحداث.
 
 ## `finance` — 9 tools
 
@@ -186,6 +207,7 @@
 - 🛠️ **tool** `remove_user_from_account` — إزالة مستخدم من الحساب الإعلاني.
 - 📦 **resource** `finance_resource` — ملخص المحفظة.
 - 💬 **prompt** `finance_report_prompt` — تقرير مالي.
+- 📦 **resource** `account_summary_resource` — ملخص أداء الحساب الإعلاني.
 
 ## `insights` — 5 tools
 
@@ -196,6 +218,9 @@
 - 🛠️ **tool** `get_account_insights_trend` — تحليلات الحساب على مدار الفترة (يومية/أسبوعية).
 - 📦 **resource** `insights_resource` — قوالب التحليلات.
 - 💬 **prompt** `insights_analysis_prompt` — تحليل رؤى.
+- 💬 **prompt** `report_insight_prompt` — تحليل تقرير وتوصيات.
+- 📦 **resource** `insights_extra_resource` — قوالب الرؤى.
+- 💬 **prompt** `insights_compare_prompt` — مقارنة رؤى.
 
 ## `instagram` — 35 tools
 
@@ -236,6 +261,8 @@
 - 🛠️ **tool** `publish_threads_post` — نشر منشور Threads (عبر Graph API v19+ إن كان متاحًا).
 - 📦 **resource** `instagram_resource` — نظرة عامة إنستغرام.
 - 💬 **prompt** `instagram_strategy_prompt` — استراتيجية إنستغرام.
+- 📦 **resource** `recent_instagram_resource` — آخر منشورات إنستغرام.
+- 💬 **prompt** `instagram_caption_prompt` — توليد كابشن إنستغرام من وصف الصورة.
 
 ## `leads` — 7 tools
 
@@ -248,6 +275,8 @@
 - 🛠️ **tool** `get_lead_field_mapping` — تحويل field_data لرصاصة إلى قاموس مسطح {field_name: values} لتسهيل المعالجة.
 - 📦 **resource** `leads_resource` — نظرة عامة على الرصاص.
 - 💬 **prompt** `lead_qualification_prompt` — تأهيل رصاصة.
+- 📦 **resource** `recent_leads_resource` — آخر الرصاصات (Leads) من النماذج.
+- 💬 **prompt** `lead_nurture_prompt` — سلسلة متابعة رصاصة (Lead Nurture).
 
 ## `messenger` — 7 tools
 
@@ -260,6 +289,8 @@
 - 🛠️ **tool** `set_messenger_typing` — إرسال مؤشر الكتابة (typing_on/typing_off) داخل محادثة Messenger.
 - 📦 **resource** `messenger_resource` — نظرة عامة ماسنجر.
 - 💬 **prompt** `messenger_reply_prompt` — رد ماسنجر.
+- 📦 **resource** `messenger_extra_resource` — قوالب ماسنجر.
+- 💬 **prompt** `messenger_template_prompt` — قالب ماسنجر.
 
 ## `metrics` — 3 tools
 
@@ -268,6 +299,7 @@
 - 🛠️ **tool** `reset_metrics` — تصفير جميع المقاييس (للتطوير/الاختبار).
 - 📦 **resource** `metrics_resource` — نظرة عامة المقاييس.
 - 💬 **prompt** `metrics_analysis_prompt` — تحليل مقاييس.
+- 📦 **resource** `metrics_snapshot_resource` — لقطة مقاييس الأداء (MCP + API).
 
 ## `pages` — 25 tools
 
@@ -298,6 +330,8 @@
 - 🛠️ **tool** `list_page_post_reactions` — قائمة تفاعلات (Reactions) على منشور صفحة.
 - 📦 **resource** `pages_resource` — نظرة عامة الصفحات.
 - 💬 **prompt** `page_content_prompt` — محتوى صفحة.
+- 📦 **resource** `pages_extra_resource` — قوالب الصفحات.
+- 💬 **prompt** `page_insights_prompt` — رؤى صفحة.
 
 ## `reports` — 5 tools
 
@@ -308,29 +342,9 @@
 - 🛠️ **tool** `export_report_to_google_sheets` — تصدير تقرير CSV موجود إلى Google Sheets.
 - 📦 **resource** `reports_resource` — قائمة التقارير.
 - 💬 **prompt** `report_customization_prompt` — تخصيص تقرير.
-
-## `resources_prompts` — 0 tools
-
-- 📦 **resource** `active_campaigns_resource` — قائمة الحملات النشطة كـ JSON.
-- 📦 **resource** `account_summary_resource` — ملخص أداء الحساب الإعلاني.
-- 📦 **resource** `audiences_list_resource` — قائمة الجماهير المخصصة.
-- 📦 **resource** `active_adsets_resource` — قائمة المجموعات الإعلانية النشطة.
-- 📦 **resource** `active_ads_resource` — قائمة الإعلانات النشطة.
-- 📦 **resource** `catalogs_list_resource` — قائمة كتالوجات المنتجات.
-- 📦 **resource** `recent_leads_resource` — آخر الرصاصات (Leads) من النماذج.
-- 📦 **resource** `recent_instagram_resource` — آخر منشورات إنستغرام.
-- 📦 **resource** `metrics_snapshot_resource` — لقطة مقاييس الأداء (MCP + API).
-- 📦 **resource** `scheduler_tasks_resource` — قائمة المهام المجدولة.
-- 💬 **prompt** `ad_copy_prompt` — إنشاء نصوص إعلانية جذابة.
 - 💬 **prompt** `marketing_report_prompt` — إنشاء تقرير أداء تسويقي.
-- 💬 **prompt** `campaign_creation_prompt` — مساعد إنشاء حملة كاملة (objective → adset → ad).
-- 💬 **prompt** `adset_targeting_prompt` — مساعد استهداف مجموعة إعلانية.
-- 💬 **prompt** `instagram_caption_prompt` — توليد كابشن إنستغرام من وصف الصورة.
-- 💬 **prompt** `lead_nurture_prompt` — سلسلة متابعة رصاصة (Lead Nurture).
-- 💬 **prompt** `whatsapp_template_prompt` — صياغة قالب واتساب معتمد.
-- 💬 **prompt** `catalog_product_prompt` — وصف منتج لكتالوج.
-- 💬 **prompt** `automation_rule_prompt` — شرح قاعدة أتمتة إعلانات.
-- 💬 **prompt** `report_insight_prompt` — تحليل تقرير وتوصيات.
+- 📦 **resource** `reports_extra_resource` — قوالب التقارير.
+- 💬 **prompt** `report_schedule_prompt` — جدولة تقرير.
 
 ## `scheduler` — 5 tools
 
@@ -341,6 +355,7 @@
 - 🛠️ **tool** `run_due_tasks` — تشغيل المهام المستحقة (run_at <= الآن).
 - 📦 **resource** `scheduler_resource` — نظرة عامة المجدولة.
 - 💬 **prompt** `scheduler_design_prompt` — تصميم جدولة.
+- 📦 **resource** `scheduler_tasks_resource` — قائمة المهام المجدولة.
 
 ## `webhook_automations` — 5 tools
 
@@ -351,6 +366,8 @@
 - 🛠️ **tool** `run_webhook_automations` — تنفيذ القواعد المطابقة لحدث Webhook فعليًا (أو محاكاة إذا dry_run=true).
 - 📦 **resource** `webhook_automations_resource` — نظرة عامة الأتمتة.
 - 💬 **prompt** `webhook_automation_prompt` — أتمتة webhook.
+- 📦 **resource** `webhook_automations_extra_resource` — قوالب الأتمتة.
+- 💬 **prompt** `webhook_test_prompt` — اختبار webhook.
 
 ## `whatsapp` — 6 tools
 
@@ -362,3 +379,6 @@
 - 🛠️ **tool** `send_whatsapp_template_message` — إرسال قالب رسالة واتساب معتمد. body_params_json: مصفوفة JSON من النصوص.
 - 📦 **resource** `whatsapp_resource` — نظرة عامة واتساب.
 - 💬 **prompt** `whatsapp_campaign_prompt` — حملة واتساب.
+- 💬 **prompt** `whatsapp_template_prompt` — صياغة قالب واتساب معتمد.
+- 📦 **resource** `whatsapp_extra_resource` — قوالب واتساب.
+- 💬 **prompt** `whatsapp_broadcast_prompt` — بث واتساب.

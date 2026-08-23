@@ -1,6 +1,10 @@
 """Insights breakdowns: age/gender/placement/country/device + time-series + attribution."""
 
+import logging
+
 from src.config import AD_ACCOUNT_ID
+
+logger = logging.getLogger(__name__)
 from src.insights import DATE_PRESETS, DEFAULT_METRICS
 
 BREAKDOWN_VALUES = [
@@ -218,3 +222,18 @@ def register(mcp):
     def breakdown_analysis_prompt(topic: str = "breakdowns") -> str:
         """تحليل مجزأ."""
         return "ساعد في تحليل مجزأ لـ " + topic + " — حلل breakdown {breakdown} (وحدة breakdowns)"
+
+    @mcp.resource("breakdowns://templates")
+    async def breakdowns_extra_resource() -> str:
+        """قوالب التحليلات."""
+        try:
+            return json_dumps({"module": "breakdowns", "resource": "breakdowns://templates", "hint": "قوالب التحليلات"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "breakdowns://templates"))
+
+    @mcp.prompt()
+    def breakdown_comparison_prompt(topic: str = "breakdowns") -> str:
+        """مقارنة تحليلات."""
+        return "ساعد في مقارنة تحليلات لـ " + topic + " — قارن breakdown {b1} و {b2} (وحدة breakdowns)"

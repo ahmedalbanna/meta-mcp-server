@@ -29,7 +29,6 @@ from src import (
     metrics,
     pages,
     reports,
-    resources_prompts,
     scheduler,
     webhook_automations,
     whatsapp,
@@ -66,7 +65,7 @@ def main() -> None:
     _install_exception_hook()
     log.info("حد التوازي لطلبات Graph API: %d", MAX_CONCURRENT)
 
-    # Register all tool modules (Phase 4 adds metrics)
+    # Register all tool modules (Phase 5 distributed resources/prompts per module)
     for module in (
         discovery,
         campaigns,
@@ -90,7 +89,6 @@ def main() -> None:
         webhook_automations,
         scheduler,
         metrics,
-        resources_prompts,
     ):
         module.register(mcp)
         log.info("تم تسجيل وحدة %s", module.__name__.split(".")[-1])

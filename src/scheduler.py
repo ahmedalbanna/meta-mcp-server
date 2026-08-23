@@ -11,7 +11,11 @@ Optional APScheduler: if installed, tasks can be scheduled with cron; otherwise
 we use simple timestamp scheduling (run_at Unix seconds).
 """
 
+import asyncio
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 import time
 import uuid
 from typing import Any
@@ -194,3 +198,23 @@ def register(mcp):
     def scheduler_design_prompt(topic: str = "scheduler") -> str:
         """تصميم جدولة."""
         return "ساعد في تصميم جدولة لـ " + topic + " — جدول مهمة {task} (وحدة scheduler)"
+
+    @mcp.resource("scheduler://tasks")
+    async def scheduler_tasks_resource() -> str:
+        """قائمة المهام المجدولة."""
+        try:
+            from src.scheduler import _load_tasks
+
+            def _fetch():
+                return _load_tasks()
+
+            t0 = time.monotonic()
+            tasks = await asyncio.to_thread(_fetch)
+            elapsed = time.monotonic() - t0
+            logger.info("scheduler://tasks fetched %d tasks in %.2fs", len(tasks), elapsed)
+            return json_dumps({"tasks": tasks, "count": len(tasks)})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            logger.exception("scheduler://tasks failed")
+            return json_dumps(handle_error(e, "scheduler://tasks"))

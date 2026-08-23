@@ -1,4 +1,9 @@
+import asyncio
 import json
+import logging
+import time
+
+logger = logging.getLogger(__name__)
 
 from src.config import AD_ACCOUNT_ID
 
@@ -231,3 +236,37 @@ def register(mcp):
     def adset_strategy_prompt(topic: str = "adsets") -> str:
         """استراتيجية مجموعة إعلانية."""
         return "ساعد في استراتيجية مجموعة إعلانية لـ " + topic + " — اقترح مجموعة إعلانية لمنتج {product} (وحدة adsets)"
+
+    @mcp.resource("adsets://active")
+    async def active_adsets_resource() -> str:
+        """قائمة المجموعات الإعلانية النشطة."""
+        try:
+
+            def _fetch():
+                account = AdAccount(AD_ACCOUNT_ID)
+                return account.get_ad_sets(
+                    params={
+                        "fields": ["name", "status", "daily_budget", "id"],
+                        "filtering": json_dumps([{"field": "status", "operator": "EQUAL", "value": "ACTIVE"}]),
+                    }
+                )
+
+            t0 = time.monotonic()
+            rows = await asyncio.to_thread(_fetch)
+            elapsed = time.monotonic() - t0
+            logger.info("adsets://active fetched in %.2fs", elapsed)
+            return json_dumps([to_dict(c) for c in rows])
+        except Exception as e:
+            from src.helpers import handle_error
+
+            logger.exception("adsets://active failed")
+            return json_dumps(handle_error(e, "adsets://active"))
+
+    @mcp.prompt()
+    def adset_targeting_prompt(product: str, country: str = "EG", age: str = "18-65") -> str:
+        """مساعد استهداف مجموعة إعلانية."""
+        return (
+            f"اقترح استهدافًا لمجموعة إعلانية لمنتج {product} في {country} للعمر {age}. "
+            "اذكر: geo_locations، age_min/max، gender، interests/behaviors، "
+            "وأعداد Advantage+ Audience (0=دقيق، 1=موسع). أرجع JSON جاهز لـ create_adset."
+        )

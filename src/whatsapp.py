@@ -3,7 +3,11 @@
 Raw Graph API calls using the system/business access token.
 """
 
+import logging
+
 from src.config import WABA_ID, WHATSAPP_PHONE_NUMBER_ID
+
+logger = logging.getLogger(__name__)
 from src.helpers import api_call, handle_error, json_dumps, write_guard
 from src.throttle import concurrency_limit
 
@@ -176,3 +180,27 @@ def register(mcp):
     def whatsapp_campaign_prompt(topic: str = "whatsapp") -> str:
         """حملة واتساب."""
         return "ساعد في حملة واتساب لـ " + topic + " — خطط حملة واتساب لـ {product} (وحدة whatsapp)"
+
+    @mcp.prompt()
+    def whatsapp_template_prompt(business: str, goal: str = "تأكيد طلب") -> str:
+        """صياغة قالب واتساب معتمد."""
+        return (
+            f"صغ قالب واتساب لفعالية {goal} لنشاط {business}. "
+            "اذكر: language, category (UTILITY/MARKETING), body_text, header_text. "
+            "استخدم create_whatsapp_message_template ثم send_whatsapp_template_message."
+        )
+
+    @mcp.resource("whatsapp://templates")
+    async def whatsapp_extra_resource() -> str:
+        """قوالب واتساب."""
+        try:
+            return json_dumps({"module": "whatsapp", "resource": "whatsapp://templates", "hint": "قوالب واتساب"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "whatsapp://templates"))
+
+    @mcp.prompt()
+    def whatsapp_broadcast_prompt(topic: str = "whatsapp") -> str:
+        """بث واتساب."""
+        return "ساعد في بث واتساب لـ " + topic + " — خطط بث واتساب لـ {audience} (وحدة whatsapp)"

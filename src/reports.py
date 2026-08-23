@@ -404,3 +404,27 @@ def register(mcp):
     def report_customization_prompt(topic: str = "reports") -> str:
         """تخصيص تقرير."""
         return "ساعد في تخصيص تقرير لـ " + topic + " — خصص تقرير {report_type} (وحدة reports)"
+
+    @mcp.prompt()
+    def marketing_report_prompt(date_range: str) -> str:
+        """إنشاء تقرير أداء تسويقي."""
+        return (
+            f"أُنشئ تقرير أداء تسويقي مفصل للفترة: {date_range}. "
+            "استخدم أدوات التحليلات (get_campaign_insights وغيرها) واذكر: الإنفاق، النقرات، "
+            "نسبة النقر (CTR)، التكلفة لكل نقرة (CPC)، وأفضل الحملات أداءً، مع توصيات للتحسين."
+        )
+
+    @mcp.resource("reports://templates")
+    async def reports_extra_resource() -> str:
+        """قوالب التقارير."""
+        try:
+            return json_dumps({"module": "reports", "resource": "reports://templates", "hint": "قوالب التقارير"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "reports://templates"))
+
+    @mcp.prompt()
+    def report_schedule_prompt(topic: str = "reports") -> str:
+        """جدولة تقرير."""
+        return "ساعد في جدولة تقرير لـ " + topic + " — جدول تقرير {report_type} (وحدة reports)"

@@ -1,4 +1,10 @@
+import asyncio
+import logging
+import time
+
 from src.config import BUSINESS_ID, COMMERCE_ACCOUNT_ID
+
+logger = logging.getLogger(__name__)
 
 
 def register(mcp):
@@ -675,3 +681,38 @@ def register(mcp):
     def catalog_optimization_prompt(topic: str = "catalog") -> str:
         """تحسين كتالوج."""
         return "ساعد في تحسين كتالوج لـ " + topic + " — حسن كتالوج {catalog_id} (وحدة catalog)"
+
+    @mcp.resource("catalogs://list")
+    async def catalogs_list_resource() -> str:
+        """قائمة كتالوجات المنتجات."""
+        try:
+            from facebook_business.adobjects.business import Business
+
+            from src.config import BUSINESS_ID
+
+            def _fetch():
+                bid = BUSINESS_ID
+                if not bid:
+                    return []
+                return Business(bid).get_owned_product_catalogs(params={"fields": ["id", "name", "product_count"]})
+
+            t0 = time.monotonic()
+            rows = await asyncio.to_thread(_fetch)
+            elapsed = time.monotonic() - t0
+            logger.info("catalogs://list fetched in %.2fs", elapsed)
+            return json_dumps([to_dict(c) for c in rows])
+        except Exception as e:
+            from src.helpers import handle_error
+
+            logger.exception("catalogs://list failed")
+            return json_dumps(handle_error(e, "catalogs://list"))
+
+    @mcp.prompt()
+    def catalog_product_prompt(product_name: str, price: str = "") -> str:
+        """وصف منتج لكتالوج."""
+        price_line = f" بسعر {price}" if price else ""
+        return (
+            f"اكتب وصف منتج مقنع لـ {product_name}{price_line} لكتالوج فيسبوك: "
+            "العنوان، الوصف، brand، availability، product_type، custom_label_0. "
+            "استخدم create_product."
+        )

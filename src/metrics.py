@@ -9,7 +9,11 @@ Thread-safe, no external deps. Used by:
 Exposed via webhook_server /metrics and via MCP tool get_metrics.
 """
 
+import asyncio
+import logging
 import threading
+
+logger = logging.getLogger(__name__)
 import time
 from collections import Counter, defaultdict
 
@@ -211,3 +215,27 @@ def register(mcp):
     def metrics_analysis_prompt(topic: str = "metrics") -> str:
         """تحليل مقاييس."""
         return "ساعد في تحليل مقاييس لـ " + topic + " — حلل مقاييس {tool} (وحدة metrics)"
+
+    @mcp.resource("metrics://snapshot")
+    async def metrics_snapshot_resource() -> str:
+        """لقطة مقاييس الأداء (MCP + API)."""
+        try:
+            from src.metrics import get_snapshot
+
+            def _fetch():
+                return get_snapshot()
+
+            t0 = time.monotonic()
+            snap = await asyncio.to_thread(_fetch)
+            elapsed = time.monotonic() - t0
+            logger.info("metrics://snapshot fetched in %.2fs", elapsed)
+            # Convert tuple keys for JSON
+            tool_calls = {f"{k[0]}:{k[1]}": v for k, v in snap.get("tool_calls", {}).items()}
+            snap["tool_calls"] = tool_calls
+            snap["tool_duration"] = {k: len(v) for k, v in snap.get("tool_duration", {}).items()}
+            return json_dumps(snap)
+        except Exception as e:
+            from src.helpers import handle_error
+
+            logger.exception("metrics://snapshot failed")
+            return json_dumps(handle_error(e, "metrics://snapshot"))

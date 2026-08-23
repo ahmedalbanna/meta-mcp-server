@@ -1,4 +1,10 @@
+import asyncio
+import logging
+import time
+
 from src.config import AD_ACCOUNT_ID
+
+logger = logging.getLogger(__name__)
 from src.utils import normalize_pii
 
 LOOKALIKE_TYPES = ["SIMILARITY", "REACH", "CUSTOM_RATIO"]
@@ -481,3 +487,27 @@ def register(mcp):
     def audience_builder_prompt(topic: str = "audiences") -> str:
         """بناء جمهور."""
         return "ساعد في بناء جمهور لـ " + topic + " — ابن جمهور لمنتج {product} (وحدة audiences)"
+
+    @mcp.resource("audiences://list")
+    async def audiences_list_resource() -> str:
+        """قائمة الجماهير المخصصة."""
+        try:
+
+            def _fetch():
+                account = AdAccount(AD_ACCOUNT_ID)
+                return account.get_custom_audiences(params={"fields": ["name", "subtype", "approximate_count", "id"]})
+
+            t0 = time.monotonic()
+            audiences = await asyncio.to_thread(_fetch)
+            elapsed = time.monotonic() - t0
+            logger.info(
+                "audiences://list fetched %d audiences in %.2fs",
+                len(list(audiences)),
+                elapsed,
+            )
+            return json_dumps([to_dict(a) for a in audiences])
+        except Exception as e:
+            from src.helpers import handle_error
+
+            logger.exception("audiences://list failed")
+            return json_dumps(handle_error(e, "audiences://list"))

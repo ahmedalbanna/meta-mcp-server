@@ -53,7 +53,6 @@ _TO_DICT_PATHS = [
     "src.automation",
     "src.finance",
     "src.pages",
-    "src.resources_prompts",
     "src.business",
     "src.campaigns",
     "src.adsets",
@@ -72,6 +71,7 @@ _TO_DICT_PATHS = [
     "src.events",
     "src.webhook_automations",
     "src.scheduler",
+    "src.metrics",
 ]
 
 
@@ -199,11 +199,10 @@ ALL_MODULES = (
     "webhook_automations",
     "scheduler",
     "metrics",
-    "resources_prompts",
 )
 
-# Modules that expose @mcp.tool() tools (resources_prompts only has resources/prompts)
-TOOL_MODULES = tuple(m for m in ALL_MODULES if m != "resources_prompts")
+# All modules now expose tools (and per-module resources/prompts)
+TOOL_MODULES = ALL_MODULES
 
 
 def register_all(recorder):
@@ -228,7 +227,6 @@ def register_all(recorder):
         metrics,
         pages,
         reports,
-        resources_prompts,
         scheduler,
         webhook_automations,
         whatsapp,
@@ -254,7 +252,6 @@ def register_all(recorder):
         "metrics": metrics,
         "pages": pages,
         "reports": reports,
-        "resources_prompts": resources_prompts,
         "scheduler": scheduler,
         "webhook_automations": webhook_automations,
         "whatsapp": whatsapp,

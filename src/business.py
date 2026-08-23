@@ -1,6 +1,10 @@
 """Business Manager users: list, invite, roles and removal."""
 
+import logging
+
 from src.config import BUSINESS_ID
+
+logger = logging.getLogger(__name__)
 from src.helpers import handle_error, json_dumps, to_dict, write_guard
 from src.throttle import concurrency_limit
 from src.utils import paginate
@@ -129,3 +133,18 @@ def register(mcp):
     def business_user_prompt(topic: str = "business") -> str:
         """إدارة مستخدمي الأعمال."""
         return "ساعد في إدارة مستخدمي الأعمال لـ " + topic + " — أضف مستخدم {email} بدور {role} (وحدة business)"
+
+    @mcp.resource("business://templates")
+    async def business_extra_resource() -> str:
+        """قوالب الأعمال."""
+        try:
+            return json_dumps({"module": "business", "resource": "business://templates", "hint": "قوالب الأعمال"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "business://templates"))
+
+    @mcp.prompt()
+    def business_invite_prompt(topic: str = "business") -> str:
+        """دعوة أعمال."""
+        return "ساعد في دعوة أعمال لـ " + topic + " — ادع مستخدم {email} (وحدة business)"

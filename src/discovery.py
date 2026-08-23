@@ -4,7 +4,11 @@ Run these first to confirm object ids before wiring FB_PAGE_ID / FB_AD_ACCOUNT_I
 / FB_IG_USER_ID in .env.
 """
 
+import logging
+
 from src.config import APP_ID, APP_SECRET, META_ACCESS_TOKEN
+
+logger = logging.getLogger(__name__)
 from src.helpers import api_call, handle_error, json_dumps
 from src.throttle import concurrency_limit
 
@@ -171,3 +175,18 @@ def register(mcp):
     def discovery_guide_prompt(topic: str = "discovery") -> str:
         """دليل اكتشاف."""
         return "ساعد في دليل اكتشاف لـ " + topic + " — اشرح كيفية اكتشاف {what} (وحدة discovery)"
+
+    @mcp.resource("discovery://templates")
+    async def discovery_extra_resource() -> str:
+        """قوالب الاكتشاف."""
+        try:
+            return json_dumps({"module": "discovery", "resource": "discovery://templates", "hint": "قوالب الاكتشاف"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "discovery://templates"))
+
+    @mcp.prompt()
+    def discovery_check_prompt(topic: str = "discovery") -> str:
+        """فحص اكتشاف."""
+        return "ساعد في فحص اكتشاف لـ " + topic + " — تحقق من اكتشاف {resource} (وحدة discovery)"

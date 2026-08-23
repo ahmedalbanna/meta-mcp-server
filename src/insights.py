@@ -1,4 +1,8 @@
+import logging
+
 from src.config import AD_ACCOUNT_ID
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_METRICS = [
     "spend",
@@ -156,3 +160,26 @@ def register(mcp):
     def insights_analysis_prompt(topic: str = "insights") -> str:
         """تحليل رؤى."""
         return "ساعد في تحليل رؤى لـ " + topic + " — حلل رؤى {level} (وحدة insights)"
+
+    @mcp.prompt()
+    def report_insight_prompt(date_range: str) -> str:
+        """تحليل تقرير وتوصيات."""
+        return (
+            f"حلّل تقرير الفترة {date_range} (generate_campaign_report + account_summary + get_metrics). "
+            "استخرج: أفضل/أسوأ حملة، CTR/CPC، تكلفة، توصيات إيقاف/زيادة ميزانية. أرجع جدول توصيات."
+        )
+
+    @mcp.resource("insights://templates")
+    async def insights_extra_resource() -> str:
+        """قوالب الرؤى."""
+        try:
+            return json_dumps({"module": "insights", "resource": "insights://templates", "hint": "قوالب الرؤى"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "insights://templates"))
+
+    @mcp.prompt()
+    def insights_compare_prompt(topic: str = "insights") -> str:
+        """مقارنة رؤى."""
+        return "ساعد في مقارنة رؤى لـ " + topic + " — قارن رؤى {campaign} (وحدة insights)"

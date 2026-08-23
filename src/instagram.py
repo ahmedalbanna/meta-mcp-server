@@ -1,4 +1,9 @@
+import asyncio
+import logging
+import time
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 import requests  # type: ignore[import-untyped]
 
@@ -817,3 +822,35 @@ def register(mcp):
     def instagram_strategy_prompt(topic: str = "instagram") -> str:
         """استراتيجية إنستغرام."""
         return "ساعد في استراتيجية إنستغرام لـ " + topic + " — خطط محتوى إنستغرام لـ {product} (وحدة instagram)"
+
+    @mcp.resource("instagram://recent")
+    async def recent_instagram_resource() -> str:
+        """آخر منشورات إنستغرام."""
+        try:
+            from src.config import INSTAGRAM_BUSINESS_ID
+            from src.helpers import api_call
+
+            def _fetch():
+                ig_id = INSTAGRAM_BUSINESS_ID
+                if not ig_id:
+                    return {"data": []}
+                return api_call("GET", f"{ig_id}/media", {"fields": "id,caption,media_type,timestamp", "limit": 10})
+
+            t0 = time.monotonic()
+            data = await asyncio.to_thread(_fetch)
+            elapsed = time.monotonic() - t0
+            logger.info("instagram://recent fetched in %.2fs", elapsed)
+            return json_dumps(data)
+        except Exception as e:
+            from src.helpers import handle_error
+
+            logger.exception("instagram://recent failed")
+            return json_dumps(handle_error(e, "instagram://recent"))
+
+    @mcp.prompt()
+    def instagram_caption_prompt(image_desc: str, style: str = "engaging") -> str:
+        """توليد كابشن إنستغرام من وصف الصورة."""
+        return (
+            f"اكتب كابشن {style} لإنستغرام لصورة وصفها: {image_desc}. "
+            "أضف 3 هاشتاغات عربية/إنجليزية ودعوة للتفاعل. استخدم generate_caption_from_image إن توفر رابط الصورة."
+        )

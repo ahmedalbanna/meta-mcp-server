@@ -1,4 +1,7 @@
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 import time
 
 from src.config import AD_ACCOUNT_ID
@@ -145,3 +148,26 @@ def register(mcp):
     def automation_design_prompt(topic: str = "automation") -> str:
         """تصميم أتمتة."""
         return "ساعد في تصميم أتمتة لـ " + topic + " — صمم قاعدة أتمتة لمقياس {metric} (وحدة automation)"
+
+    @mcp.prompt()
+    def automation_rule_prompt(metric: str = "spend", threshold: str = "100") -> str:
+        """شرح قاعدة أتمتة إعلانات."""
+        return (
+            f"اشرح قاعدة أتمتة: عند {metric} > {threshold} أوقف الحملة. "
+            "اذكر: evaluation_spec و execution_spec JSON لـ create_auto_rule / create_simple_auto_rule."
+        )
+
+    @mcp.resource("automation://templates")
+    async def automation_extra_resource() -> str:
+        """قوالب الأتمتة."""
+        try:
+            return json_dumps({"module": "automation", "resource": "automation://templates", "hint": "قوالب الأتمتة"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "automation://templates"))
+
+    @mcp.prompt()
+    def automation_test_prompt(topic: str = "automation") -> str:
+        """اختبار أتمتة."""
+        return "ساعد في اختبار أتمتة لـ " + topic + " — اختبر قاعدة {rule_id} (وحدة automation)"

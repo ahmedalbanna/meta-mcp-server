@@ -1,6 +1,12 @@
 """Lead Ads & Forms: lead-gen forms, leads and campaign-lead management."""
 
+import asyncio
+import logging
+import time
+
 from src.config import PAGE_ID
+
+logger = logging.getLogger(__name__)
 from src.helpers import get_page_api, handle_error, json_dumps, to_dict, write_guard
 from src.throttle import concurrency_limit
 from src.utils import paginate
@@ -194,3 +200,47 @@ def register(mcp):
     def lead_qualification_prompt(topic: str = "leads") -> str:
         """تأهيل رصاصة."""
         return "ساعد في تأهيل رصاصة لـ " + topic + " — قيّم رصاصة {lead_id} (وحدة leads)"
+
+    @mcp.resource("leads://recent")
+    async def recent_leads_resource() -> str:
+        """آخر الرصاصات (Leads) من النماذج."""
+        try:
+            from facebook_business.adobjects.page import Page
+
+            from src.config import PAGE_ID
+            from src.helpers import get_page_api
+
+            def _fetch():
+                page = Page(PAGE_ID, api=get_page_api())
+                forms = page.get_lead_gen_forms(params={"fields": ["id"], "limit": 3})
+                out = []
+                for f in list(forms)[:2]:
+                    fid = f.get("id") if isinstance(f, dict) else f.export_all_data().get("id")
+                    try:
+                        from facebook_business.adobjects.leadgenform import LeadgenForm
+
+                        leads = LeadgenForm(fid, api=get_page_api()).get_leads(params={"limit": 5})
+                        out.extend([to_dict(lead) for lead in leads])
+                    except Exception:
+                        continue
+                return out
+
+            t0 = time.monotonic()
+            rows = await asyncio.to_thread(_fetch)
+            elapsed = time.monotonic() - t0
+            logger.info("leads://recent fetched %d leads in %.2fs", len(rows), elapsed)
+            return json_dumps(rows)
+        except Exception as e:
+            from src.helpers import handle_error
+
+            logger.exception("leads://recent failed")
+            return json_dumps(handle_error(e, "leads://recent"))
+
+    @mcp.prompt()
+    def lead_nurture_prompt(lead_name: str, product: str = "") -> str:
+        """سلسلة متابعة رصاصة (Lead Nurture)."""
+        prod = f" حول {product}" if product else ""
+        return (
+            f"صمم سلسلة متابعة 3 رسائل واتساب/ماسنجر للرصاصة {lead_name}{prod}: "
+            "رسالة ترحيب + تذكير بعد 24 ساعة + عرض نهائي. استخدم send_whatsapp_template_message / send_messenger_message."
+        )

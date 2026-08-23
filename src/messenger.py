@@ -3,7 +3,11 @@
 All calls use the page-scoped access token (page_api_call).
 """
 
+import logging
+
 from src.config import PAGE_ID
+
+logger = logging.getLogger(__name__)
 from src.helpers import handle_error, json_dumps, page_api_call, write_guard
 from src.throttle import concurrency_limit
 
@@ -150,3 +154,18 @@ def register(mcp):
     def messenger_reply_prompt(topic: str = "messenger") -> str:
         """رد ماسنجر."""
         return "ساعد في رد ماسنجر لـ " + topic + " — اكتب رد ماسنجر لـ {message} (وحدة messenger)"
+
+    @mcp.resource("messenger://templates")
+    async def messenger_extra_resource() -> str:
+        """قوالب ماسنجر."""
+        try:
+            return json_dumps({"module": "messenger", "resource": "messenger://templates", "hint": "قوالب ماسنجر"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "messenger://templates"))
+
+    @mcp.prompt()
+    def messenger_template_prompt(topic: str = "messenger") -> str:
+        """قالب ماسنجر."""
+        return "ساعد في قالب ماسنجر لـ " + topic + " — أنشئ قالب ماسنجر لـ {topic} (وحدة messenger)"

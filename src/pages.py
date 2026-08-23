@@ -1,4 +1,8 @@
+import logging
+
 from src.config import PAGE_ID
+
+logger = logging.getLogger(__name__)
 from src.helpers import (
     get_page_api,
     handle_error,
@@ -523,3 +527,18 @@ def register(mcp):
     def page_content_prompt(topic: str = "pages") -> str:
         """محتوى صفحة."""
         return f"ساعد في محتوى صفحة لـ {topic} — اقترح محتوى صفحة لـ {topic} (وحدة pages)"
+
+    @mcp.resource("pages://templates")
+    async def pages_extra_resource() -> str:
+        """قوالب الصفحات."""
+        try:
+            return json_dumps({"module": "pages", "resource": "pages://templates", "hint": "قوالب الصفحات"})
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "pages://templates"))
+
+    @mcp.prompt()
+    def page_insights_prompt(topic: str = "pages") -> str:
+        """رؤى صفحة."""
+        return "ساعد في رؤى صفحة لـ " + topic + " — حلل صفحة {page_id} (وحدة pages)"

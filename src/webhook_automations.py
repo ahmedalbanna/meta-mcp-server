@@ -9,6 +9,9 @@ without requiring Meta's Automated Rules API.
 """
 
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 import uuid
 from typing import Any
 
@@ -268,3 +271,24 @@ def register(mcp):
     def webhook_automation_prompt(topic: str = "webhook_automations") -> str:
         """أتمتة webhook."""
         return "ساعد في أتمتة webhook لـ " + topic + " — صمم أتمتة لحدث {event} (وحدة webhook_automations)"
+
+    @mcp.resource("webhook_automations://templates")
+    async def webhook_automations_extra_resource() -> str:
+        """قوالب الأتمتة."""
+        try:
+            return json_dumps(
+                {
+                    "module": "webhook_automations",
+                    "resource": "webhook_automations://templates",
+                    "hint": "قوالب الأتمتة",
+                }
+            )
+        except Exception as e:
+            from src.helpers import handle_error
+
+            return json_dumps(handle_error(e, "webhook_automations://templates"))
+
+    @mcp.prompt()
+    def webhook_test_prompt(topic: str = "webhook_automations") -> str:
+        """اختبار webhook."""
+        return "ساعد في اختبار webhook لـ " + topic + " — اختبر webhook {event} (وحدة webhook_automations)"

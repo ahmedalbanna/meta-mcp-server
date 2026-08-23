@@ -1,4 +1,10 @@
+import asyncio
+import logging
+import time
+
 from src.config import AD_ACCOUNT_ID, BASE_DIR
+
+logger = logging.getLogger(__name__)
 
 
 def register(mcp):
@@ -302,3 +308,28 @@ def register(mcp):
     def ad_review_prompt(topic: str = "ads") -> str:
         """مراجعة إعلان."""
         return "ساعد في مراجعة إعلان لـ " + topic + " — راجع إعلان {ad_id} (وحدة ads)"
+
+    @mcp.resource("ads://active")
+    async def active_ads_resource() -> str:
+        """قائمة الإعلانات النشطة."""
+        try:
+
+            def _fetch():
+                account = AdAccount(AD_ACCOUNT_ID)
+                return account.get_ads(
+                    params={
+                        "fields": ["name", "status", "creative", "id"],
+                        "filtering": json_dumps([{"field": "status", "operator": "EQUAL", "value": "ACTIVE"}]),
+                    }
+                )
+
+            t0 = time.monotonic()
+            rows = await asyncio.to_thread(_fetch)
+            elapsed = time.monotonic() - t0
+            logger.info("ads://active fetched in %.2fs", elapsed)
+            return json_dumps([to_dict(c) for c in rows])
+        except Exception as e:
+            from src.helpers import handle_error
+
+            logger.exception("ads://active failed")
+            return json_dumps(handle_error(e, "ads://active"))
