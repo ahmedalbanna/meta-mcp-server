@@ -23,12 +23,12 @@
 | `metrics` | 3 | 0 | 0 |
 | `pages` | 25 | 0 | 0 |
 | `reports` | 5 | 0 | 0 |
-| `resources_prompts` | 0 | 3 | 2 |
+| `resources_prompts` | 0 | 10 | 10 |
 | `scheduler` | 5 | 0 | 0 |
 | `webhook_automations` | 5 | 0 | 0 |
 | `whatsapp` | 6 | 0 | 0 |
 
-**Total:** 199 tools + 3 resources + 2 prompts
+**Total:** 199 tools + 10 resources + 10 prompts
 
 
 ## `ads` — 10 tools
@@ -276,8 +276,23 @@
 - 📦 **resource** `active_campaigns_resource` — قائمة الحملات النشطة كـ JSON.
 - 📦 **resource** `account_summary_resource` — ملخص أداء الحساب الإعلاني.
 - 📦 **resource** `audiences_list_resource` — قائمة الجماهير المخصصة.
+- 📦 **resource** `active_adsets_resource` — قائمة المجموعات الإعلانية النشطة.
+- 📦 **resource** `active_ads_resource` — قائمة الإعلانات النشطة.
+- 📦 **resource** `catalogs_list_resource` — قائمة كتالوجات المنتجات.
+- 📦 **resource** `recent_leads_resource` — آخر الرصاصات (Leads) من النماذج.
+- 📦 **resource** `recent_instagram_resource` — آخر منشورات إنستغرام.
+- 📦 **resource** `metrics_snapshot_resource` — لقطة مقاييس الأداء (MCP + API).
+- 📦 **resource** `scheduler_tasks_resource` — قائمة المهام المجدولة.
 - 💬 **prompt** `ad_copy_prompt` — إنشاء نصوص إعلانية جذابة.
 - 💬 **prompt** `marketing_report_prompt` — إنشاء تقرير أداء تسويقي.
+- 💬 **prompt** `campaign_creation_prompt` — مساعد إنشاء حملة كاملة (objective → adset → ad).
+- 💬 **prompt** `adset_targeting_prompt` — مساعد استهداف مجموعة إعلانية.
+- 💬 **prompt** `instagram_caption_prompt` — توليد كابشن إنستغرام من وصف الصورة.
+- 💬 **prompt** `lead_nurture_prompt` — سلسلة متابعة رصاصة (Lead Nurture).
+- 💬 **prompt** `whatsapp_template_prompt` — صياغة قالب واتساب معتمد.
+- 💬 **prompt** `catalog_product_prompt` — وصف منتج لكتالوج.
+- 💬 **prompt** `automation_rule_prompt` — شرح قاعدة أتمتة إعلانات.
+- 💬 **prompt** `report_insight_prompt` — تحليل تقرير وتوصيات.
 
 ## `scheduler` — 5 tools
 
