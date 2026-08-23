@@ -46,8 +46,8 @@ APP_SECRET = _get("FB_APP_SECRET", "APP_SECRET")
 WABA_ID = _get("FB_WABA_ID", "WABA_ID")
 WHATSAPP_PHONE_NUMBER_ID = _get("FB_WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_PHONE_NUMBER_ID")
 
-GRAPH_VERSION = _get("FB_API_VERSION", default="v26.0")
-# Supported Graph API versions (Phase 5.3 v27 prep)
+GRAPH_VERSION = _get("FB_API_VERSION", default="v27.0")
+# Supported Graph API versions (Phase 5.6 v27 smoke — SDK 27 prepared, PyPI latest 26.0.0 as of 2026-09-18)
 SUPPORTED_API_VERSIONS = ["v24.0", "v25.0", "v26.0", "v27.0"]
 DEPRECATED_API_VERSIONS = ["v18.0", "v19.0", "v20.0", "v21.0", "v22.0", "v23.0"]
 if GRAPH_VERSION not in SUPPORTED_API_VERSIONS and GRAPH_VERSION not in DEPRECATED_API_VERSIONS:
