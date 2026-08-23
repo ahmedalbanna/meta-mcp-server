@@ -94,8 +94,19 @@ def main() -> None:
         log.info("تم تسجيل وحدة %s", module.__name__.split(".")[-1])
 
     mcp_transport = os.getenv("MCP_TRANSPORT", "stdio")
-    log.info(f"تشغيل خادم MCP: meta-marketing-pro (النقل: {mcp_transport})")
-    mcp.run(transport=mcp_transport)
+    mcp_host = os.getenv("MCP_HOST", "0.0.0.0")
+    mcp_port = int(os.getenv("MCP_PORT", os.getenv("PORT", "8000")))
+    log.info(f"تشغيل خادم MCP: meta-marketing-pro (النقل: {mcp_transport} host={mcp_host}:{mcp_port})")
+    # Phase 9.1: Support sse / streamable-http for mcp-remote and HTTP clients
+    if mcp_transport in ("sse", "streamable-http", "http"):
+        try:
+            # FastMCP 1.29+ supports host/port kwargs for HTTP transports
+            mcp.run(transport=mcp_transport, host=mcp_host, port=mcp_port)
+        except TypeError:
+            # Fallback for older FastMCP that only accepts transport
+            mcp.run(transport=mcp_transport)
+    else:
+        mcp.run(transport=mcp_transport)
 
 
 if __name__ == "__main__":

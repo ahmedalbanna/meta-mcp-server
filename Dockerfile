@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 LABEL org.opencontainers.image.title="meta-mcp-server"
 LABEL org.opencontainers.image.description="Meta Marketing MCP Server — 199 tools for Facebook/Instagram/WhatsApp"
-LABEL org.opencontainers.image.source="https://github.com/anomalyco/opencode-meta-mcp"
+LABEL org.opencontainers.image.source="https://github.com/ahmedalbanna/meta-mcp-server"
 
 WORKDIR /app
 

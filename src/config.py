@@ -99,7 +99,9 @@ CONFIRM_WRITES = _get_bool("FB_CONFIRM_WRITES", default=False)
 MCP_HTTP_TOKEN = _get("FB_MCP_TOKEN")
 # RBAC (Phase 8.2): tasks allowed for this token — ADVERTISE, ANALYZE, MANAGE, DRAFT
 MCP_ALLOWED_TASKS: list[str] = [
-    s.strip().upper() for s in _get("FB_MCP_ALLOWED_TASKS", default="ADVERTISE,ANALYZE,MANAGE,DRAFT").split(",") if s.strip()
+    s.strip().upper()
+    for s in _get("FB_MCP_ALLOWED_TASKS", default="ADVERTISE,ANALYZE,MANAGE,DRAFT").split(",")
+    if s.strip()
 ]
 AUDIT_LOG_FILE = REPORT_DIR / "audit.jsonl"
 

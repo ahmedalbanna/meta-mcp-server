@@ -74,7 +74,10 @@ def register(mcp):
     @concurrency_limit()
     @write_guard
     def create_custom_audience(
-        name: str, description: str = "", customer_file_source: str = "BOTH_USER_AND_PARTNER_PROVIDED", ad_account_id: str = ""
+        name: str,
+        description: str = "",
+        customer_file_source: str = "BOTH_USER_AND_PARTNER_PROVIDED",
+        ad_account_id: str = "",
     ) -> str:
         """إنشاء جمهور مخصص جديد."""
         try:

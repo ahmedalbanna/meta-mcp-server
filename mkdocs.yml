@@ -1,7 +1,11 @@
 site_name: Meta MCP Server
-site_description: Meta Marketing MCP Server — 199 tools for Facebook/Instagram/WhatsApp
-site_url: https://anomalyco.github.io/opencode-meta-mcp
-repo_url: https://github.com/anomalyco/opencode-meta-mcp
+site_description: Meta Marketing MCP Server — 201 tools for Facebook/Instagram/WhatsApp
+site_url: https://ahmedalbanna.github.io/meta-mcp-server
+repo_url: https://github.com/ahmedalbanna/meta-mcp-server
+# Versioning via mike (Phase 9.3) — deploy with `mike deploy 2.0 latest --update-aliases`
+extra:
+  version:
+    provider: mike
 theme:
   name: material
   language: en

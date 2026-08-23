@@ -7,7 +7,7 @@ pip install meta-mcp-server  # from PyPI (tag v1.4.0+)
 # or
 pipx install meta-mcp-server
 # or dev
-git clone https://github.com/anomalyco/opencode-meta-mcp && cd meta-mcp-server
+git clone https://github.com/ahmedalbanna/meta-mcp-server && cd meta-mcp-server
 pip install -r requirements-dev.txt
 ```
 

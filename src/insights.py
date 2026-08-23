@@ -57,7 +57,9 @@ def register(mcp):
     @mcp.tool()
     @cached(ttl=60.0)
     @concurrency_limit()
-    def get_account_insights(date_preset: str = "last_30d", metrics: str = ",".join(DEFAULT_METRICS), ad_account_id: str = "") -> str:
+    def get_account_insights(
+        date_preset: str = "last_30d", metrics: str = ",".join(DEFAULT_METRICS), ad_account_id: str = ""
+    ) -> str:
         """تحليلات على مستوى الحساب الإعلاني."""
         try:
             fields = _validate(date_preset, metrics)
@@ -131,7 +133,13 @@ def register(mcp):
         """
         try:
             fields = _validate(date_preset, metrics)
-            account = AdAccount(resolve_ad_account_id("") if "ad_account_id" not in locals() else resolve_ad_account_id(ad_account_id) if "ad_account_id" in dir() else AdAccount(AD_ACCOUNT_ID))
+            account = AdAccount(
+                resolve_ad_account_id("")
+                if "ad_account_id" not in locals()
+                else resolve_ad_account_id(ad_account_id)
+                if "ad_account_id" in dir()
+                else AdAccount(AD_ACCOUNT_ID)
+            )
             params = {
                 "date_preset": date_preset,
                 "fields": fields,

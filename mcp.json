@@ -1,0 +1,46 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-03-26/server.schema.json",
+  "name": "io.github.ahmedalbanna/meta-mcp-server",
+  "title": "Meta Marketing MCP Server",
+  "description": "Meta Marketing MCP Server — 201 tools + 44 resources + 44 prompts for Facebook/Instagram/WhatsApp ads via FastMCP",
+  "version": "2.0.0",
+  "repository": {
+    "url": "https://github.com/ahmedalbanna/meta-mcp-server",
+    "source": "github"
+  },
+  "homepage": "https://ahmedalbanna.github.io/meta-mcp-server",
+  "author": {
+    "name": "Meta MCP Contributors"
+  },
+  "license": "MIT",
+  "keywords": ["meta", "facebook", "instagram", "whatsapp", "ads", "mcp", "marketing", "claude"],
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "meta-mcp-server",
+      "version": "2.0.0",
+      "transport": {
+        "type": "stdio"
+      }
+    },
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/ahmedalbanna/meta-mcp-server",
+      "version": "2.0.0",
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://localhost:8000/mcp"
+      }
+    }
+  ],
+  "remotes": [
+    {
+      "transportType": "streamable-http",
+      "url": "http://localhost:8000/mcp"
+    },
+    {
+      "transportType": "sse",
+      "url": "http://localhost:8000/sse"
+    }
+  ]
+}

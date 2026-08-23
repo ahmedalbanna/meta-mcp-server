@@ -8,7 +8,7 @@ updates:
       time: "09:00"
     open-pull-requests-limit: 10
     labels: [dependencies, security]
-    reviewers: [anomalyco]
+    reviewers: [ahmedalbanna]
     # Security audit via pip-audit in CI; dependabot covers pip updates
   - package-ecosystem: docker
     directory: "/"

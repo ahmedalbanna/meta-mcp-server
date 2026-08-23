@@ -7,7 +7,7 @@
 ## Quick start
 
 ```bash
-git clone https://github.com/anomalyco/opencode-meta-mcp && cd meta-mcp-server
+git clone https://github.com/ahmedalbanna/meta-mcp-server && cd meta-mcp-server
 cp .env.example .env  # fill FB_*
 pip install -r requirements.txt
 python scripts/validate_config.py
@@ -23,7 +23,7 @@ See [Getting Started](getting-started.md) for opencode / Claude Desktop wiring.
 - **Paginate uniformly:** `src/utils.paginate` for all `list_*`
 - **Automation:** `webhook_automations` + `scheduler` (APScheduler cron) + creative assistant (`generate_ad_copy`, `generate_caption_from_image`)
 - **Observability:** `/metrics` (Prometheus), `/dashboard` (HTML), `correlation_id` tracing, adaptive throttle (`FB_ADAPTIVE_THROTTLE`), `get_metrics` MCP tool
-- **Distribution:** PyPI `pipx install meta-mcp-server`, Docker `ghcr.io/anomalyco/opencode-meta-mcp`, `mkdocs` site
+- **Distribution:** PyPI `pipx install meta-mcp-server`, Docker `ghcr.io/ahmedalbanna/meta-mcp-server`, `mkdocs` site
 
 ## Architecture
 

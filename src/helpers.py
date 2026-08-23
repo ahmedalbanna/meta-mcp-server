@@ -404,7 +404,9 @@ def _check_rbac(tool: str) -> tuple[bool, str]:
 
         # Map tool to required task
         required = "ANALYZE"
-        if any(x in tool for x in ("create", "update", "delete", "remove", "add_", "ban", "publish", "upload", "send_")):
+        if any(
+            x in tool for x in ("create", "update", "delete", "remove", "add_", "ban", "publish", "upload", "send_")
+        ):
             required = "ADVERTISE"
         elif "lead" in tool or "audience" in tool:
             required = "MANAGE"

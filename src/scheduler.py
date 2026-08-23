@@ -144,10 +144,14 @@ def register(mcp):
                         )
                     elif run_at:
                         run_date = _dt.fromtimestamp(run_at)
-                        sched.add_job(lambda: None, "date", run_date=run_date, id=task_id, name=name, replace_existing=True)
+                        sched.add_job(
+                            lambda: None, "date", run_date=run_date, id=task_id, name=name, replace_existing=True
+                        )
             except Exception as e:
                 logger.debug("APScheduler persist failed (fallback to JSON): %s", e)
-            return json_dumps({"success": True, "task": task, "total": len(tasks), "apscheduler": _get_apscheduler() is not None})
+            return json_dumps(
+                {"success": True, "task": task, "total": len(tasks), "apscheduler": _get_apscheduler() is not None}
+            )
         except Exception as e:
             return json_dumps(handle_error(e, "schedule_task"))
 
