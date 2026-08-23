@@ -64,6 +64,19 @@ def register(mcp):
         except Exception as e:
             return json_dumps(handle_error(e, "get_campaign"))
 
+    # Phase 5.3 — v27 deprecation watch
+    _DEPRECATED_OBJECTIVES = {
+        "LINK_CLICKS": "OUTCOME_TRAFFIC",
+        "CONVERSIONS": "OUTCOME_SALES",
+        "LEAD_GENERATION": "OUTCOME_LEADS",
+        "REACH": "OUTCOME_AWARENESS",
+        "BRAND_AWARENESS": "OUTCOME_AWARENESS",
+        "APP_INSTALLS": "OUTCOME_APP_PROMOTION",
+        "VIDEO_VIEWS": "OUTCOME_ENGAGEMENT",
+        "MESSAGES": "OUTCOME_ENGAGEMENT",
+        "ENGAGEMENT": "OUTCOME_ENGAGEMENT",
+    }
+
     @mcp.tool()
     @concurrency_limit()
     @write_guard
@@ -77,10 +90,22 @@ def register(mcp):
         """
         إنشاء حملة جديدة.
         objective: OUTCOME_TRAFFIC, OUTCOME_ENGAGEMENT, OUTCOME_AWARENESS,
-                   CONVERSIONS, LEAD_GENERATION, OUTCOME_SALES...
+                   CONVERSIONS, LEAD_GENERATION, OUTCOME_SALES... (يدعم أسماء قديمة مع تحويل تلقائي)
         الميزانية بالعملة الصغرى (مثال 1000 = 10 دولار). حدد daily_budget أو lifetime_budget.
         """
         try:
+            # v27 deprecation: map old objectives to new OUTCOME_* with warning
+            orig_objective = objective
+            objective = _DEPRECATED_OBJECTIVES.get(objective.strip().upper(), objective.strip().upper())
+            if orig_objective.strip().upper() in _DEPRECATED_OBJECTIVES:
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    "objective '%s' deprecated — mapped to '%s' for Graph %s",
+                    orig_objective,
+                    objective,
+                    __import__("src.config", fromlist=["GRAPH_VERSION"]).GRAPH_VERSION,
+                )
             account = AdAccount(AD_ACCOUNT_ID)
             params = {
                 Campaign.Field.name: name,

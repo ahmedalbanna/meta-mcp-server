@@ -47,6 +47,22 @@ WABA_ID = _get("FB_WABA_ID", "WABA_ID")
 WHATSAPP_PHONE_NUMBER_ID = _get("FB_WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_PHONE_NUMBER_ID")
 
 GRAPH_VERSION = _get("FB_API_VERSION", default="v26.0")
+# Supported Graph API versions (Phase 5.3 v27 prep)
+SUPPORTED_API_VERSIONS = ["v24.0", "v25.0", "v26.0", "v27.0"]
+DEPRECATED_API_VERSIONS = ["v18.0", "v19.0", "v20.0", "v21.0", "v22.0", "v23.0"]
+if GRAPH_VERSION not in SUPPORTED_API_VERSIONS and GRAPH_VERSION not in DEPRECATED_API_VERSIONS:
+    import logging as _log
+
+    _log.getLogger(__name__).warning(
+        "FB_API_VERSION %s غير مدعومة. المدعومة: %s — قد تحتاج لتحديث facebook-business SDK",
+        GRAPH_VERSION,
+        ", ".join(SUPPORTED_API_VERSIONS),
+    )
+if GRAPH_VERSION in DEPRECATED_API_VERSIONS:
+    import logging as _log2
+
+    _log2.getLogger(__name__).warning("FB_API_VERSION %s deprecated — حدّث إلى %s", GRAPH_VERSION, SUPPORTED_API_VERSIONS[-1])
+
 REPORT_DIR = BASE_DIR / "reports"
 
 # Write gating & ad-spend guardrails (safe defaults: writes OFF)

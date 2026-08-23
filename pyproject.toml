@@ -1,11 +1,13 @@
 [project]
 name = "meta-mcp-server"
-version = "1.3.0"
+version = "1.4.0"
 description = "Meta Marketing MCP Server — 199 tools for Facebook/Instagram/WhatsApp advertising"
 requires-python = ">=3.10"
 readme = "README.md"
 license = { text = "MIT" }
-keywords = ["mcp", "facebook", "instagram", "whatsapp", "ads", "marketing"]
+keywords = ["mcp", "facebook", "instagram", "whatsapp", "ads", "marketing", "mcp-server", "claude"]
+authors = [{ name = "Meta MCP Contributors", email = "maintainers@example.com" }]
+maintainers = [{ name = "Meta MCP Contributors" }]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -14,6 +16,9 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Topic :: Communications",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Framework :: FastAPI",
 ]
 dependencies = [
     "mcp[cli]==1.29.0",
@@ -23,6 +28,16 @@ dependencies = [
     "fastapi==0.141.1",
     "uvicorn==0.52.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/anomalyco/opencode-meta-mcp"
+Repository = "https://github.com/anomalyco/opencode-meta-mcp"
+Issues = "https://github.com/anomalyco/opencode-meta-mcp/issues"
+Documentation = "https://anomalyco.github.io/opencode-meta-mcp"
+
+[project.scripts]
+meta-mcp-server = "server:main"
+meta-webhook = "webhook_server:app"
 
 [project.optional-dependencies]
 dev = [
@@ -34,6 +49,11 @@ dev = [
 sheets = [
     "gspread==6.2.1",
     "google-auth==2.35.0",
+]
+docs = [
+    "mkdocs==1.6.1",
+    "mkdocs-material==9.5.41",
+    "mkdocs-autorefs==1.2.0",
 ]
 
 [tool.ruff]

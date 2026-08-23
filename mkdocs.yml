@@ -1,0 +1,36 @@
+site_name: Meta MCP Server
+site_description: Meta Marketing MCP Server — 199 tools for Facebook/Instagram/WhatsApp
+site_url: https://anomalyco.github.io/opencode-meta-mcp
+repo_url: https://github.com/anomalyco/opencode-meta-mcp
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - toc.follow
+    - search.highlight
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Tools Reference: tools.md
+  - Webhooks: webhooks.md
+  - Metrics & Dashboard: metrics.md
+  - Contributing: contributing.md
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+plugins:
+  - search
