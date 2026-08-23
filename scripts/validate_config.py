@@ -38,6 +38,7 @@ BOOL_KEYS = {
     "FB_ENABLE_WRITES": "تفعيل عمليات الكتابة",
     "FB_DRY_RUN": "وضع المحاكاة",
     "FB_ADS_ALLOW_ACTIVATE": "السماح بتفعيل الحملات",
+    "FB_CONFIRM_WRITES": "طلب تأكيد للحذف (FB_CONFIRM_WRITES)",
 }
 
 

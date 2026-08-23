@@ -55,6 +55,7 @@ DRY_RUN = _get_bool("FB_DRY_RUN", default=False)
 ADS_ALLOW_ACTIVATE = _get_bool("FB_ADS_ALLOW_ACTIVATE", default=False)
 MAX_DAILY_BUDGET = _get_int("FB_ADS_MAX_DAILY_BUDGET")
 MAX_LIFETIME_BUDGET = _get_int("FB_ADS_MAX_LIFETIME_BUDGET")
+CONFIRM_WRITES = _get_bool("FB_CONFIRM_WRITES", default=False)
 
 MCP_HTTP_TOKEN = _get("FB_MCP_TOKEN")
 

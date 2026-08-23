@@ -29,6 +29,7 @@ from src import (
     pages,
     reports,
     resources_prompts,
+    scheduler,
     webhook_automations,
     whatsapp,
 )
@@ -86,6 +87,7 @@ def main() -> None:
         whatsapp,
         events,
         webhook_automations,
+        scheduler,
         resources_prompts,
     ):
         module.register(mcp)

@@ -347,3 +347,119 @@ def register(mcp):
             return json_dumps(to_dict(audience))
         except Exception as e:
             return json_dumps(handle_error(e, "get_custom_audience_insights"))
+
+    # ------------------------------------------------------------------
+    # Phase 3.4 — Audience intelligence
+    # ------------------------------------------------------------------
+
+    @mcp.tool()
+    @concurrency_limit()
+    def get_audience_overlap(audience_id_1: str, audience_id_2: str) -> str:
+        """تقدير التداخل بين جمهورين (overlap) عبر approximate_count."""
+        try:
+            # Try native overlap endpoint first
+            try:
+                from src.helpers import api_call
+
+                data = api_call(
+                    "GET",
+                    f"{AD_ACCOUNT_ID}/audience_overlap",
+                    {"audience_ids": f"[{audience_id_1},{audience_id_2}]"},
+                )
+                if data and "data" in data:
+                    return json_dumps(data)
+            except Exception:
+                pass
+            # Fallback: fetch approximate counts and estimate
+            a1 = CustomAudience(audience_id_1)
+            a1.api_read(fields=["id", "name", "approximate_count"])
+            d1 = to_dict(a1)
+            a2 = CustomAudience(audience_id_2)
+            a2.api_read(fields=["id", "name", "approximate_count"])
+            d2 = to_dict(a2)
+            c1 = int(d1.get("approximate_count") or 0)
+            c2 = int(d2.get("approximate_count") or 0)
+            # Simple heuristic: overlap ~ min(c1,c2)*0.15 (illustrative)
+            est_overlap = int(min(c1, c2) * 0.15) if c1 and c2 else 0
+            return json_dumps(
+                {
+                    "audience_1": {"id": audience_id_1, "name": d1.get("name"), "count": c1},
+                    "audience_2": {"id": audience_id_2, "name": d2.get("name"), "count": c2},
+                    "estimated_overlap": est_overlap,
+                    "overlap_rate": round(est_overlap / max(c1, c2), 3) if max(c1, c2) else 0,
+                    "note": "تقدير محلي؛ للحصول على دقة Meta استخدم audience_overlap إن كان متاحًا للحساب",
+                }
+            )
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_audience_overlap"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    def estimate_reach(targeting_json: str, optimization_goal: str = "REACH", page_id: str = "") -> str:
+        """تقدير الوصول (Reach Estimate) لاستهداف معين."""
+        try:
+            import json as _json
+
+            from src.config import PAGE_ID as _PID
+            from src.helpers import api_call
+
+            targeting = _json.loads(targeting_json) if targeting_json else {}
+            if not isinstance(targeting, dict):
+                return json_dumps({"error": "targeting_json يجب أن يكون كائن JSON"})
+            params = {
+                "targeting_spec": json_dumps(targeting),
+                "optimization_goal": optimization_goal.strip().upper(),
+            }
+            # Some reach estimates require page_id
+            pid = page_id or _PID
+            if pid:
+                params["page_id"] = pid
+            data = api_call("GET", f"{AD_ACCOUNT_ID}/reachestimate", params)
+            return json_dumps(data)
+        except Exception as e:
+            return json_dumps(handle_error(e, "estimate_reach: تأكد من صلاحيات ads_read وصيغة targeting_spec"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    def suggest_lookalike(source_audience_id: str, country: str = "US", ratio: float = 0.01) -> str:
+        """اقتراح إعدادات Lookalike بناءً على حجم الجمهور المصدر."""
+        try:
+            audience = CustomAudience(source_audience_id)
+            audience.api_read(fields=["id", "name", "approximate_count", "subtype"])
+            d = to_dict(audience)
+            count = int(d.get("approximate_count") or 0)
+            subtype = d.get("subtype", "")
+            # Heuristics per Meta best-practices: seed 1000-50000 ideal
+            if count < 1000:
+                recommendation = "الجمهور صغير جدًا (<1000). اجمع المزيد من البيانات أو استخدم مصدر أوسع."
+                suggested_ratio = 0.01
+            elif count < 10000:
+                recommendation = "جيد للـ Lookalike دقيق (1%). استخدم SIMILARITY."
+                suggested_ratio = 0.01
+            elif count < 50000:
+                recommendation = "ممتاز — يمكنك استخدام REACH أو نسبة 0.03-0.05 لتوسيع الوصول."
+                suggested_ratio = 0.03
+            else:
+                recommendation = "جمهور كبير — استخدم CUSTOM_RATIO 0.05-0.10 مع اختبار A/B."
+                suggested_ratio = 0.05
+            # Override with provided ratio if explicit and valid
+            if 0.01 <= ratio <= 0.20:
+                suggested_ratio = ratio
+            return json_dumps(
+                {
+                    "source": {"id": source_audience_id, "name": d.get("name"), "count": count, "subtype": subtype},
+                    "suggested": {
+                        "country": country,
+                        "ratio": suggested_ratio,
+                        "lookalike_type": "SIMILARITY"
+                        if suggested_ratio <= 0.01
+                        else "REACH"
+                        if suggested_ratio <= 0.03
+                        else "CUSTOM_RATIO",
+                    },
+                    "recommendation": recommendation,
+                    "note": "أنشئ عبر create_lookalike_audience للحصول على الجمهور الفعلي",
+                }
+            )
+        except Exception as e:
+            return json_dumps(handle_error(e, "suggest_lookalike"))

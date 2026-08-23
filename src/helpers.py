@@ -14,6 +14,7 @@ from facebook_business.api import FacebookAdsApi
 
 from src.config import (
     ADS_ALLOW_ACTIVATE,
+    CONFIRM_WRITES,
     DRY_RUN,
     ENABLE_WRITES,
     GRAPH_VERSION,
@@ -253,8 +254,11 @@ def write_guard(fn):
 
     Uses functools.wraps so FastMCP still sees the original typed signature.
     Rejections include a machine-readable guard code for clients.
+    FB_CONFIRM_WRITES: when true, DELETE/remove tools require confirm="yes".
+    DRY_RUN: when true, shows diff preview instead of executing.
     """
     sig = inspect.signature(fn)
+    is_destructive = "delete" in fn.__name__.lower() or "remove" in fn.__name__.lower() or "ban" in fn.__name__.lower()
 
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -274,15 +278,46 @@ def write_guard(fn):
             elif "الميزانية الإجمالية" in msg:
                 code = "GUARD_LIFETIME_BUDGET_EXCEEDED"
             return json_dumps({"error": msg, "guard": True, "code": code, "subcode": None})
+        # Safety rails v2: confirm required for destructive ops when FB_CONFIRM_WRITES=true
+        if CONFIRM_WRITES and is_destructive:
+            confirm = bound.arguments.get("confirm", "")
+            # Also check kwargs directly for confirm
+            if not confirm:
+                confirm = kwargs.get("confirm", "")
+            if str(confirm).lower() not in ("yes", "true", "confirm", "1"):
+                return json_dumps(
+                    {
+                        "error": "تأكيد مطلوب للعمليات الحذفية (FB_CONFIRM_WRITES=true). مرّر confirm='yes'",
+                        "guard": True,
+                        "code": "GUARD_CONFIRM_REQUIRED",
+                        "action": fn.__name__,
+                    }
+                )
         if DRY_RUN:
+            params = {k: v for k, v in bound.arguments.items() if k not in ("self", "confirm")}
+            # Diff preview: show what would be created/updated/deleted
+            diff_hint = (
+                "إنشاء"
+                if "create" in fn.__name__
+                else "تحديث"
+                if "update" in fn.__name__
+                else "حذف"
+                if is_destructive
+                else "تنفيذ"
+            )
             return json_dumps(
                 {
                     "dry_run": True,
                     "action": fn.__name__,
-                    "params": {k: v for k, v in bound.arguments.items() if k != "self"},
-                    "note": "محاكاة فقط — لم يتم تنفيذ أي عملية فعلية",
+                    "diff": f"{diff_hint} {fn.__name__} بالبراميترات: {json.dumps(params, ensure_ascii=False)}",
+                    "params": params,
+                    "note": "محاكاة فقط — لم يتم تنفيذ أي عملية فعلية (FB_DRY_RUN=true)",
                 }
             )
+        # Strip confirm before dispatching to functions that don't expect it
+        if "confirm" in kwargs:
+            kwargs.pop("confirm")
+        # Also handle confirm passed positionally? not needed
         return fn(*args, **kwargs)
 
     return wrapper

@@ -70,6 +70,8 @@ _TO_DICT_PATHS = [
     "src.creatives",
     "src.discovery",
     "src.events",
+    "src.webhook_automations",
+    "src.scheduler",
 ]
 
 
@@ -195,6 +197,7 @@ ALL_MODULES = (
     "creatives",
     "events",
     "webhook_automations",
+    "scheduler",
     "resources_prompts",
 )
 
@@ -224,6 +227,7 @@ def register_all(recorder):
         pages,
         reports,
         resources_prompts,
+        scheduler,
         webhook_automations,
         whatsapp,
     )
@@ -248,6 +252,7 @@ def register_all(recorder):
         "pages": pages,
         "reports": reports,
         "resources_prompts": resources_prompts,
+        "scheduler": scheduler,
         "webhook_automations": webhook_automations,
         "whatsapp": whatsapp,
     }
