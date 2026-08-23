@@ -18,24 +18,26 @@ def register(mcp):
     def list_adsets(campaign_id: str = "", limit: int = 25) -> str:
         """قائمة المجموعات الإعلانية (يمكن تحديد حملة معينة)."""
         try:
-            params = {
-                "fields": [
-                    AdSet.Field.name,
-                    AdSet.Field.status,
-                    AdSet.Field.targeting,
-                    AdSet.Field.daily_budget,
-                    AdSet.Field.lifetime_budget,
-                    AdSet.Field.optimization_goal,
-                    AdSet.Field.billing_event,
-                    AdSet.Field.id,
-                ],
-                "limit": limit,
-            }
-            if campaign_id:
-                adsets = Campaign(campaign_id).get_ad_sets(params=params)
-            else:
-                adsets = AdAccount(AD_ACCOUNT_ID).get_ad_sets(params=params)
-            return json_dumps([to_dict(a) for a in adsets])
+            from src.utils import paginate
+
+            fields = [
+                AdSet.Field.name,
+                AdSet.Field.status,
+                AdSet.Field.targeting,
+                AdSet.Field.daily_budget,
+                AdSet.Field.lifetime_budget,
+                AdSet.Field.optimization_goal,
+                AdSet.Field.billing_event,
+                AdSet.Field.id,
+            ]
+
+            def _getter(params):
+                if campaign_id:
+                    return Campaign(campaign_id).get_ad_sets(params=params)
+                return AdAccount(AD_ACCOUNT_ID).get_ad_sets(params=params)
+
+            rows = paginate(_getter, fields=fields, limit=limit)
+            return json_dumps(rows)
         except Exception as e:
             return json_dumps(handle_error(e, "list_adsets"))
 

@@ -29,6 +29,7 @@ from src import (
     pages,
     reports,
     resources_prompts,
+    webhook_automations,
     whatsapp,
 )
 from src.config import validate_config
@@ -84,6 +85,7 @@ def main() -> None:
         creatives,
         whatsapp,
         events,
+        webhook_automations,
         resources_prompts,
     ):
         module.register(mcp)

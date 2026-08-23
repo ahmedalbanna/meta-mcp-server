@@ -101,10 +101,12 @@ def register(mcp):
         metrics: str = ",".join(DEFAULT_METRICS),
         format: str = "csv",
         filename: str = "",
+        mode: str = "overwrite",
     ) -> str:
         """
         توليد تقرير أداء على مستوى الحملات كملف CSV أو Excel.
         format: csv | excel. filename: اسم الملف (بدون امتداد).
+        mode: overwrite | append (incremental — يلحق الصفوف بملف موجود بدلاً من الكتابة فوقه)
         """
         try:
             ensure_report_dir()
@@ -116,6 +118,21 @@ def register(mcp):
                     base = sanitize_filename(base)
                 except ValueError as e:
                     return json_dumps({"error": f"اسم ملف غير صالح: {e}"})
+            # Incremental append: merge with existing file if mode=append
+            if mode == "append":
+                ext = ".xlsx" if format == "excel" else ".csv"
+                path = Path(REPORT_DIR) / f"{base}{ext}"
+                if path.exists() and format == "csv":
+                    try:
+                        existing = []
+                        with path.open("r", encoding="utf-8", newline="") as fh:
+                            reader = csv.DictReader(fh)
+                            existing = list(reader)
+                        # Deduplicate by campaign_name
+                        seen = {r.get("campaign_name") for r in existing}
+                        rows = existing + [r for r in rows if r.get("campaign_name") not in seen]
+                    except Exception:
+                        pass
             if format == "excel":
                 path = Path(REPORT_DIR) / f"{base}.xlsx"
                 _write_excel(path, rows)

@@ -425,6 +425,50 @@ def register(mcp):
         except Exception as e:
             return json_dumps(handle_error(e, "delete_product_feed"))
 
+    @mcp.tool()
+    @concurrency_limit()
+    def get_product_feed(feed_id: str) -> str:
+        """تفاصيل خلاصة منتجات واحدة (الجدولة، الحالة، الرابط)."""
+        try:
+            info = ProductFeed(feed_id).api_get(
+                fields=[
+                    "id",
+                    "name",
+                    "schedule",
+                    "latest_upload",
+                    "filter",
+                    "country",
+                    "default_currency",
+                    "file_type",
+                ]
+            )
+            return json_dumps(to_dict(info))
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_product_feed"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    @write_guard
+    def update_product_feed_schedule(feed_id: str, url: str = "", interval: str = "DAILY") -> str:
+        """تحديث جدولة خلاصة منتجات (الرابط والفترة). interval: HOURLY | DAILY | WEEKLY"""
+        try:
+            valid = {"HOURLY", "DAILY", "WEEKLY"}
+            interval = interval.upper()
+            if interval not in valid:
+                return json_dumps({"error": f"interval غير صالح. اختر من: {', '.join(sorted(valid))}"})
+            params = {}
+            if url:
+                params[ProductFeed.Field.schedule] = json_dumps({"interval": interval, "url": url})
+            elif interval:
+                # interval-only update needs at least placeholder; fetch existing schedule
+                params[ProductFeed.Field.schedule] = json_dumps({"interval": interval})
+            if not params:
+                return json_dumps({"error": "حدد url أو interval"})
+            result = ProductFeed(feed_id).api_update(params=params)
+            return json_dumps({"success": True, "feed_id": feed_id, "result": to_dict(result)})
+        except Exception as e:
+            return json_dumps(handle_error(e, "update_product_feed_schedule"))
+
     # ------------------------------------------------------------------
     # التجارة الإلكترونية Commerce / Orders
     # ------------------------------------------------------------------

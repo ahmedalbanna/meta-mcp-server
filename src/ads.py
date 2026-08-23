@@ -48,22 +48,24 @@ def register(mcp):
     def list_ads(adset_id: str = "", limit: int = 25) -> str:
         """قائمة الإعلانات (يمكن تحديد مجموعة إعلانية معينة)."""
         try:
-            params = {
-                "fields": [
-                    Ad.Field.name,
-                    Ad.Field.status,
-                    Ad.Field.creative,
-                    Ad.Field.adset_id,
-                    Ad.Field.created_time,
-                    Ad.Field.id,
-                ],
-                "limit": limit,
-            }
-            if adset_id:
-                ads = AdSet(adset_id).get_ads(params=params)
-            else:
-                ads = AdAccount(AD_ACCOUNT_ID).get_ads(params=params)
-            return json_dumps([to_dict(a) for a in ads])
+            from src.utils import paginate
+
+            fields = [
+                Ad.Field.name,
+                Ad.Field.status,
+                Ad.Field.creative,
+                Ad.Field.adset_id,
+                Ad.Field.created_time,
+                Ad.Field.id,
+            ]
+
+            def _getter(params):
+                if adset_id:
+                    return AdSet(adset_id).get_ads(params=params)
+                return AdAccount(AD_ACCOUNT_ID).get_ads(params=params)
+
+            rows = paginate(_getter, fields=fields, limit=limit)
+            return json_dumps(rows)
         except Exception as e:
             return json_dumps(handle_error(e, "list_ads"))
 
@@ -252,9 +254,13 @@ def register(mcp):
     def list_ad_creatives(limit: int = 25) -> str:
         """قائمة الإبداعات (Ad Creatives) في الحساب الإعلاني."""
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            creatives = account.get_ad_creatives(params={"limit": limit})
-            return json_dumps([to_dict(c) for c in creatives])
+            from src.utils import paginate
+
+            rows = paginate(
+                lambda params: AdAccount(AD_ACCOUNT_ID).get_ad_creatives(params=params),
+                limit=limit,
+            )
+            return json_dumps(rows)
         except Exception as e:
             return json_dumps(handle_error(e, "list_ad_creatives"))
 

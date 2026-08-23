@@ -55,6 +55,21 @@ _TO_DICT_PATHS = [
     "src.pages",
     "src.resources_prompts",
     "src.business",
+    "src.campaigns",
+    "src.adsets",
+    "src.ads",
+    "src.insights",
+    "src.breakdowns",
+    "src.reports",
+    "src.audiences",
+    "src.instagram",
+    "src.catalog",
+    "src.leads",
+    "src.messenger",
+    "src.whatsapp",
+    "src.creatives",
+    "src.discovery",
+    "src.events",
 ]
 
 
@@ -75,7 +90,7 @@ def mock_meta_sdk():
             mock.patch("src.helpers.page_api_call", return_value={"data": []})
         )
         for mod_path in _TO_DICT_PATHS:
-            stack.enter_context(mock.patch(f"{mod_path}.to_dict", new=_fake_to_dict))
+            stack.enter_context(mock.patch(f"{mod_path}.to_dict", new=_fake_to_dict, create=True))
         stack.enter_context(mock.patch("src.helpers.get_page_api"))
         stack.enter_context(mock.patch("src.instagram.requests"))
         for path in SDK_CLASSES:
@@ -121,7 +136,7 @@ def mock_meta_sdk_recorded():
         for p in page_api_call_patches:
             stack.enter_context(mock.patch(p, new=page_api_call))
         for mod_path in _TO_DICT_PATHS:
-            stack.enter_context(mock.patch(f"{mod_path}.to_dict", new=_fake_to_dict))
+            stack.enter_context(mock.patch(f"{mod_path}.to_dict", new=_fake_to_dict, create=True))
         stack.enter_context(mock.patch("src.helpers.get_page_api"))
         stack.enter_context(mock.patch("src.instagram.requests"))
         for path in SDK_CLASSES:
@@ -179,6 +194,7 @@ ALL_MODULES = (
     "business",
     "creatives",
     "events",
+    "webhook_automations",
     "resources_prompts",
 )
 
@@ -208,6 +224,7 @@ def register_all(recorder):
         pages,
         reports,
         resources_prompts,
+        webhook_automations,
         whatsapp,
     )
 
@@ -231,6 +248,7 @@ def register_all(recorder):
         "pages": pages,
         "reports": reports,
         "resources_prompts": resources_prompts,
+        "webhook_automations": webhook_automations,
         "whatsapp": whatsapp,
     }
     for name in ALL_MODULES:

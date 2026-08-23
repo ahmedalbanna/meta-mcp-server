@@ -159,6 +159,7 @@ def _json_safe(value: Any) -> Any:
 def handle_error(e: Exception, context: str = "") -> dict[str, Any]:
     """Normalise an exception into an error dict with an Arabic-friendly message.
 
+    Returns a consistent contract: {error, context, code?, subcode?, retry_after?}.
     Handles FacebookRequestError (including rate-limit without exception),
     generic exceptions, and empty/invalid API responses.
     """
@@ -174,14 +175,18 @@ def handle_error(e: Exception, context: str = "") -> dict[str, Any]:
             return {
                 "error": f"تم تقييد الوصول من Meta (rate limit). كود: {code}/{subcode}",
                 "context": context,
+                "code": code,
+                "subcode": subcode,
                 "retry_after": "إعادة المحاولة بعد 30-60 ثانية",
             }
         return {
             "error": f"Meta API error ({code}): {msg}",
             "context": context,
+            "code": code,
+            "subcode": subcode,
         }
     logger.exception("Unexpected error in %s", context)
-    return {"error": f"{context}: {e}".strip(": "), "context": context}
+    return {"error": f"{context}: {e}".strip(": "), "context": context, "code": None, "subcode": None}
 
 
 @concurrency_limit()
@@ -247,6 +252,7 @@ def write_guard(fn):
     """Guard mutating tools: enforce write enable, dry-run, activate & budget caps.
 
     Uses functools.wraps so FastMCP still sees the original typed signature.
+    Rejections include a machine-readable guard code for clients.
     """
     sig = inspect.signature(fn)
 
@@ -259,7 +265,15 @@ def write_guard(fn):
         spend_cap = bound.arguments.get("spend_cap") or 0
         ok, msg = evaluate_guard(status, daily_budget, lifetime_budget, spend_cap)
         if not ok:
-            return json_dumps({"error": msg, "guard": True})
+            # Derive a short guard code from the message for programmatic handling
+            code = "GUARD_WRITES_DISABLED"
+            if "تفعيل" in msg:
+                code = "GUARD_ACTIVATE_DISABLED"
+            elif "الميزانية اليومية" in msg:
+                code = "GUARD_DAILY_BUDGET_EXCEEDED"
+            elif "الميزانية الإجمالية" in msg:
+                code = "GUARD_LIFETIME_BUDGET_EXCEEDED"
+            return json_dumps({"error": msg, "guard": True, "code": code, "subcode": None})
         if DRY_RUN:
             return json_dumps(
                 {

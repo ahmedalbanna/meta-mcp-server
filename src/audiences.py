@@ -47,19 +47,20 @@ def register(mcp):
     def list_custom_audiences(limit: int = 25) -> str:
         """قائمة الجماهير المخصصة في الحساب."""
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            audiences = account.get_custom_audiences(
-                params={
-                    "fields": [
-                        CustomAudience.Field.name,
-                        CustomAudience.Field.subtype,
-                        "approximate_count",
-                        CustomAudience.Field.id,
-                    ],
-                    "limit": limit,
-                }
+            from src.utils import paginate
+
+            fields = [
+                CustomAudience.Field.name,
+                CustomAudience.Field.subtype,
+                "approximate_count",
+                CustomAudience.Field.id,
+            ]
+            rows = paginate(
+                lambda params: AdAccount(AD_ACCOUNT_ID).get_custom_audiences(params=params),
+                fields=fields,
+                limit=limit,
             )
-            return json_dumps([to_dict(a) for a in audiences])
+            return json_dumps(rows)
         except Exception as e:
             return json_dumps(handle_error(e, "list_custom_audiences"))
 

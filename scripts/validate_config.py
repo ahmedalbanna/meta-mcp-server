@@ -15,6 +15,7 @@ from src.config import BASE_DIR, REQUIRED_KEYS, validate_config
 OPTIONAL_KEYS = {
     "FB_APP_ID": "debug_access_token",
     "FB_APP_SECRET": "debug_access_token",
+    "FB_API_VERSION": "إصدار Graph API (افتراضي v26.0)",
     "FB_PAGE_ID": "أدوات الصفحات / الرصاص",
     "FB_AD_ACCOUNT_ID": "الحملات / الإعلانات / التقارير",
     "FB_IG_USER_ID": "أدوات إنستغرام",
@@ -23,12 +24,14 @@ OPTIONAL_KEYS = {
     "FB_BUSINESS_ID": "الكتالوجات والتجارة / مستخدمو Business Manager",
     "FB_COMMERCE_ACCOUNT_ID": "طلبات التجارة (اختياري داخل أدوات التجارة)",
     "FB_META_WEBHOOK_VERIFY_TOKEN": "استقبال Webhooks (webhook_server.py)",
+    "FB_PAGE_ACCESS_TOKEN": "توكن الصفحة الصريح (اختياري — يشتق تلقائيًا)",
 }
 
 INT_KEYS = {
     "FB_ADS_MAX_DAILY_BUDGET": "الحد الأقصى للميزانية اليومية",
     "FB_ADS_MAX_LIFETIME_BUDGET": "الحد الأقصى للميزانية الإجمالية",
     "FB_WEBHOOK_PORT": "منفذ خادم Webhooks",
+    "FB_MAX_CONCURRENT": "حد التوازي لطلبات Graph API (افتراضي 4)",
 }
 
 BOOL_KEYS = {
@@ -70,14 +73,32 @@ def main() -> int:
     for key, label in INT_KEYS.items():
         raw = os.getenv(key, "0").strip()
         try:
-            int(raw)
-            print(f"[جيد]   {key} = {raw}  ({label})")
+            v = int(raw)
+            if key == "FB_MAX_CONCURRENT" and not (1 <= v <= 20):
+                print(f"[تحذير] {key} = {raw} خارج النطاق الموصى (1-20)  ({label})")
+            else:
+                print(f"[جيد]   {key} = {raw}  ({label})")
         except ValueError:
             print(f"[خطأ]   {key} = '{raw}' ليس رقمًا صحيحًا  ({label})")
             exit_code = 1
     for key, label in BOOL_KEYS.items():
         value = "true" if _read_bool(key) else "false"
         print(f"[جيد]   {key} = {value}  ({label})")
+
+    # Discovery hints (ROADMAP 1.5)
+    print("\nتلميحات الاكتشاف:")
+    if not os.getenv("FB_PAGE_ID"):
+        print("[تلميح] FB_PAGE_ID فارغ — شغّل أداة list_pages ثم عبّئ .env")
+    if not os.getenv("FB_AD_ACCOUNT_ID"):
+        print("[تلميح] FB_AD_ACCOUNT_ID فارغ — شغّل أداة list_ad_accounts ثم عبّئ .env")
+    if not os.getenv("FB_IG_USER_ID"):
+        print("[تلميح] FB_IG_USER_ID فارغ — شغّل أداة discover_ig_user ثم عبّئ .env")
+    if os.getenv("FB_ENABLE_WRITES", "false").lower() in ("1", "true", "yes", "on"):
+        print("[تنبيه] FB_ENABLE_WRITES=true — عمليات الكتابة مفعّلة (تأكد من FB_DRY_RUN عند الاختبار)")
+
+    # Auto-generate opencode.json snippet
+    print("\nمقتطف opencode.json (انسخه إلى جذر مشروعك):")
+    print('{ "mcp": { "meta-marketing-pro": { "type": "local", "command": ["python", "server.py"], "enabled": true } } }')
 
     if exit_code:
         print("\nالنتيجة: توجد أخطاء — أصلحها ثم أعد الفحص.")

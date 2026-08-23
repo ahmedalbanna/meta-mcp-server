@@ -18,23 +18,27 @@ def register(mcp):
         status اختياري: ACTIVE, PAUSED, DELETED, ARCHIVED
         """
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            params = {
-                "fields": [
-                    Campaign.Field.name,
-                    Campaign.Field.status,
-                    Campaign.Field.objective,
-                    Campaign.Field.daily_budget,
-                    Campaign.Field.lifetime_budget,
-                    Campaign.Field.created_time,
-                    Campaign.Field.id,
-                ],
-                "limit": limit,
-            }
+            from src.utils import paginate
+
+            fields = [
+                Campaign.Field.name,
+                Campaign.Field.status,
+                Campaign.Field.objective,
+                Campaign.Field.daily_budget,
+                Campaign.Field.lifetime_budget,
+                Campaign.Field.created_time,
+                Campaign.Field.id,
+            ]
+            extra = {}
             if status:
-                params["filtering"] = json_dumps([{"field": "status", "operator": "EQUAL", "value": status}])
-            campaigns = account.get_campaigns(params=params)
-            return json_dumps([to_dict(c) for c in campaigns])
+                extra["filtering"] = json_dumps([{"field": "status", "operator": "EQUAL", "value": status}])
+            rows = paginate(
+                lambda params: AdAccount(AD_ACCOUNT_ID).get_campaigns(params=params),
+                fields=fields,
+                params=extra or None,
+                limit=limit,
+            )
+            return json_dumps(rows)
         except Exception as e:
             return json_dumps(handle_error(e, "list_campaigns"))
 

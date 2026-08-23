@@ -1,8 +1,20 @@
 [project]
 name = "meta-mcp-server"
-version = "1.0.0"
-description = "Meta Marketing MCP Server — 155+ tools for Facebook/Instagram/WhatsApp advertising"
+version = "1.1.0"
+description = "Meta Marketing MCP Server — 174 tools for Facebook/Instagram/WhatsApp advertising"
 requires-python = ">=3.10"
+readme = "README.md"
+license = { text = "MIT" }
+keywords = ["mcp", "facebook", "instagram", "whatsapp", "ads", "marketing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 dependencies = [
     "mcp[cli]==1.29.0",
     "facebook-business==26.0.0",
