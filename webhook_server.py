@@ -11,10 +11,14 @@ import hashlib
 import hmac
 import json
 import logging
+import threading
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from src.config import APP_SECRET, MCP_HTTP_TOKEN, META_WEBHOOK_VERIFY_TOKEN, REPORT_DIR, WEBHOOK_PORT
@@ -22,44 +26,63 @@ from src.config import APP_SECRET, MCP_HTTP_TOKEN, META_WEBHOOK_VERIFY_TOKEN, RE
 log = logging.getLogger("meta-mcp.webhook")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-app = FastAPI(title="Meta Marketing Webhook Receiver", version="1.0.0")
 
-# Metrics via src.metrics (Phase 4.1) + local verify counter
-_metrics = {"webhook_events_total": 0, "webhook_events_failed": 0, "webhook_verify_total": 0}
-_start_time = datetime.now(timezone.utc)
-_MAX_WEBHOOK_FILES = 500  # rotation limit (Phase 4.5)
-
-
-@app.on_event("startup")
-async def _startup_scheduler():
-    """Start scheduler daemon (Phase 8.3) — runs due tasks every 60s."""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start scheduler daemon on startup (Phase 8.3) — runs due tasks every 60s."""
     try:
         from src.scheduler import _get_apscheduler
 
         sched = _get_apscheduler()
         if sched is not None:
             log.info("APScheduler started with DB %s", sched)
-        # Fallback JSON scheduler daemon
         import asyncio
 
         async def _loop():
             while True:
                 await asyncio.sleep(60)
                 try:
-                    from src.scheduler import _load_tasks
+                    from src.scheduler import _dispatch_tool, _load_tasks, _save_tasks
 
                     tasks = _load_tasks()
-                    now = __import__("time").time()
+                    now = int(__import__("time").time())
                     due = [t for t in tasks if t.get("status") == "scheduled" and int(t.get("run_at", 0)) <= now]
                     if due:
-                        log.info("scheduler daemon: %d due tasks", len(due))
+                        for task in due:
+                            try:
+                                await asyncio.to_thread(_dispatch_tool, task.get("tool_name") or "", task.get("params") or {})
+                                task["status"] = "done"
+                                task["executed_at"] = now
+                            except Exception as e:
+                                task["status"] = "failed"
+                                task["error"] = str(e)
+                        _save_tasks(tasks)
+                        log.info("scheduler daemon: executed %d tasks", len(due))
                 except Exception as e:
                     log.debug("scheduler loop error: %s", e)
 
-        asyncio.create_task(_loop())
+        _scheduler_tasks.append(asyncio.create_task(_loop()))
         log.info("scheduler daemon started (60s loop)")
     except Exception as e:
         log.debug("scheduler daemon not started: %s", e)
+    yield
+
+
+app = FastAPI(title="Meta Marketing Webhook Receiver", version="1.0.0", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Metrics via src.metrics (Phase 4.1) + local verify counter
+_metrics = {"webhook_events_total": 0, "webhook_events_failed": 0, "webhook_verify_total": 0}
+_metrics_lock = threading.Lock()
+_start_time = datetime.now(timezone.utc)
+_MAX_WEBHOOK_FILES = 500  # rotation limit (Phase 4.5)
+_scheduler_tasks: list[Any] = []
 
 
 def verify_webhook_token(hub_mode: str = "", hub_verify_token: str = "") -> bool:
@@ -117,7 +140,8 @@ def webhook_verify(
     hub_challenge: str = Query("", alias="hub.challenge"),
 ):
     """Meta subscription verification handshake."""
-    _metrics["webhook_verify_total"] += 1
+    with _metrics_lock:
+        _metrics["webhook_verify_total"] += 1
     if verify_webhook_token(hub_mode, hub_verify_token):
         return PlainTextResponse(hub_challenge)
     return JSONResponse({"error": "verification token mismatch"}, status_code=403)
@@ -217,7 +241,8 @@ async def webhook_receive(request: Request):
     body = await request.body()
     signature = request.headers.get("x-hub-signature-256", "")
     if not verify_signature(body, signature):
-        _metrics["webhook_events_failed"] += 1
+        with _metrics_lock:
+            _metrics["webhook_events_failed"] += 1
         try:
             from src.metrics import inc_webhook
 
@@ -229,7 +254,8 @@ async def webhook_receive(request: Request):
     try:
         payload = json.loads(body) if body else {}
     except Exception:
-        _metrics["webhook_events_failed"] += 1
+        with _metrics_lock:
+            _metrics["webhook_events_failed"] += 1
         try:
             from src.metrics import inc_webhook
 
@@ -238,7 +264,8 @@ async def webhook_receive(request: Request):
             pass
         return JSONResponse({"error": "invalid JSON body"}, status_code=400)
     try:
-        _metrics["webhook_events_total"] += 1
+        with _metrics_lock:
+            _metrics["webhook_events_total"] += 1
         try:
             from src.metrics import inc_webhook
 
@@ -271,7 +298,8 @@ async def webhook_receive(request: Request):
             pass
         return {"received": True, "saved": saved, "correlation_id": cid}
     except Exception as e:
-        _metrics["webhook_events_failed"] += 1
+        with _metrics_lock:
+            _metrics["webhook_events_failed"] += 1
         try:
             from src.metrics import inc_webhook
 

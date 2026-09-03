@@ -20,6 +20,7 @@ from src.config import (
     GRAPH_VERSION,
     MAX_DAILY_BUDGET,
     MAX_LIFETIME_BUDGET,
+    MAX_SPEND_CAP,
     META_ACCESS_TOKEN,
     PAGE_ACCESS_TOKEN,
     PAGE_ID,
@@ -376,6 +377,11 @@ def evaluate_guard(
             False,
             f"الميزانية الإجمالية ({lifetime_budget}) تتجاوز الحد المسموح ({MAX_LIFETIME_BUDGET}).",
         )
+    if MAX_SPEND_CAP and spend_cap and spend_cap > MAX_SPEND_CAP:
+        return (
+            False,
+            f"حد الإنفاق ({spend_cap}) يتجاوز الحد المسموح ({MAX_SPEND_CAP}).",
+        )
     return True, ""
 
 
@@ -388,7 +394,19 @@ def _audit_log(tool: str, params: dict, correlation_id: str = "") -> None:
         entry = {
             "ts": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
             "tool": tool,
-            "params": {k: v for k, v in params.items() if "token" not in k.lower()},
+            "params": {
+                k: v
+                for k, v in params.items()
+                if k.lower()
+                not in {
+                    "token",
+                    "secret",
+                    "password",
+                    "api_key",
+                    "apikey",
+                    "credential",
+                }
+            },
             "correlation_id": correlation_id or None,
         }
         with open(AUDIT_LOG_FILE, "a", encoding="utf-8") as fh:
@@ -402,16 +420,44 @@ def _check_rbac(tool: str) -> tuple[bool, str]:
     try:
         from src.config import MCP_ALLOWED_TASKS
 
-        # Map tool to required task
-        required = "ANALYZE"
-        if any(
-            x in tool for x in ("create", "update", "delete", "remove", "add_", "ban", "publish", "upload", "send_")
-        ):
-            required = "ADVERTISE"
-        elif "lead" in tool or "audience" in tool:
-            required = "MANAGE"
+        TOOL_TASK_MAP = {
+            "create_webhook_automation": "MANAGE",
+            "add_users_to_custom_audience": "MANAGE",
+            "add_users_to_account": "MANAGE",
+            "ban_instagram_commenter": "MANAGE",
+            "mute_instagram_commenter": "MANAGE",
+            "invite_business_user": "MANAGE",
+            "delete_business_user": "MANAGE",
+            "update_business_user_role": "MANAGE",
+            "hide_instagram_comment": "MANAGE",
+            "delete_instagram_comment": "MANAGE",
+            "reply_to_instagram_comment": "MANAGE",
+            "reply_to_page_comment": "MANAGE",
+            "delete_page_comment": "MANAGE",
+            "send_instagram_dm": "MANAGE",
+            "send_instagram_dm_with_image": "MANAGE",
+            "send_messenger_message": "MANAGE",
+            "mark_messenger_seen": "MANAGE",
+            "set_messenger_typing": "MANAGE",
+            "send_whatsapp_text_message": "MANAGE",
+            "send_whatsapp_template_message": "MANAGE",
+            "subscribe_leadgen_webhook": "MANAGE",
+            "add_instagram_media_comment": "MANAGE",
+            "create_lead_gen_form": "MANAGE",
+            "create_whatsapp_message_template": "MANAGE",
+            "upload_custom_audience_csv": "MANAGE",
+            "remove_users_from_custom_audience": "MANAGE",
+        }
+        required = TOOL_TASK_MAP.get(tool)
+        if required is None:
+            required = "ANALYZE"
+            if any(
+                x in tool for x in ("create", "update", "delete", "remove", "add_", "ban", "publish", "upload", "send_")
+            ):
+                required = "ADVERTISE"
+            elif "lead" in tool or "audience" in tool:
+                required = "MANAGE"
         if required not in MCP_ALLOWED_TASKS and "ADMIN" not in MCP_ALLOWED_TASKS:
-            # Allow if wildcard
             if "*" not in MCP_ALLOWED_TASKS:
                 return False, f"مهمة {tool} تتطلب صلاحية {required}. المسموح: {', '.join(MCP_ALLOWED_TASKS)}"
         return True, ""
@@ -441,7 +487,6 @@ def write_guard(fn):
         spend_cap = bound.arguments.get("spend_cap") or 0
         ok, msg = evaluate_guard(status, daily_budget, lifetime_budget, spend_cap)
         if not ok:
-            # Derive a short guard code from the message for programmatic handling
             code = "GUARD_WRITES_DISABLED"
             if "تفعيل" in msg:
                 code = "GUARD_ACTIVATE_DISABLED"
@@ -449,6 +494,8 @@ def write_guard(fn):
                 code = "GUARD_DAILY_BUDGET_EXCEEDED"
             elif "الميزانية الإجمالية" in msg:
                 code = "GUARD_LIFETIME_BUDGET_EXCEEDED"
+            elif "حد الإنفاق" in msg:
+                code = "GUARD_SPEND_CAP_EXCEEDED"
             return json_dumps({"error": msg, "guard": True, "code": code, "subcode": None})
         # RBAC (Phase 8.2)
         ok_rbac, rbac_msg = _check_rbac(fn.__name__)

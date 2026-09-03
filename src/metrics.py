@@ -87,14 +87,21 @@ def render_prometheus() -> str:
     lines.append("# TYPE mcp_tool_calls_total counter")
     for (tool, status), cnt in snap["tool_calls"].items():
         lines.append(f'mcp_tool_calls_total{{tool="{tool}",status="{status}"}} {cnt}')
-    lines.append("# HELP mcp_tool_duration_seconds MCP tool duration histogram (avg)")
+    lines.append("# HELP mcp_tool_duration_seconds MCP tool duration summary")
     lines.append("# TYPE mcp_tool_duration_seconds summary")
     for tool, durations in snap["tool_duration"].items():
-        if durations:
-            avg = sum(durations) / len(durations)
-            lines.append(f'mcp_tool_duration_seconds{{tool="{tool}",quantile="0.5"}} {avg:.3f}')
-            lines.append(f'mcp_tool_duration_seconds_count{{tool="{tool}"}} {len(durations)}')
-            lines.append(f'mcp_tool_duration_seconds_sum{{tool="{tool}"}} {sum(durations):.3f}')
+        if not durations:
+            continue
+        sorted_d = sorted(durations)
+        n = len(sorted_d)
+        q50 = sorted_d[int(n * 0.5)] if n > 0 else 0
+        q90 = sorted_d[min(int(n * 0.9), n - 1)]
+        q99 = sorted_d[min(int(n * 0.99), n - 1)]
+        lines.append(f'mcp_tool_duration_seconds{{tool="{tool}",quantile="0.5"}} {q50:.3f}')
+        lines.append(f'mcp_tool_duration_seconds{{tool="{tool}",quantile="0.9"}} {q90:.3f}')
+        lines.append(f'mcp_tool_duration_seconds{{tool="{tool}",quantile="0.99"}} {q99:.3f}')
+        lines.append(f'mcp_tool_duration_seconds_count{{tool="{tool}"}} {n}')
+        lines.append(f'mcp_tool_duration_seconds_sum{{tool="{tool}"}} {sum(durations):.3f}')
     lines.append("# HELP meta_api_calls_total Meta Graph API calls")
     lines.append("# TYPE meta_api_calls_total counter")
     for method, cnt in snap["api_calls"].items():

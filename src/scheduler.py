@@ -26,6 +26,72 @@ from src.config import REPORT_DIR, SCHEDULER_DB_URL, ensure_report_dir
 SCHEDULE_FILE = REPORT_DIR / "schedule.json"
 SCHEDULER_DB_FILE = REPORT_DIR / "scheduler.db"
 
+_MODULES = [
+    "ads",
+    "adsets",
+    "audiences",
+    "automation",
+    "breakdowns",
+    "business",
+    "campaigns",
+    "catalog",
+    "creatives",
+    "discovery",
+    "events",
+    "finance",
+    "insights",
+    "instagram",
+    "leads",
+    "messenger",
+    "metrics",
+    "pages",
+    "reports",
+    "webhook_automations",
+    "whatsapp",
+]
+
+
+class _Recorder:
+    def tool(self, *args, **kwargs):
+        def decorator(fn):
+            self.tools[fn.__name__] = fn
+            return fn
+        return decorator
+
+    def resource(self, *args, **kwargs):
+        def decorator(fn):
+            return fn
+        return decorator
+
+    def prompt(self, *args, **kwargs):
+        def decorator(fn):
+            return fn
+        return decorator
+
+    def __init__(self):
+        self.tools = {}
+
+
+_TOOL_CACHE: dict[str, Any] = {}
+
+
+def _dispatch_tool(tool_name: str, params: dict) -> Any:
+    if tool_name in _TOOL_CACHE:
+        return _TOOL_CACHE[tool_name](**params)
+    import importlib
+
+    for mod_name in _MODULES:
+        try:
+            mod = importlib.import_module(f"src.{mod_name}")
+            rec = _Recorder()
+            mod.register(rec)
+            if tool_name in rec.tools:
+                _TOOL_CACHE[tool_name] = rec.tools[tool_name]
+                return rec.tools[tool_name](**params)
+        except Exception:
+            continue
+    raise ValueError(f"أداة غير معروفة: {tool_name}")
+
 
 def _get_apscheduler():
     """Return APScheduler instance with SQLAlchemy store if available, else None (Phase 8.3)."""
@@ -135,17 +201,17 @@ def register(mcp):
 
                     if cron:
                         sched.add_job(
-                            lambda: None,
+                            _dispatch_tool,
                             "cron",
                             id=task_id,
                             name=name,
-                            kwargs={"tool": tool_name, "params": params},
+                            args=[tool_name, params],
                             replace_existing=True,
                         )
                     elif run_at:
                         run_date = _dt.fromtimestamp(run_at)
                         sched.add_job(
-                            lambda: None, "date", run_date=run_date, id=task_id, name=name, replace_existing=True
+                            _dispatch_tool, "date", run_date=run_date, id=task_id, name=name, args=[tool_name, params], replace_existing=True
                         )
             except Exception as e:
                 logger.debug("APScheduler persist failed (fallback to JSON): %s", e)
@@ -221,19 +287,21 @@ def register(mcp):
                 return json_dumps({"due": 0, "message": "لا توجد مهام مستحقة"})
             results = []
             for task in due:
-                tool_name = task.get("tool_name")
-                params = task.get("params", {})
+                tool_name = task.get("tool_name") or ""
+                params = task.get("params") or {}
                 if dry_run:
                     results.append({"task_id": task["id"], "tool": tool_name, "status": "would_run", "params": params})
                 else:
-                    # Try to dispatch via known modules (best-effort)
-                    # For now we mark as done without real dispatch; real execution would
-                    # require MCP client dispatch. We simulate by marking done.
-                    task["status"] = "done"
-                    task["executed_at"] = now
-                    results.append({"task_id": task["id"], "tool": tool_name, "status": "executed", "params": params})
+                    try:
+                        _dispatch_tool(tool_name, params)
+                        task["status"] = "done"
+                        task["executed_at"] = now
+                        results.append({"task_id": task["id"], "tool": tool_name, "status": "executed", "params": params})
+                    except Exception as e:
+                        task["status"] = "failed"
+                        task["error"] = str(e)
+                        results.append({"task_id": task["id"], "tool": tool_name, "status": "error", "error": str(e)})
             if not dry_run:
-                # persist status updates
                 _save_tasks(tasks)
             return json_dumps({"due": len(due), "dry_run": dry_run, "results": results})
         except Exception as e:

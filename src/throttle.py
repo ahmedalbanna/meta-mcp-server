@@ -31,6 +31,7 @@ _ACTIVE = 0
 # Async semaphore (for async tools and resources)
 _ASYNC_SEMAPHORE: asyncio.Semaphore | None = None
 _ASYNC_ACTIVE = 0
+_ASYNC_COUNT_LOCK = threading.Lock()
 
 # Meta rate-limit + transient error codes/subcodes worth retrying.
 RATE_LIMIT_CODES = {4, 17, 32, 613, 80004}
@@ -48,7 +49,10 @@ def _get_async_semaphore() -> asyncio.Semaphore:
 def concurrent_count() -> int:
     """Return the number of currently in-flight API calls (for health checks)."""
     with _COUNT_LOCK:
-        return _ACTIVE
+        sync = _ACTIVE
+    with _ASYNC_COUNT_LOCK:
+        async_count = _ASYNC_ACTIVE
+    return sync + async_count
 
 
 def _acquire_slot() -> None:
@@ -63,6 +67,18 @@ def _release_slot() -> None:
     with _COUNT_LOCK:
         _ACTIVE -= 1
     _API_SEMAPHORE.release()
+
+
+def _acquire_async_slot() -> None:
+    global _ASYNC_ACTIVE
+    with _ASYNC_COUNT_LOCK:
+        _ASYNC_ACTIVE += 1
+
+
+def _release_async_slot() -> None:
+    global _ASYNC_ACTIVE
+    with _ASYNC_COUNT_LOCK:
+        _ASYNC_ACTIVE -= 1
 
 
 def _is_rate_limit(e: FacebookRequestError) -> bool:
@@ -223,6 +239,7 @@ def async_concurrency_limit(
         async def wrapper(*args, **kwargs):
             sem = _get_async_semaphore()
             async with sem:
+                _acquire_async_slot()
                 t0 = time.monotonic()
                 status = "ok"
                 try:
@@ -251,6 +268,7 @@ def async_concurrency_limit(
                         observe_tool_duration(fn.__name__, time.monotonic() - t0)
                     except Exception:
                         pass
+                    _release_async_slot()
 
         return wrapper
 
