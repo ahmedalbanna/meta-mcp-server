@@ -57,7 +57,7 @@ sheets = [
 docs = [
     "mkdocs==1.6.1",
     "mkdocs-material==9.5.41",
-    "mkdocs-autorefs==1.2.0",
+    "mkdocs-autorefs==1.4.4",
     "mike==2.1.3",
 ]
 ai = [
