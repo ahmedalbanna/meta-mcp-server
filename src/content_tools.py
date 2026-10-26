@@ -5,18 +5,15 @@ generate captions, find the best posting time, plan a content calendar, and
 analyze which hashtags actually perform for our own account.
 """
 
-import json
 import logging
 import re
+import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from facebook_business.adobjects.page import Page
-from facebook_business.adobjects.post import Post
-
 from src.config import PAGE_ID
-from src.helpers import get_page_api, handle_error, json_dumps, to_dict
+from src.helpers import handle_error, json_dumps, page_api_call
 from src.llm import call_llm
 from src.throttle import concurrency_limit
 
@@ -39,17 +36,35 @@ def _extract_hashtags(text: str) -> list[str]:
     return [h.lower() for h in re.findall(r"#[^\s#.,!?؛،؟]+", text or "")]
 
 
-def _page(node_id: str = "") -> Page:
-    return Page(node_id or PAGE_ID, api=get_page_api())
+def _fetch_our_posts(limit: int = 100, with_message: bool = False) -> tuple[list, str | None]:
+    """Recent posts of OUR page via the page-scoped token.
+
+    The user token cannot read /published_posts (needs Page Public Content
+    Access), so this always routes through page_api_call — same pattern as
+    competitors._fetch_published_posts. Returns (posts, error_or_none).
+    """
+    fields = "id,created_time" + (",message" if with_message else "")
+    try:
+        data = page_api_call("GET", f"{PAGE_ID}/published_posts", {"fields": fields, "limit": limit})
+        return (data.get("data") or []), None
+    except Exception as e:
+        return [], str(e)[:200]
 
 
 def _post_engagement(post_id: str) -> int:
-    """Reactions + comments for one post (0 on any failure)."""
+    """Reactions + comments for one of our posts (0 when unavailable).
+
+    Uses the page-scoped token and the limit(0) field form, which is what
+    Graph API v26 accepts for summary counts.
+    """
     try:
-        info = Post(post_id, api=get_page_api()).api_get(fields=["reactions.summary(true)", "comments.summary(true)"])
-        d = to_dict(info)
-        reacts = (((d.get("reactions") or {}).get("summary") or {}).get("total_count")) or 0
-        comms = (((d.get("comments") or {}).get("summary") or {}).get("total_count")) or 0
+        data = page_api_call(
+            "GET", post_id, {"fields": "reactions.limit(0).summary(true),comments.limit(0).summary(true)"}
+        )
+        if not isinstance(data, dict):
+            return 0
+        reacts = (((data.get("reactions") or {}).get("summary") or {}).get("total_count")) or 0
+        comms = (((data.get("comments") or {}).get("summary") or {}).get("total_count")) or 0
         return reacts + comms
     except Exception:
         return 0
@@ -222,15 +237,14 @@ def register(mcp):
         try:
             if days <= 0:
                 return json_dumps({"error": "days يجب أن تكون > 0"})
-            posts = _page().get_posts(params={"fields": ["created_time", "id"], "limit": 100})
-            # fetch insights for engagement
+            posts, err = _fetch_our_posts(limit=100)
+            if not posts:
+                return json_dumps({"error": err or "لا توجد منشورات", "metric": metric})
             rows: list[dict[str, Any]] = []
             for p in posts:
-                pd = to_dict(p)
-                cid = str(pd.get("id") or "")
-                ts = pd.get("created_time")
-                dt = _parse_ts(ts)
-                if not dt:
+                cid = str(p.get("id") or "")
+                dt = _parse_ts(p.get("created_time"))
+                if not dt or not cid:
                     continue
                 rows.append({"dt": dt, "engagement": _post_engagement(cid)})
 
@@ -291,14 +305,14 @@ def register(mcp):
         try:
             if days <= 0:
                 return json_dumps({"error": "days يجب أن تكون > 0"})
-            posts = _page().get_posts(params={"fields": ["message", "created_time", "id"], "limit": 100})
+            posts, err = _fetch_our_posts(limit=100, with_message=True)
+            if not posts:
+                return json_dumps({"error": err or "لا توجد منشورات", "days": days})
             tag_data: dict = defaultdict(lambda: {"count": 0, "engagements": []})
             for p in posts:
-                pd = to_dict(p)
-                cid = str(pd.get("id") or "")
-                caption = pd.get("message") or ""
-                tags = _extract_hashtags(caption)
-                if not tags:
+                cid = str(p.get("id") or "")
+                tags = _extract_hashtags(p.get("message") or "")
+                if not tags or not cid:
                     continue
                 eng = _post_engagement(cid)
                 for tag in set(tags):
@@ -323,7 +337,7 @@ def register(mcp):
             rows.sort(key=lambda r: (r["avg_engagement"], r["uses"]), reverse=True)
             return json_dumps(
                 {
-                    "analyzed_posts": len(list(posts)),
+                    "analyzed_posts": len(posts),
                     "unique_hashtags": len(rows),
                     "top_hashtags": rows[:20],
                     "weak_hashtags": [r for r in rows if r["avg_engagement"] < 2][:10],
@@ -445,21 +459,32 @@ def register(mcp):
         try:
             if not keyword or not reply:
                 return json_dumps({"error": "keyword و reply مطلوبان"})
-            params = {
+
+            # Persist the rule through the webhook_automations store so the
+            # running webhook server can act on it — same file, same schema.
+            from src import webhook_automations
+
+            rules = webhook_automations._load_rules()
+            rule_id = uuid.uuid4().hex[:12]
+            rule = {
+                "id": rule_id,
                 "name": f"auto-reply: {keyword}",
                 "trigger": "comment_keyword",
                 "keyword": keyword,
                 "action_type": "reply_comment",
-                "action_params_json": json.dumps({"message": reply}, ensure_ascii=False),
+                "action_params": {"message": reply},
                 "enabled": enabled,
             }
-            # store locally (the actual webhook runtime lives in webhook_server.py)
+            rules.append(rule)
+            webhook_automations._save_rules(rules)
             return json_dumps(
                 {
                     "configured": True,
-                    "rule": params,
+                    "rule_id": rule_id,
+                    "rule": rule,
+                    "total_rules": len(rules),
                     "note": "يتطلب FB_AUTO_RUN_WEBHOOK_AUTOMATIONS=true في .env و webhook_server.py يعمل",
-                    "hint": "create_webhook_automation(name=..., trigger='comment_keyword', keyword=..., action_type='reply_comment', action_params_json='{\"message\":\"...\"}')",
+                    "manage": "list_webhook_automations() للعرض | delete_webhook_automation(rule_id) للحذف",
                 }
             )
         except Exception as e:

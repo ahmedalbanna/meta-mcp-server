@@ -79,21 +79,21 @@ def test_generate_caption_requires_product(recorder):
 # ---------------------------------------------------------------------------
 
 
-def _post_mock(post_id: str, hours_ago: int):
-    """A post object that behaves like a Meta SDK object for to_dict()."""
-    dt = datetime.now(timezone.utc) - timedelta(hours=hours_ago)
-    m = mock.Mock()
-    m.export_all_data.return_value = {"id": post_id, "created_time": dt.isoformat()}
-    return m
+def _published_posts(*specs):
+    """specs: (post_id, hours_ago, message) -> dicts like published_posts returns."""
+    out = []
+    for pid, hours, msg in specs:
+        dt = datetime.now(timezone.utc) - timedelta(hours=hours)
+        out.append({"id": pid, "created_time": dt.isoformat(), "message": msg})
+    return out
 
 
 def test_best_posting_time_ranks_slots_by_engagement(recorder):
-    posts = [_post_mock("p1", 20), _post_mock("p2", 26), _post_mock("p3", 24)]
+    posts = _published_posts(("p1", 20, "a"), ("p2", 26, "b"), ("p3", 24, "c"))
     with (
-        mock.patch.object(content_tools, "_page") as page,
+        mock.patch.object(content_tools, "page_api_call", return_value={"data": posts}),
         mock.patch.object(content_tools, "_post_engagement", side_effect=[50, 10, 30]),
     ):
-        page.return_value.get_posts.return_value = posts
         out = json.loads(recorder.tools["best_posting_time"](days=30))
 
     assert out["analyzed_posts"] == 3
@@ -103,10 +103,15 @@ def test_best_posting_time_ranks_slots_by_engagement(recorder):
 
 
 def test_best_posting_time_handles_no_posts(recorder):
-    with mock.patch.object(content_tools, "_page") as page:
-        page.return_value.get_posts.return_value = []
+    with mock.patch.object(content_tools, "page_api_call", return_value={"data": []}):
         out = json.loads(recorder.tools["best_posting_time"](days=30))
     assert "error" in out
+
+
+def test_best_posting_time_surfaces_api_error(recorder):
+    with mock.patch.object(content_tools, "page_api_call", side_effect=Exception("403 forbidden")):
+        out = json.loads(recorder.tools["best_posting_time"](days=30))
+    assert "403" in out["error"]
 
 
 def test_best_posting_time_rejects_bad_window(recorder):
@@ -120,16 +125,15 @@ def test_best_posting_time_rejects_bad_window(recorder):
 
 
 def test_hashtag_analyzer_aggregates_by_tag(recorder):
-    posts = [
-        {"id": "p1", "message": "طقم جديد #كارتير #استيل"},
-        {"id": "p2", "message": "عرض #كارتير #صنعاء"},
-        {"id": "p3", "message": "بدون وسوم"},
-    ]
+    posts = _published_posts(
+        ("p1", 20, "طقم جديد #كارتير #استيل"),
+        ("p2", 26, "عرض #كارتير #صنعاء"),
+        ("p3", 30, "بدون وسوم"),
+    )
     with (
-        mock.patch.object(content_tools, "_page") as page,
+        mock.patch.object(content_tools, "page_api_call", return_value={"data": posts}),
         mock.patch.object(content_tools, "_post_engagement", side_effect=[100, 40, 0]),
     ):
-        page.return_value.get_posts.return_value = posts
         out = json.loads(recorder.tools["hashtag_analyzer"](days=60))
 
     tags = {r["hashtag"]: r for r in out["top_hashtags"]}
@@ -144,8 +148,8 @@ def test_hashtag_analyzer_aggregates_by_tag(recorder):
 
 
 def test_hashtag_analyzer_no_hashtags(recorder):
-    with mock.patch.object(content_tools, "_page") as page:
-        page.return_value.get_posts.return_value = [{"id": "p1", "message": "بدون"}]
+    posts = _published_posts(("p1", 20, "بدون"))
+    with mock.patch.object(content_tools, "page_api_call", return_value={"data": posts}):
         out = json.loads(recorder.tools["hashtag_analyzer"](days=60))
     assert "message" in out
 
@@ -182,12 +186,36 @@ def test_content_calendar_caps_posts(recorder):
 # ---------------------------------------------------------------------------
 
 
-def test_auto_reply_comments_configures_rule(recorder):
-    out = json.loads(recorder.tools["auto_reply_comments"](keyword="سعر", reply="أهلاً! السعر في الرسائل 📩"))
+def test_auto_reply_comments_persists_the_rule(recorder):
+    stored = {}
+
+    def _save(rules):
+        stored["rules"] = rules
+
+    with (
+        mock.patch("src.webhook_automations._load_rules", return_value=[]),
+        mock.patch("src.webhook_automations._save_rules", side_effect=_save),
+    ):
+        out = json.loads(recorder.tools["auto_reply_comments"](keyword="سعر", reply="أهلاً! السعر في الرسائل 📩"))
+
     assert out["configured"] is True
+    assert out["rule_id"]
     assert out["rule"]["keyword"] == "سعر"
     assert out["rule"]["trigger"] == "comment_keyword"
-    assert json.loads(out["rule"]["action_params_json"])["message"].endswith("📩")
+    assert out["rule"]["action_params"]["message"].endswith("📩")
+    assert out["rule"]["enabled"] is True
+    # the rule really reached the webhook_automations store
+    assert stored["rules"][0]["keyword"] == "سعر"
+    assert stored["rules"][0]["action_params"]["message"].endswith("📩")
+
+
+def test_auto_reply_comments_can_be_disabled(recorder):
+    with (
+        mock.patch("src.webhook_automations._load_rules", return_value=[]),
+        mock.patch("src.webhook_automations._save_rules"),
+    ):
+        out = json.loads(recorder.tools["auto_reply_comments"](keyword="كم", reply="x", enabled=False))
+    assert out["rule"]["enabled"] is False
 
 
 def test_auto_reply_comments_requires_args(recorder):
