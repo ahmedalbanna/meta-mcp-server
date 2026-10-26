@@ -7,6 +7,7 @@ If not configured, falls back to uguu.se (free, temporary) — warns in logs.
 All local media/*.jpeg uploads for FB/IG now go through host_image() which prefers
 permanent hosting. Fixes catalog 38981123561474624 image expiry.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -14,6 +15,7 @@ import logging
 import time
 from pathlib import Path
 from typing import Sequence
+from urllib.parse import urlparse
 
 import requests
 
@@ -25,6 +27,16 @@ from src.config import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_hosted_url(url: str) -> str:
+    """Ensure a hosted URL is an absolute https URL with a host."""
+    if not isinstance(url, str) or not url:
+        raise ValueError("hosted url must be a non-empty string")
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise ValueError(f"hosted url must be an https URL with a host: {url!r}")
+    return url
 
 
 def _parse_cloudinary_url(url: str) -> tuple[str, str, str] | None:
@@ -68,10 +80,14 @@ def _upload_cloudinary(file_path: Path, resource_type: str = "image") -> str | N
             )
             r.raise_for_status()
             data = r.json()
-            secure = str(data.get("secure_url") or data.get("url") or "")
+            secure = data.get("secure_url") or data.get("url")
             if secure:
-                logger.info("Cloudinary permanent hosting: %s -> %s", file_path.name, secure)
-                return secure.replace("http://", "https://")
+                secure = str(secure).replace("http://", "https://")
+                try:
+                    return _validate_hosted_url(secure)
+                except ValueError as e:
+                    logger.warning("Cloudinary returned invalid url for %s: %s", file_path.name, e)
+                    return None
             logger.warning("Cloudinary response no url: %s", data)
             return None
     except Exception as e:
@@ -87,9 +103,9 @@ def _upload_uguu(file_path: Path) -> str:
         data = r.json()
         if not data.get("success") or not data.get("files"):
             raise RuntimeError(f"uguu upload failed: {data}")
-        url = str(data["files"][0]["url"])
+        url = str(data["files"][0]["url"]).replace("http://", "https://")
         logger.warning("Used TEMPORARY hosting uguu.se (72h) for %s — set CLOUDINARY_URL for permanent", file_path.name)
-        return url.replace("http://", "https://")
+        return _validate_hosted_url(url)
 
 
 def host_image(file_path: str | Path) -> str:

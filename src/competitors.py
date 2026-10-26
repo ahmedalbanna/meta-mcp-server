@@ -84,6 +84,9 @@ _CTA_MARKERS = (
 # Any non-space run after '#' — works for Arabic and Latin hashtags.
 _HASHTAG_RE = re.compile(r"#([^\s#.,!?؛،؟]+)")
 
+# Instagram handles: 1-30 chars, letters/digits/dots/underscores only.
+_IG_HANDLE_RE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
+
 
 def _parse_iso(ts) -> float | None:
     """Parse an ISO-8601 timestamp into a UTC epoch (None if unparseable)."""
@@ -501,7 +504,7 @@ def register(mcp):
 
     @mcp.tool()
     @concurrency_limit()
-    def competitor_report(handle: str, page_id: str = "", days: int = 30) -> str:
+    def competitor_report(handle: str, page_id: str = "", days: int = 30, our_followers: int = 1457) -> str:
         """تقرير منافس شامل: صفحته + وتيرة نشره + أفضل منشوراته + توصيات.
 
         handle: اسم حساب إنستغرام (بدون @) — مطلوب
@@ -515,6 +518,8 @@ def register(mcp):
             if not handle:
                 return json_dumps({"error": "handle مطلوب"})
             handle = handle.lstrip("@")
+            if not _IG_HANDLE_RE.match(handle):
+                return json_dumps({"error": f"handle غير صالح: {handle!r} (أحرف/أرقام/./_ فقط، 1-30)"})
             report = {"handle": handle, "window_days": days}
 
             # 1. Instagram Business Discovery
@@ -626,7 +631,7 @@ def register(mcp):
             if isinstance(ig, dict) and "error" not in ig:
                 if (ig.get("followers") or 0) > 10000:
                     recs.append(
-                        f"المنافس {handle} يملك {ig['followers']} متابع — جمهور أوسع منكِ (1,457). ركّزي على نمو المتابعين."
+                        f"المنافس {handle} يملك {ig['followers']} متابع — جمهور أوسع منكِ ({our_followers:,}). ركّزي على نمو المتابعين."
                     )
                 if (ig.get("engagement_rate") or 0) < 0.2:
                     recs.append(
@@ -674,7 +679,11 @@ def register(mcp):
                     errors.append({"page_id": pid, "error": handle_error(e, "compare_competitors")})
             ours = str(PAGE_ID)
             rows.sort(
-                key=lambda r: (r.get("engagement_rate") or 0, r.get("fan_count") or 0),
+                key=lambda r: (
+                    r.get("engagement_rate") is not None,
+                    r.get("engagement_rate") or 0,
+                    r.get("fan_count") or 0,
+                ),
                 reverse=True,
             )
             table = [
@@ -750,6 +759,8 @@ def register(mcp):
             handle = username.strip().lstrip("@")
             if not handle:
                 return json_dumps({"error": "username مطلوب"})
+            if not _IG_HANDLE_RE.match(handle):
+                return json_dumps({"error": f"username غير صالح: {handle!r} (أحرف/أرقام/./_ فقط، 1-30)"})
             ml = max(0, min(int(media_limit), 25))
             fields = (
                 f"business_discovery.username({handle})"

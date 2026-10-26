@@ -46,9 +46,30 @@ def sanitize_path(path_str: str, allowed_root: Path) -> Path:
 
     Raises ValueError if the resolved path escapes allowed_root.
     """
-    resolved = (Path(allowed_root) / path_str).resolve()
+    if not isinstance(path_str, str):
+        path_str = str(path_str)
     root_resolved = Path(allowed_root).resolve()
-    if not str(resolved).startswith(str(root_resolved) + "/") and resolved != root_resolved:
+
+    # POSIX-style absolute paths (leading "/") are always treated as escape
+    # attempts, even on Windows where pathlib considers them relative — this
+    # keeps the behaviour consistent across platforms and matches the tests.
+    if path_str.startswith("/") or path_str.startswith("\\\\"):
+        raise ValueError(f"Path escapes allowed directory: {path_str!r}")
+
+    candidate = Path(path_str)
+    if candidate.is_absolute():
+        # Windows absolute path (has a drive letter): only allowed when it
+        # resolves inside allowed_root.
+        try:
+            resolved = candidate.resolve()
+        except Exception:
+            raise ValueError(f"Path escapes allowed directory: {path_str!r}")
+    else:
+        resolved = (root_resolved / path_str).resolve()
+
+    try:
+        resolved.relative_to(root_resolved)
+    except ValueError:
         raise ValueError(f"Path escapes allowed directory: {path_str!r}")
     return resolved
 
@@ -85,7 +106,7 @@ def _fetch_page_access_token() -> str:
             if str(page.get("id")) == page_id and page.get("access_token"):
                 return str(page["access_token"])
         raise RuntimeError(
-            f"الصفحة {page_id} غير موجودة في me/accounts أو بدون توكن صفحة. " "تأكد من أن المستخدم يدير الصفحة."
+            f"الصفحة {page_id} غير موجودة في me/accounts أو بدون توكن صفحة. تأكد من أن المستخدم يدير الصفحة."
         )
     except Exception as e:
         if isinstance(e, RuntimeError):
