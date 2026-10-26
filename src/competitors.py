@@ -26,6 +26,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+from src.competitor_content import fetch_business_media
 from src.config import INSTAGRAM_BUSINESS_ID, PAGE_ID
 from src.helpers import api_call, handle_error, json_dumps, page_api_call
 from src.throttle import concurrency_limit
@@ -497,6 +498,151 @@ def register(mcp):
             return json_dumps(profile)
         except Exception as e:
             return json_dumps(handle_error(e, "analyze_competitor_page"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    def competitor_report(handle: str, page_id: str = "", days: int = 30) -> str:
+        """تقرير منافس شامل: صفحته + وتيرة نشره + أفضل منشوراته + توصيات.
+
+        handle: اسم حساب إنستغرام (بدون @) — مطلوب
+        page_id: معرف صفحة فيسبوك (اختياري — لتحليل صفحته também)
+        days: نافذة التحليل (افتراضي 30)
+
+        يجمع: تحليل الحساب (متابعون، تفاعل)، cadence (أفضل نوع محتوى، وتيرة),
+        وأفضل 5 منشورات — مع توصيات مبنية على بياناتنا (Butterfly).
+        """
+        try:
+            if not handle:
+                return json_dumps({"error": "handle مطلوب"})
+            handle = handle.lstrip("@")
+            report = {"handle": handle, "window_days": days}
+
+            # 1. Instagram Business Discovery
+            try:
+                ig = api_call(
+                    "GET",
+                    INSTAGRAM_BUSINESS_ID,
+                    {
+                        "fields": (
+                            f"business_discovery.username({handle})"
+                            "{username,name,biography,followers_count,follows_count,"
+                            "media_count,profile_picture_url,website,media.limit(8)"
+                            "{id,caption,permalink,timestamp,like_count,comments_count,media_type}}"
+                        )
+                    },
+                )
+                biz = ig.get("business_discovery") or {}
+                media = (biz.get("media") or {}).get("data", [])
+                likes = [m.get("like_count") or 0 for m in media]
+                comments = [m.get("comments_count") or 0 for m in media]
+                avg_likes = round(sum(likes) / len(likes), 1) if likes else 0
+                avg_comments = round(sum(comments) / len(comments), 1) if comments else 0
+                followers = biz.get("followers_count") or 0
+                eng_rate = round(((avg_likes + avg_comments) / followers) * 100, 3) if followers else None
+                report["instagram"] = {
+                    "username": biz.get("username"),
+                    "name": biz.get("name"),
+                    "followers": followers,
+                    "media_count": biz.get("media_count"),
+                    "biography": (biz.get("biography") or "")[:200],
+                    "website": biz.get("website"),
+                    "avg_likes": avg_likes,
+                    "avg_comments": avg_comments,
+                    "engagement_rate": eng_rate,
+                    "top_hashtags": [
+                        {"tag": t, "count": n}
+                        for t, n in Counter(
+                            h for m in media for h in _HASHTAG_RE.findall(m.get("caption") or "")
+                        ).most_common(8)
+                    ],
+                    "latest_posts": [
+                        {
+                            "permalink": m.get("permalink"),
+                            "timestamp": m.get("timestamp"),
+                            "likes": m.get("like_count"),
+                            "comments": m.get("comments_count"),
+                            "type": m.get("media_type"),
+                            "caption": (m.get("caption") or "")[:100],
+                        }
+                        for m in sorted(
+                            media,
+                            key=lambda x: (x.get("like_count") or 0) + (x.get("comments_count") or 0),
+                            reverse=True,
+                        )[:5]
+                    ],
+                }
+            except Exception as e:
+                report["instagram"] = {"error": str(e)[:200]}
+
+            # 2. Facebook page (optional)
+            if page_id:
+                try:
+                    report["facebook"] = _fetch_page_profile(page_id, days)
+                except Exception as e:
+                    report["facebook"] = {"error": str(e)[:200]}
+
+            # 3. cadence (best media type, posting frequency)
+            try:
+                media_all = fetch_business_media(handle)
+                cutoff = time.time() - days * SECONDS_PER_DAY
+                by_day: dict = {}
+                by_type: dict = {}
+                in_window = 0
+                for m in media_all:
+                    ts = _parse_iso(m.get("timestamp"))  # epoch seconds (float)
+                    if not ts or ts < cutoff:
+                        continue
+                    in_window += 1
+                    eng = (m.get("like_count") or 0) + (m.get("comments_count") or 0)
+                    day = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
+                    by_day.setdefault(day, []).append(eng)
+                    by_type.setdefault(m.get("media_type") or "UNKNOWN", []).append(eng)
+                type_summary = sorted(
+                    (
+                        {"media_type": t, "posts": len(v), "avg_engagement": round(sum(v) / len(v), 1), "max": max(v)}
+                        for t, v in by_type.items()
+                    ),
+                    key=lambda r: r["avg_engagement"],
+                    reverse=True,
+                )
+                report["cadence"] = {
+                    "fetched": len(media_all),
+                    "in_window": in_window,
+                    "active_days": len(by_day),
+                    "avg_posts_per_day": round(in_window / max(len(by_day), 1), 1),
+                    "by_media_type": type_summary,
+                    "best_days": sorted(
+                        ({"date": d, "avg": round(sum(v) / len(v), 1), "posts": len(v)} for d, v in by_day.items()),
+                        key=lambda r: r["avg"],
+                        reverse=True,
+                    )[:5],
+                }
+            except Exception as e:
+                report["cadence"] = {"error": str(e)[:200]}
+
+            # 4. recommendations vs Butterfly (our data: 1457 followers, eng 0.213%, 154 posts)
+            recs = []
+            ig = report.get("instagram", {})
+            if isinstance(ig, dict) and "error" not in ig:
+                if (ig.get("followers") or 0) > 10000:
+                    recs.append(
+                        f"المنافس {handle} يملك {ig['followers']} متابع — جمهور أوسع منكِ (1,457). ركّزي على نمو المتابعين."
+                    )
+                if (ig.get("engagement_rate") or 0) < 0.2:
+                    recs.append(
+                        f"نسبة تفاعل منخفضة ({ig.get('engagement_rate')}%) — جمهور 'مشاهد' لا 'مشتري'. فرصة لكِ."
+                    )
+                if ig.get("top_hashtags"):
+                    recs.append(f"استخدمي وسومهم: {', '.join(h['tag'] for h in ig['top_hashtags'][:5])}")
+            report["recommendations"] = recs or ["لا توصيات محددة — راجع التفاصيل"]
+
+            return json_dumps(report)
+        except Exception as e:
+            return json_dumps(handle_error(e, "competitor_report"))
+
+    # ------------------------------------------------------------------
+    # مقارنة عدة منافسين
+    # ------------------------------------------------------------------
 
     @mcp.tool()
     @concurrency_limit()

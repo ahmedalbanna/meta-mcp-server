@@ -423,7 +423,6 @@ def register(mcp):
         try:
             import time
 
-            since = int(time.time()) - days * SECONDS_PER_DAY
             # 1. Facebook page info
             try:
                 info = _page().api_get(

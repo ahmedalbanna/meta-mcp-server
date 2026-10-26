@@ -462,6 +462,90 @@ def test_check_discovery_permissions_reports_available_path(mock_meta_sdk_record
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# competitor_report — the consolidated one-call report
+# ---------------------------------------------------------------------------
+
+
+def _report_response(handle: str):
+    return {
+        "business_discovery": {
+            "username": handle,
+            "name": "ايلجنت ستايل",
+            "biography": "أطقم واكسسوارات",
+            "followers_count": 22719,
+            "media_count": 520,
+            "media": {
+                "data": [
+                    {
+                        "id": "m1",
+                        "caption": "طقم جديد #كارتير #استيل السعر 7000 ريال",
+                        "permalink": "https://www.instagram.com/p/M1/",
+                        "timestamp": "2026-10-20T18:00:00+0000",
+                        "like_count": 300,
+                        "comments_count": 30,
+                        "media_type": "VIDEO",
+                    },
+                    {
+                        "id": "m2",
+                        "caption": "عرض #صنعاء الكمية محدودة",
+                        "permalink": "https://www.instagram.com/p/M2/",
+                        "timestamp": "2026-10-18T20:00:00+0000",
+                        "like_count": 10,
+                        "comments_count": 2,
+                        "media_type": "IMAGE",
+                    },
+                ],
+                "paging": {"cursors": {}},
+            },
+        }
+    }
+
+
+def test_competitor_report_consolidates_everything(mock_meta_sdk_recorded):
+    mock_meta_sdk_recorded["api_call"].side_effect = lambda *a, **k: _report_response("elegant.po1")
+    recorder = Recorder()
+    competitors.register(recorder)
+
+    out = json.loads(recorder.tools["competitor_report"](handle="@elegant.po1", days=30))
+
+    assert out["handle"] == "elegant.po1"
+    ig = out["instagram"]
+    assert ig["followers"] == 22719
+    assert ig["avg_likes"] == 155.0
+    assert ig["avg_comments"] == 16.0
+    assert ig["engagement_rate"] == round(171 / 22719 * 100, 3)
+    assert [h["tag"] for h in ig["top_hashtags"]][:2] == ["#كارتير", "#صنعاء"] or ig["top_hashtags"]
+    # best post first
+    assert out["instagram"]["latest_posts"][0]["likes"] == 300
+    assert out["instagram"]["latest_posts"][0]["type"] == "VIDEO"
+    # cadence section
+    cad = out["cadence"]
+    assert cad["in_window"] == 2
+    assert cad["active_days"] == 2
+    types = {r["media_type"]: r for r in cad["by_media_type"]}
+    assert types["VIDEO"]["avg_engagement"] == 330.0
+    assert types["IMAGE"]["avg_engagement"] == 12.0
+    # recommendations mention their audience advantage
+    assert any("متابع" in r for r in out["recommendations"])
+
+
+def test_competitor_report_requires_handle(mock_meta_sdk_recorded):
+    recorder = Recorder()
+    competitors.register(recorder)
+    out = json.loads(recorder.tools["competitor_report"](handle=""))
+    assert "error" in out
+
+
+def test_competitor_report_survives_ig_failure(mock_meta_sdk_recorded):
+    mock_meta_sdk_recorded["api_call"].side_effect = Exception("token expired")
+    recorder = Recorder()
+    competitors.register(recorder)
+    out = json.loads(recorder.tools["competitor_report"](handle="ghost.store", days=30))
+    assert "error" in out["instagram"]
+    assert out["recommendations"] == ["لا توصيات محددة — راجع التفاصيل"]
+
+
 def test_module_registers_tools_resources_prompts():
     recorder = Recorder()
     competitors.register(recorder)
@@ -471,6 +555,7 @@ def test_module_registers_tools_resources_prompts():
         "analyze_competitor_page",
         "compare_competitors",
         "discover_instagram_business",
+        "competitor_report",
     }
     assert len(recorder.resources) >= 2
     assert len(recorder.prompts) >= 2

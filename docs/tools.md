@@ -14,7 +14,8 @@
 | `catalog` | 26 | 2 | 2 |
 | `competitor_catalog` | 3 | 2 | 2 |
 | `competitor_content` | 3 | 2 | 2 |
-| `competitors` | 5 | 2 | 2 |
+| `competitors` | 6 | 2 | 2 |
+| `content_tools` | 5 | 2 | 2 |
 | `creatives` | 5 | 2 | 3 |
 | `discovery` | 5 | 2 | 2 |
 | `events` | 3 | 2 | 2 |
@@ -32,7 +33,7 @@
 | `whatsapp` | 6 | 2 | 3 |
 | `yemen_bundle` | 2 | 1 | 1 |
 
-**Total:** 224 tools + 53 resources + 53 prompts
+**Total:** 230 tools + 55 resources + 55 prompts
 
 
 ## `ads` — 10 tools
@@ -185,17 +186,30 @@
 - 📦 **resource** `competitor_content_extra_resource` — قوالب تحليل المنافسين.
 - 💬 **prompt** `competitor_post_breakdown_prompt` — تفكيك منشور منافس.
 
-## `competitors` — 5 tools
+## `competitors` — 6 tools
 
 - 🛠️ **tool** `search_business_pages` — البحث عن صفحات تجارية على فيسبوك بكلمة مفتاحية (+ مدينة/منتج).
 - 🛠️ **tool** `check_discovery_permissions` — فحص أي مسارات اكتشاف المنافسين متاحة فعلياً لهذا التطبيق/التوكن.
 - 🛠️ **tool** `analyze_competitor_page` — تحليل صفحة منافس بعمق: المتابعون، النمط، التفاعل، المحتوى، التقييمات.
+- 🛠️ **tool** `competitor_report` — تقرير منافس شامل: صفحته + وتيرة نشره + أفضل منشوراته + توصيات.
 - 🛠️ **tool** `compare_competitors` — مقارنة عدة صفحات منافسة في جدول واحد (مرتّب بنسبة التفاعل).
 - 🛠️ **tool** `discover_instagram_business` — اكتشاف حساب إنستغرام تجاري عام وتحليل أداء منشوراته.
 - 📦 **resource** `competitors_resource` — نظرة عامة على المنافسة.
 - 💬 **prompt** `competitor_strategy_prompt` — استراتيجية المنافسة.
 - 📦 **resource** `competitors_extra_resource` — قوالب تحليل المنافسين.
 - 💬 **prompt** `competitor_report_prompt` — تقرير منافس.
+
+## `content_tools` — 5 tools
+
+- 🛠️ **tool** `generate_post_caption` — توليد كابشن إنستغرام/فيسبوك جاهز لمنشور (عربي/إنجليزي).
+- 🛠️ **tool** `best_posting_time` — تحليل متى ننشر للحصول على أعلى تفاعل (من منشورات صفحتنا).
+- 🛠️ **tool** `hashtag_analyzer` — تحليل أي هاشتاغات تجلب أعلى تفاعل (من منشورات صفحتنا).
+- 🛠️ **tool** `content_calendar` — توليد تقويم محتوى لـ 7 أيام (منشورات + ستوريات) مع أوقات وأفكار.
+- 🛠️ **tool** `auto_reply_comments` — إعداد رد تلقائي على تعليقات تحتوي كلمة مفتاحية.
+- 📦 **resource** `content_tools_resource` — نظرة عامة على أدوات المحتوى.
+- 💬 **prompt** `content_tools_prompt` — أدوات المحتوى.
+- 📦 **resource** `content_tools_extra_resource` — قوالب المحتوى.
+- 💬 **prompt** `content_plan_prompt` — خطة محتوى.
 
 ## `creatives` — 5 tools
 
