@@ -219,9 +219,9 @@ def register(mcp):
             return json_dumps(handle_error(e, "breakdowns://overview"))
 
     @mcp.prompt()
-    def breakdown_analysis_prompt(topic: str = "breakdowns") -> str:
+    def breakdown_analysis_prompt(topic: str = "breakdowns", breakdown: str = "age,gender") -> str:
         """تحليل مجزأ."""
-        return "ساعد في تحليل مجزأ لـ " + topic + " — حلل breakdown {breakdown} (وحدة breakdowns)"
+        return f"ساعد في تحليل مجزأ لـ {topic} — حلل breakdown {breakdown} (وحدة breakdowns)"
 
     @mcp.resource("breakdowns://templates")
     async def breakdowns_extra_resource() -> str:
@@ -234,6 +234,6 @@ def register(mcp):
             return json_dumps(handle_error(e, "breakdowns://templates"))
 
     @mcp.prompt()
-    def breakdown_comparison_prompt(topic: str = "breakdowns") -> str:
+    def breakdown_comparison_prompt(topic: str = "breakdowns", b1: str = "age", b2: str = "gender") -> str:
         """مقارنة تحليلات."""
-        return "ساعد في مقارنة تحليلات لـ " + topic + " — قارن breakdown {b1} و {b2} (وحدة breakdowns)"
+        return f"ساعد في مقارنة تحليلات لـ {topic} — قارن breakdown {b1} و {b2} (وحدة breakdowns)"
