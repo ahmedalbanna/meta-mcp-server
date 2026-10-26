@@ -32,8 +32,23 @@ def _parse_ts(value) -> datetime | None:
         return None
 
 
-def _extract_hashtags(text: str) -> list[str]:
+def _all_hashtags(text: str) -> list[str]:
+    """Every hashtag in a message, lowercased — no filtering."""
     return [h.lower() for h in re.findall(r"#[^\s#.,!?؛،؟]+", text or "")]
+
+
+def _is_contact_hashtag(tag: str) -> bool:
+    """True for hashtags that carry contact info rather than marketing intent.
+
+    Pages in this space overuse phone-number tags (#+967777000, #0777000000),
+    which are not marketing signals and drown out real ones. Heuristic: a tag
+    is contact info when it has at least 5 digits, or more digits than letters
+    — so tags with a year (#Dior2026) survive while #777000 does not.
+    """
+    body = tag.lstrip("#")
+    digits = sum(c.isdigit() for c in body)
+    letters = sum(c.isalpha() for c in body)
+    return digits >= 5 or (digits > 0 and digits > letters)
 
 
 def _fetch_our_posts(limit: int = 100, with_message: bool = False) -> tuple[list, str | None]:
@@ -297,7 +312,7 @@ def register(mcp):
     @mcp.tool()
     @concurrency_limit()
     def hashtag_analyzer(days: int = 60) -> str:
-        """تحليل أي هاشتاغات تجلب أعلى تفاعل (من منشورات صفحتنا).
+        """تحليل أي هاشتاغات تجلب أعلى تفاعل (من منشورات صفحتنا) — تُستبعد وسوم معلومات التواصل (أرقام الهواتف).
 
         days: نافذة التحليل (افتراضي 60)
         يرجّع: قائمة هاشتاغات مرتبة بـ (متوسط تفاعل، عدد استخدام، أفضل منشور).
@@ -309,9 +324,12 @@ def register(mcp):
             if not posts:
                 return json_dumps({"error": err or "لا توجد منشورات", "days": days})
             tag_data: dict = defaultdict(lambda: {"count": 0, "engagements": []})
+            skipped_contact = 0
             for p in posts:
                 cid = str(p.get("id") or "")
-                tags = _extract_hashtags(p.get("message") or "")
+                raw_tags = _all_hashtags(p.get("message") or "")
+                tags = [t for t in raw_tags if not _is_contact_hashtag(t)]
+                skipped_contact += len(raw_tags) - len(tags)
                 if not tags or not cid:
                     continue
                 eng = _post_engagement(cid)
@@ -320,7 +338,10 @@ def register(mcp):
                     tag_data[tag]["engagements"].append(eng)
 
             if not tag_data:
-                return json_dumps({"message": "لا توجد هاشتاغات في المنشورات", "days": days})
+                message = "لا توجد هاشتاغات تسويقية في المنشورات"
+                if skipped_contact:
+                    message += f" (استُبعد {skipped_contact} وسم معلومات تواصل مثل أرقام الهواتف)"
+                return json_dumps({"message": message, "days": days, "skipped_contact_hashtags": skipped_contact})
 
             rows = []
             for tag, d in tag_data.items():
@@ -339,6 +360,7 @@ def register(mcp):
                 {
                     "analyzed_posts": len(posts),
                     "unique_hashtags": len(rows),
+                    "skipped_contact_hashtags": skipped_contact,
                     "top_hashtags": rows[:20],
                     "weak_hashtags": [r for r in rows if r["avg_engagement"] < 2][:10],
                     "recommendation": (

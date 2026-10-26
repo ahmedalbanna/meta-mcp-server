@@ -154,6 +154,44 @@ def test_hashtag_analyzer_no_hashtags(recorder):
     assert "message" in out
 
 
+def test_is_contact_hashtag_separates_phones_from_marketing_tags():
+    assert content_tools._is_contact_hashtag("#+967777000123")
+    assert content_tools._is_contact_hashtag("#0777000000")
+    assert not content_tools._is_contact_hashtag("#كارتير")
+    assert not content_tools._is_contact_hashtag("#Dior2026")  # letters still dominate
+    assert not content_tools._is_contact_hashtag("#Butterfly")
+
+
+def test_hashtag_analyzer_skips_contact_hashtags(recorder):
+    posts = _published_posts(
+        ("p1", 20, "للطلب #+967777000111 #كارتير"),
+        ("p2", 26, "عرض #777000222 #صنعاء"),
+    )
+    with (
+        mock.patch.object(content_tools, "page_api_call", return_value={"data": posts}),
+        mock.patch.object(content_tools, "_post_engagement", side_effect=[80, 40]),
+    ):
+        out = json.loads(recorder.tools["hashtag_analyzer"](days=60))
+
+    tags = {r["hashtag"] for r in out["top_hashtags"]}
+    assert tags == {"#كارتير", "#صنعاء"}
+    assert out["skipped_contact_hashtags"] == 2
+    assert "#+967777000111" not in out["recommendation"]
+
+
+def test_hashtag_analyzer_reports_when_all_tags_are_contact_info(recorder):
+    posts = _published_posts(("p1", 20, "للطلب #+967777000111 #777000222"))
+    with (
+        mock.patch.object(content_tools, "page_api_call", return_value={"data": posts}),
+        mock.patch.object(content_tools, "_post_engagement", return_value=10),
+    ):
+        out = json.loads(recorder.tools["hashtag_analyzer"](days=60))
+
+    assert "message" in out
+    assert out["skipped_contact_hashtags"] == 2
+    assert "استُبعد" in out["message"]
+
+
 # ---------------------------------------------------------------------------
 # content_calendar
 # ---------------------------------------------------------------------------

@@ -21,7 +21,7 @@
 | `events` | 3 | 2 | 2 |
 | `finance` | 9 | 2 | 1 |
 | `insights` | 6 | 2 | 3 |
-| `instagram` | 37 | 2 | 2 |
+| `instagram` | 38 | 2 | 2 |
 | `leads` | 7 | 2 | 2 |
 | `media_tools` | 4 | 2 | 2 |
 | `messenger` | 7 | 2 | 2 |
@@ -33,7 +33,7 @@
 | `whatsapp` | 6 | 2 | 3 |
 | `yemen_bundle` | 2 | 1 | 1 |
 
-**Total:** 230 tools + 55 resources + 55 prompts
+**Total:** 231 tools + 55 resources + 55 prompts
 
 
 ## `ads` — 10 tools
@@ -203,7 +203,7 @@
 
 - 🛠️ **tool** `generate_post_caption` — توليد كابشن إنستغرام/فيسبوك جاهز لمنشور (عربي/إنجليزي).
 - 🛠️ **tool** `best_posting_time` — تحليل متى ننشر للحصول على أعلى تفاعل (من منشورات صفحتنا).
-- 🛠️ **tool** `hashtag_analyzer` — تحليل أي هاشتاغات تجلب أعلى تفاعل (من منشورات صفحتنا).
+- 🛠️ **tool** `hashtag_analyzer` — تحليل أي هاشتاغات تجلب أعلى تفاعل (من منشورات صفحتنا) — تُستبعد وسوم معلومات التواصل (أرقام الهواتف).
 - 🛠️ **tool** `content_calendar` — توليد تقويم محتوى لـ 7 أيام (منشورات + ستوريات) مع أوقات وأفكار.
 - 🛠️ **tool** `auto_reply_comments` — إعداد رد تلقائي على تعليقات تحتوي كلمة مفتاحية.
 - 📦 **resource** `content_tools_resource` — نظرة عامة على أدوات المحتوى.
@@ -275,7 +275,7 @@
 - 📦 **resource** `insights_extra_resource` — قوالب الرؤى.
 - 💬 **prompt** `insights_compare_prompt` — مقارنة رؤى.
 
-## `instagram` — 37 tools
+## `instagram` — 38 tools
 
 - 🛠️ **tool** `get_instagram_account` — معلومات حساب إنستغرام المرتبط بالأعمال.
 - 🛠️ **tool** `list_instagram_media` — منشورات حساب إنستغرام.
@@ -311,7 +311,7 @@
 - 🛠️ **tool** `send_instagram_dm_with_image` — إرسال رسالة مباشرة (DM) مع صورة عبر إنستغرام.
 - 🛠️ **tool** `list_instagram_comments` — قائمة تعليقات منشور إنستغرام مع ترقيم الصفحات (paginate).
 - 🛠️ **tool** `get_instagram_reels_insights` — تحليلات ريلز إنستغرام (plays + reach + engagement) — مخصص لفيديوهات Reels.
-- 🛠️ **tool** `get_instagram_reels_account_insights` — تحليلات Reels على مستوى حساب إنستغرام (plays/reach/saved/shares) — يجمع insights أحدث Reels within days.
+- 🛠️ **tool** `get_instagram_reels_account_insights` — تحليلات Reels على مستوى حساب إنستغرام (plays/reach/saved/shares) — يجمع insights
 - 🛠️ **tool** `publish_instagram_carousel_from_media` — نشر كاروسيل إنستغرام مباشرة من مجلد محلي (media/*.jpeg) بدون رابط عام — يدعم Product Tagging.
 - 🛠️ **tool** `publish_instagram_reel_from_media` — نشر ريلز إنستغرام من ملف فيديو محلي (media/*.mp4) — يرفع تلقائيا لاستضافة دائمة ثم ينشر.
 - 🛠️ **tool** `publish_threads_post` — نشر منشور Threads (عبر Graph API v19+ إن كان متاحًا).
