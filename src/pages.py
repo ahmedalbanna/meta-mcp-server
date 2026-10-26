@@ -1,9 +1,11 @@
 import logging
+from datetime import datetime, timezone
 
-from src.config import PAGE_ID
+from src.config import INSTAGRAM_BUSINESS_ID, PAGE_ID
 
 logger = logging.getLogger(__name__)
 from src.helpers import (
+    api_call,
     get_page_api,
     handle_error,
     json_dumps,
@@ -401,6 +403,178 @@ def register(mcp):
             return json_dumps([to_dict(i) for i in results])
         except Exception as e:
             return json_dumps(handle_error(e, "get_page_insights"))
+
+    # ------------------------------------------------------------------
+    # صحة صفحتنا (تجميع كل التحليلات في تقرير واحد)
+    # ------------------------------------------------------------------
+
+    @mcp.tool()
+    @concurrency_limit()
+    def analyze_our_page(days: int = 30, include_instagram: bool = True) -> str:
+        """تقرير صحة صفحتنا (Facebook + Instagram) في تقرير واحد.
+
+        days: نافذة التحليل (افتراضي 30)
+        include_instagram: تضمين إنستغرام (افتراضي true)
+
+        يجمع: المتابعون، المنشورات (آخر 10)، مشاهدات/تفاعل آخر 7 أيام،
+        أيام آخر منشور، إنستغرام (متابعون + تفاعل 28 يوم)، ومقياس صحة 0-100
+        مع توصيات مبنية على بيانات المنافسين (وتيرة، سعر، ضمان).
+        """
+        try:
+            import time
+
+            since = int(time.time()) - days * SECONDS_PER_DAY
+            # 1. Facebook page info
+            try:
+                info = _page().api_get(
+                    fields=[
+                        Page.Field.name,
+                        Page.Field.fan_count,
+                        Page.Field.link,
+                        Page.Field.category,
+                        Page.Field.phone,
+                        Page.Field.website,
+                    ]
+                )
+                fb_info = to_dict(info)
+            except Exception as e:
+                fb_info = {"error": str(e)[:120]}
+
+            # 2. FB page insights (last 7 days)
+            try:
+                insights = _page().get_insights(
+                    params={
+                        "metric": ["page_views_total", "page_post_engagements", "page_actions_post_reactions_total"],
+                        "period": "day",
+                        "since": int(time.time()) - 7 * SECONDS_PER_DAY,
+                    }
+                )
+                fb_insights = [to_dict(i) for i in insights]
+            except Exception as e:
+                fb_insights = {"error": str(e)[:120]}
+
+            # 3. recent posts
+            try:
+                posts = _page().get_posts(
+                    params={"fields": ["message", "created_time", "permalink_url", "id"], "limit": 10}
+                )
+                fb_posts = [to_dict(p) for p in posts]
+            except Exception as e:
+                fb_posts = {"error": str(e)[:120]}
+
+            fb_days_since = None
+            if isinstance(fb_posts, list) and fb_posts:
+                ts = None
+                for p in fb_posts:
+                    try:
+                        dt = datetime.fromisoformat(str(p.get("created_time", "")).replace("Z", "+00:00"))
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        ts = max(ts or 0, dt.timestamp())
+                    except Exception:
+                        pass
+                if ts:
+                    fb_days_since = round((time.time() - ts) / SECONDS_PER_DAY, 1)
+
+            # 4. Instagram
+            ig_info = None
+            ig_insights = None
+            if include_instagram and INSTAGRAM_BUSINESS_ID:
+                try:
+                    ig_info = api_call(
+                        "GET",
+                        INSTAGRAM_BUSINESS_ID,
+                        {"fields": "id,username,media_count,followers_count,biography"},
+                    )
+                except Exception as e:
+                    ig_info = {"error": str(e)[:120]}
+                try:
+                    ig_insights = api_call(
+                        "GET",
+                        INSTAGRAM_BUSINESS_ID,
+                        {"fields": "insights.metric(reach,follower_count,profile_views,accounts_engaged,total_interactions).period(days_28)"},
+                    )
+                except Exception as e:
+                    ig_insights = {"error": str(e)[:120]}
+
+            # 5. health score + recommendations
+            fan_count = fb_info.get("fan_count") if isinstance(fb_info, dict) else None
+            score = 0
+            notes: list[str] = []
+            posts_count = len(fb_posts) if isinstance(fb_posts, list) else 0
+            if posts_count >= 10:
+                score += 25
+            elif posts_count >= 5:
+                score += 12
+            else:
+                notes.append("منشورات قليلة — زد وتيرة النشر (هدف: 2-3/أسبوع)")
+            if fb_days_since is None:
+                notes.append("لا توجد منشورات حديثة")
+            elif fb_days_since <= 3:
+                score += 25
+            elif fb_days_since <= 10:
+                score += 12
+            else:
+                notes.append(f"آخر منشور قبل {int(fb_days_since)} يوم — نشر قديم")
+            # engagement from insights
+            total_eng = 0
+            if isinstance(fb_insights, list):
+                for ins in fb_insights:
+                    if ins.get("name") == "page_post_engagements":
+                        for v in ins.get("values", []):
+                            total_eng += v.get("value", 0) or 0
+            if fan_count and total_eng:
+                rate = (total_eng / fan_count) * 100
+                if rate >= 5:
+                    score += 30
+                elif rate >= 1:
+                    score += 18
+                elif rate >= 0.2:
+                    score += 8
+                else:
+                    notes.append("نسبة تفاعل ضعيفة (أقل من 0.2%)")
+            else:
+                notes.append("لا توجد بيانات تفاعل (الصفحة خاملة أو حملة موقوفة)")
+            ig_followers = (ig_info or {}).get("followers_count") if isinstance(ig_info, dict) else None
+            if ig_followers:
+                score += 10  # bonus for having IG connected
+            if (ig_followers or 0) >= 5000:
+                score += 10
+
+            level = "قوي" if score >= 70 else "متوسط" if score >= 40 else "خامل/ضعيف"
+            return json_dumps(
+                {
+                    "facebook": {
+                        "name": fb_info.get("name") if isinstance(fb_info, dict) else None,
+                        "fan_count": fan_count,
+                        "category": fb_info.get("category") if isinstance(fb_info, dict) else None,
+                        "link": fb_info.get("link") if isinstance(fb_info, dict) else None,
+                        "phone": fb_info.get("phone") if isinstance(fb_info, dict) else None,
+                        "website": fb_info.get("website") if isinstance(fb_info, dict) else None,
+                        "days_since_last_post": fb_days_since,
+                        "recent_posts_count": posts_count,
+                        "recent_posts": fb_posts if isinstance(fb_posts, list) else None,
+                        "insights_last_7d": fb_insights if isinstance(fb_insights, list) else None,
+                    },
+                    "instagram": {
+                        "account": ig_info if isinstance(ig_info, dict) else None,
+                        "insights_last_28d": ig_insights,
+                    } if include_instagram else None,
+                    "health": {
+                        "score": score,
+                        "level": level,
+                        "notes": notes or ["لا ملاحظات — أداء جيد"],
+                    },
+                    "recommendations": [
+                        "نشر 2-3 منشورات/أسبوع (فيديو أو كاروسيل — وليس صورة مفردة)",
+                        "كتابة السعر على الصورة (كل منشورات المنافسين الناجحة تحمله)",
+                        "إضافة 'ضمان سنة' في كل منشور (سلاحك ضد المنافسين المطلية)",
+                        "استهداف بوسوم #استيل #ستانلس_ستيل #بديل_الذهب #صنعاء",
+                    ],
+                }
+            )
+        except Exception as e:
+            return json_dumps(handle_error(e, "analyze_our_page"))
 
     # ------------------------------------------------------------------
     # الأحداث Events

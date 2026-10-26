@@ -69,6 +69,8 @@ _TO_DICT_PATHS = [
     "src.creatives",
     "src.discovery",
     "src.events",
+    "src.competitors",
+    "src.competitor_content",
     "src.webhook_automations",
     "src.scheduler",
     "src.metrics",
@@ -85,12 +87,8 @@ def mock_meta_sdk():
                 get_default_api=mock.DEFAULT,
             )
         )
-        stack.enter_context(
-            mock.patch("src.helpers.api_call", return_value={"data": [], "paging": {}})
-        )
-        stack.enter_context(
-            mock.patch("src.helpers.page_api_call", return_value={"data": []})
-        )
+        stack.enter_context(mock.patch("src.helpers.api_call", return_value={"data": [], "paging": {}}))
+        stack.enter_context(mock.patch("src.helpers.page_api_call", return_value={"data": []}))
         for mod_path in _TO_DICT_PATHS:
             stack.enter_context(mock.patch(f"{mod_path}.to_dict", new=_fake_to_dict, create=True))
         stack.enter_context(mock.patch("src.helpers.get_page_api"))
@@ -117,11 +115,15 @@ def mock_meta_sdk_recorded():
         "src.whatsapp.api_call",
         "src.instagram.api_call",
         "src.discovery.api_call",
+        "src.competitors.api_call",
+        "src.competitor_content.api_call",
+        "src.competitor_catalog.api_call",
     ]
     page_api_call_patches = [
         "src.helpers.page_api_call",
         "src.messenger.page_api_call",
         "src.pages.page_api_call",
+        "src.competitors.page_api_call",
     ]
 
     with ExitStack() as stack:
@@ -187,6 +189,7 @@ ALL_MODULES = (
     "pages",
     "instagram",
     "leads",
+    "media_tools",
     "messenger",
     "whatsapp",
     "automation",
@@ -198,6 +201,8 @@ ALL_MODULES = (
     "webhook_automations",
     "scheduler",
     "metrics",
+    "competitors",
+    "competitor_content",
 )
 
 # All modules now expose tools (and per-module resources/prompts)
@@ -215,6 +220,8 @@ def register_all(recorder):
         business,
         campaigns,
         catalog,
+        competitor_content,
+        competitors,
         creatives,
         discovery,
         events,
@@ -222,6 +229,7 @@ def register_all(recorder):
         insights,
         instagram,
         leads,
+        media_tools,
         messenger,
         metrics,
         pages,
@@ -247,6 +255,7 @@ def register_all(recorder):
         "insights": insights,
         "instagram": instagram,
         "leads": leads,
+        "media_tools": media_tools,
         "messenger": messenger,
         "metrics": metrics,
         "pages": pages,
@@ -254,6 +263,8 @@ def register_all(recorder):
         "scheduler": scheduler,
         "webhook_automations": webhook_automations,
         "whatsapp": whatsapp,
+        "competitors": competitors,
+        "competitor_content": competitor_content,
     }
     for name in ALL_MODULES:
         module_map[name].register(recorder)

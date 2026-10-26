@@ -21,3 +21,5 @@ htmlcov/
 .ipynb_checkpoints/
 .pytest_cache/
 media/*
+# Generated competitor research artifacts
+competitors/

@@ -1,7 +1,7 @@
 [project]
 name = "meta-mcp-server"
 version = "2.0.0"
-description = "Meta Marketing MCP Server — 201 tools for Facebook/Instagram/WhatsApp advertising"
+description = "Meta Marketing MCP Server — 224 tools for Facebook/Instagram/WhatsApp advertising"
 requires-python = ">=3.10"
 readme = "README.md"
 license = { text = "MIT" }
@@ -103,6 +103,7 @@ ignore = [
 "src/metrics.py" = ["F401"]
 "src/helpers.py" = ["SIM102"]
 "src/scheduler.py" = ["SIM105"]
+"tests/test_competitor_catalog.py" = ["RUF001"]
 "src/llm.py" = ["UP007"]
 "scripts/*" = ["RUF001", "B007", "E701", "UP038", "I001"]
 

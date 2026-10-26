@@ -12,22 +12,27 @@
 | `business` | 5 | 2 | 2 |
 | `campaigns` | 6 | 2 | 2 |
 | `catalog` | 26 | 2 | 2 |
+| `competitor_catalog` | 3 | 2 | 2 |
+| `competitor_content` | 3 | 2 | 2 |
+| `competitors` | 5 | 2 | 2 |
 | `creatives` | 5 | 2 | 3 |
 | `discovery` | 5 | 2 | 2 |
 | `events` | 3 | 2 | 2 |
 | `finance` | 9 | 2 | 1 |
 | `insights` | 6 | 2 | 3 |
-| `instagram` | 35 | 2 | 2 |
+| `instagram` | 37 | 2 | 2 |
 | `leads` | 7 | 2 | 2 |
+| `media_tools` | 4 | 2 | 2 |
 | `messenger` | 7 | 2 | 2 |
 | `metrics` | 3 | 2 | 1 |
-| `pages` | 25 | 2 | 2 |
+| `pages` | 29 | 2 | 2 |
 | `reports` | 5 | 2 | 3 |
 | `scheduler` | 5 | 2 | 1 |
 | `webhook_automations` | 5 | 2 | 2 |
 | `whatsapp` | 6 | 2 | 3 |
+| `yemen_bundle` | 2 | 1 | 1 |
 
-**Total:** 201 tools + 44 resources + 44 prompts
+**Total:** 224 tools + 53 resources + 53 prompts
 
 
 ## `ads` — 10 tools
@@ -160,6 +165,38 @@
 - 📦 **resource** `catalogs_list_resource` — قائمة كتالوجات المنتجات.
 - 💬 **prompt** `catalog_product_prompt` — وصف منتج لكتالوج.
 
+## `competitor_catalog` — 3 tools
+
+- 🛠️ **tool** `build_competitor_catalog` — خط أنابيب كامل: اسحب أفضل منتجات كل منافس (آخر N يوم) وابنِ مسودة كتالوج.
+- 🛠️ **tool** `publish_catalog_draft` — نشر مسودات الكتالوج: تحويل visibility من staging إلى published.
+- 🛠️ **tool** `list_catalog_drafts` — عرض منتجات المسودة (visibility=staging) في كتالوج — قبل النشر.
+- 📦 **resource** `competitor_catalog_resource` — خط أنابيب كتالوج المنافسين.
+- 💬 **prompt** `competitor_catalog_prompt` — بناء كتالوج من المنافسين.
+- 📦 **resource** `competitor_catalog_extra_resource` — قائمة تحقق قبل النشر.
+- 💬 **prompt** `catalog_review_prompt` — مراجعة منتج قبل النشر.
+
+## `competitor_content` — 3 tools
+
+- 🛠️ **tool** `resolve_instagram_post_url` — تحليل رابط منشور إنستغرام عام → صاحب الحساب والإحصائيات والكابشن.
+- 🛠️ **tool** `download_top_competitor_posts` — تنزيل أفضل منشورات منافس (مرتّبة بالتفاعل) خلال فترة — للتحليل التنافسي.
+- 🛠️ **tool** `analyze_competitor_cadence` — تحليل وتيرة نشر منافس وأداء كل نوع محتوى (فيديو/كاروسيل/صورة).
+- 📦 **resource** `competitor_content_resource` — نظرة عامة على محتوى المنافسين.
+- 💬 **prompt** `competitor_content_prompt` — تحليل محتوى منافس.
+- 📦 **resource** `competitor_content_extra_resource` — قوالب تحليل المنافسين.
+- 💬 **prompt** `competitor_post_breakdown_prompt` — تفكيك منشور منافس.
+
+## `competitors` — 5 tools
+
+- 🛠️ **tool** `search_business_pages` — البحث عن صفحات تجارية على فيسبوك بكلمة مفتاحية (+ مدينة/منتج).
+- 🛠️ **tool** `check_discovery_permissions` — فحص أي مسارات اكتشاف المنافسين متاحة فعلياً لهذا التطبيق/التوكن.
+- 🛠️ **tool** `analyze_competitor_page` — تحليل صفحة منافس بعمق: المتابعون، النمط، التفاعل، المحتوى، التقييمات.
+- 🛠️ **tool** `compare_competitors` — مقارنة عدة صفحات منافسة في جدول واحد (مرتّب بنسبة التفاعل).
+- 🛠️ **tool** `discover_instagram_business` — اكتشاف حساب إنستغرام تجاري عام وتحليل أداء منشوراته.
+- 📦 **resource** `competitors_resource` — نظرة عامة على المنافسة.
+- 💬 **prompt** `competitor_strategy_prompt` — استراتيجية المنافسة.
+- 📦 **resource** `competitors_extra_resource` — قوالب تحليل المنافسين.
+- 💬 **prompt** `competitor_report_prompt` — تقرير منافس.
+
 ## `creatives` — 5 tools
 
 - 🛠️ **tool** `generate_ad_preview` — توليد معاينة إعلان (HTML + رابط) بالشكل المطلوب.
@@ -200,7 +237,7 @@
 - 🛠️ **tool** `get_account_balance` — رصيد الحساب الإعلاني والإنفاق وحد الإنفاق والعملة.
 - 🛠️ **tool** `get_spend_cap` — حدود الإنفاق الحالية للحساب الإعلاني.
 - 🛠️ **tool** `update_spend_cap` — تعديل حد الإنفاق الكلي للحساب (بالعملة الصغرى).
-- 🛠️ **tool** `get_transactions` — آخر المعاملات المالية للحساب الإعلاني (فواتير/مدفوعات/إضافات).
+- 🛠️ **tool** `get_transactions` — سجل معاملات الحساب الإعلاني. ملاحظة: أزالت Meta حافة /transactions من Graph API بالكامل — الفواتير متاحة من Business Manager > Billing.
 - 🛠️ **tool** `get_payment_methods` — طرق الدفع المرتبطة بالحساب (مصدر التمويل).
 - 🛠️ **tool** `get_business_info` — معلومات Business Manager (الفوترة، اسم النشاط، الحالة).
 - 🛠️ **tool** `list_account_users` — المستخدمون المرتبطون بالحساب الإعلاني وصلاحياتهم.
@@ -224,7 +261,7 @@
 - 📦 **resource** `insights_extra_resource` — قوالب الرؤى.
 - 💬 **prompt** `insights_compare_prompt` — مقارنة رؤى.
 
-## `instagram` — 35 tools
+## `instagram` — 37 tools
 
 - 🛠️ **tool** `get_instagram_account` — معلومات حساب إنستغرام المرتبط بالأعمال.
 - 🛠️ **tool** `list_instagram_media` — منشورات حساب إنستغرام.
@@ -236,11 +273,11 @@
 - 🛠️ **tool** `download_instagram_media` — تنزيل صور منشور إنستغرام إلى ملفات محلية (العملة/الصورة وكل عناصر الكاروسيل).
 - 🛠️ **tool** `get_instagram_media_insights` — تحليلات منشور إنستغرام معين.
 - 🛠️ **tool** `get_instagram_account_insights` — تحليلات على مستوى حساب إنستغرام. period: day | week | days_28.
-- 🛠️ **tool** `publish_instagram_photo` — نشر صورة على إنستغرام.
+- 🛠️ **tool** `publish_instagram_photo` — نشر صورة على إنستغرام — يدعم Product Tagging.
 - 🛠️ **tool** `publish_instagram_video` — نشر فيديو على إنستغرام (صفحة/تغذية).
 - 🛠️ **tool** `publish_instagram_reel` — نشر ريلز على إنستغرام.
 - 🛠️ **tool** `publish_instagram_story` — نشر قصة (Story) على إنستغرام. أرسل image_url أو video_url فقط.
-- 🛠️ **tool** `publish_instagram_carousel` — نشر ألبوم كاروسيل على إنستغرام.
+- 🛠️ **tool** `publish_instagram_carousel` — نشر ألبوم كاروسيل على إنستغرام — يدعم Product Tagging (IG Shopping).
 - 🛠️ **tool** `add_instagram_media_comment` — إضافة تعليق على منشور إنستغرام (حل بديل لإضافة نص الكابشن لمُنشور منشور مسبقًا،
 - 🛠️ **tool** `delete_instagram_media` — حذف منشور إنستغرام (يُستخدم في سير عمل: حذف ثم إعادة نشر بكابشن محدّث).
 - 🛠️ **tool** `update_instagram_media_caption` — تحديث كابشن منشور إنستغرام (صورة أو كاروسيل) بسير عمل: إعادة نشر بكابشن جديد ثم حذف القديم.
@@ -260,6 +297,8 @@
 - 🛠️ **tool** `send_instagram_dm_with_image` — إرسال رسالة مباشرة (DM) مع صورة عبر إنستغرام.
 - 🛠️ **tool** `list_instagram_comments` — قائمة تعليقات منشور إنستغرام مع ترقيم الصفحات (paginate).
 - 🛠️ **tool** `get_instagram_reels_insights` — تحليلات ريلز إنستغرام (plays + reach + engagement) — مخصص لفيديوهات Reels.
+- 🛠️ **tool** `publish_instagram_carousel_from_media` — نشر كاروسيل إنستغرام مباشرة من مجلد محلي (media/*.jpeg) بدون رابط عام — يدعم Product Tagging.
+- 🛠️ **tool** `publish_instagram_reel_from_media` — نشر ريلز إنستغرام من ملف فيديو محلي (media/*.mp4) — يرفع تلقائيا لاستضافة دائمة ثم ينشر.
 - 🛠️ **tool** `publish_threads_post` — نشر منشور Threads (عبر Graph API v19+ إن كان متاحًا).
 - 📦 **resource** `instagram_resource` — نظرة عامة إنستغرام.
 - 💬 **prompt** `instagram_strategy_prompt` — استراتيجية إنستغرام.
@@ -279,6 +318,17 @@
 - 💬 **prompt** `lead_qualification_prompt` — تأهيل رصاصة.
 - 📦 **resource** `recent_leads_resource` — آخر الرصاصات (Leads) من النماذج.
 - 💬 **prompt** `lead_nurture_prompt` — سلسلة متابعة رصاصة (Lead Nurture).
+
+## `media_tools` — 4 tools
+
+- 🛠️ **tool** `host_image_url` — رفع صورة محلية إلى استضافة عامة وإرجاع رابط URL.
+- 🛠️ **tool** `host_video_url` — رفع فيديو محلي إلى استضافة عامة وإرجاع رابط URL.
+- 🛠️ **tool** `host_many_images` — رفع عدة صور دفعة واحدة (مسارات مفصولة بفواصل) وإرجاع روابطها.
+- 🛠️ **tool** `list_local_media` — قائمة ملفات الوسائط المحلية في media/ (أو مجلد فرعي).
+- 📦 **resource** `media_resource` — نظرة عامة على الوسائط.
+- 💬 **prompt** `media_prompt` — رفع وسائط.
+- 📦 **resource** `media_extra_resource` — قوالب الوسائط.
+- 💬 **prompt** `media_upload_prompt` — رفع وسائط.
 
 ## `messenger` — 7 tools
 
@@ -303,12 +353,14 @@
 - 💬 **prompt** `metrics_analysis_prompt` — تحليل مقاييس.
 - 📦 **resource** `metrics_snapshot_resource` — لقطة مقاييس الأداء (MCP + API).
 
-## `pages` — 25 tools
+## `pages` — 29 tools
 
 - 🛠️ **tool** `get_page_info` — معلومات صفحة فيسبوك (الاسم، عدد المتابعين، التصنيف).
 - 🛠️ **tool** `list_page_posts` — منشورات صفحة فيسبوك.
 - 🛠️ **tool** `publish_page_post` — نشر منشور نصي على صفحة فيسبوك.
 - 🛠️ **tool** `publish_page_photo` — نشر صورة على صفحة فيسبوك (مع نص اختياري).
+- 🛠️ **tool** `publish_page_album` — نشر ألبوم (2-10 صور في بوست واحد) على صفحة فيسبوك — يدعم Product Tagging (اختياري).
+- 🛠️ **tool** `publish_page_album_from_media` — نشر ألبوم مباشرة من مجلد محلي (media/*.jpeg) بدون رابط عام — يدعم Product Tagging.
 - 🛠️ **tool** `schedule_page_post` — جدولة منشور على صفحة فيسبوك.
 - 🛠️ **tool** `update_page_post_caption` — تعديل نص منشور صفحة فيسبوك.
 - 🛠️ **tool** `delete_page_post` — حذف منشور من صفحة فيسبوك.
@@ -319,7 +371,8 @@
 - 🛠️ **tool** `list_page_albums` — ألبومات الصور على صفحة فيسبوك.
 - 🛠️ **tool** `get_album_photos` — صور ألبوم معيّن في صفحة فيسبوك.
 - 🛠️ **tool** `update_page_cover` — تعيين صورة غلاف الصفحة من صورة موجودة في ألبوم.
-- 🛠️ **tool** `get_page_insights` — تحليلات صفحة فيسبوك (انطباعات، تفاعل، متابعون).
+- 🛠️ **tool** `get_page_insights` — تحليلات صفحة فيسبوك (مشاهدات، تفاعل، تفاعلات المنشورات). ملاحظة: مقاييس impressions/page_fans أُوقفت من Meta في 2025-11.
+- 🛠️ **tool** `analyze_our_page` — تقرير صحة صفحتنا (Facebook + Instagram) في تقرير واحد.
 - 🛠️ **tool** `list_page_events` — الأحداث المرتبطة بصفحة فيسبوك.
 - 🛠️ **tool** `get_page_event` — تفاصيل حدث واحد على الصفحة.
 - 🛠️ **tool** `create_page_event` — إنشاء حدث على صفحة فيسبوك.
@@ -328,6 +381,7 @@
 - 🛠️ **tool** `get_page_cta` — زر الدعوة لاتخاذ إجراء الحالي على الصفحة.
 - 🛠️ **tool** `update_page_cta` — تعيين زر CTA على الصفحة.
 - 🛠️ **tool** `publish_page_reel` — نشر ريلز على صفحة فيسبوك (Page Reel).
+- 🛠️ **tool** `publish_page_reel_from_media` — نشر ريلز فيسبوك من ملف فيديو محلي (media/*.mp4) — يرفع تلقائيا لاستضافة دائمة ثم ينشر.
 - 🛠️ **tool** `get_page_video_insights` — تحليلات فيديو صفحة فيسبوك (views, completes, avg watch).
 - 🛠️ **tool** `list_page_post_reactions` — قائمة تفاعلات (Reactions) على منشور صفحة.
 - 📦 **resource** `pages_resource` — نظرة عامة الصفحات.
@@ -384,3 +438,10 @@
 - 💬 **prompt** `whatsapp_template_prompt` — صياغة قالب واتساب معتمد.
 - 📦 **resource** `whatsapp_extra_resource` — قوالب واتساب.
 - 💬 **prompt** `whatsapp_broadcast_prompt` — بث واتساب.
+
+## `yemen_bundle` — 2 tools
+
+- 🛠️ **tool** `publish_yemen_product_bundle` — نشر منتج يمني (حزمة كاملة) — كتالوج + فيسبوك ألبوم 6 صور + إنستغرام كاروسيل بضغطة واحدة — يدعم Product Tagging + استضافة دائمة.
+- 🛠️ **tool** `get_yemen_bundle_status` — حالة حزمة اليمن — آخر منتجات + آخر منشورات FB/IG للتحقق السريع.
+- 📦 **resource** `yemen_resource` — 
+- 💬 **prompt** `yemen_publish_prompt` — 

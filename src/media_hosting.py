@@ -13,6 +13,7 @@ import hashlib
 import logging
 import time
 from pathlib import Path
+from typing import Sequence
 
 import requests
 
@@ -67,7 +68,7 @@ def _upload_cloudinary(file_path: Path, resource_type: str = "image") -> str | N
             )
             r.raise_for_status()
             data = r.json()
-            secure = data.get("secure_url") or data.get("url")
+            secure = str(data.get("secure_url") or data.get("url") or "")
             if secure:
                 logger.info("Cloudinary permanent hosting: %s -> %s", file_path.name, secure)
                 return secure.replace("http://", "https://")
@@ -86,7 +87,7 @@ def _upload_uguu(file_path: Path) -> str:
         data = r.json()
         if not data.get("success") or not data.get("files"):
             raise RuntimeError(f"uguu upload failed: {data}")
-        url = data["files"][0]["url"]
+        url = str(data["files"][0]["url"])
         logger.warning("Used TEMPORARY hosting uguu.se (72h) for %s — set CLOUDINARY_URL for permanent", file_path.name)
         return url.replace("http://", "https://")
 
@@ -124,6 +125,6 @@ def host_video(file_path: str | Path) -> str:
     return _upload_uguu(p)
 
 
-def host_many(paths: list[str | Path]) -> list[str]:
+def host_many(paths: Sequence[str | Path]) -> list[str]:
     """Host multiple images, return public URLs in same order."""
     return [host_image(p) for p in paths]
