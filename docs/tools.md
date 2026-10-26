@@ -311,6 +311,7 @@
 - 🛠️ **tool** `send_instagram_dm_with_image` — إرسال رسالة مباشرة (DM) مع صورة عبر إنستغرام.
 - 🛠️ **tool** `list_instagram_comments` — قائمة تعليقات منشور إنستغرام مع ترقيم الصفحات (paginate).
 - 🛠️ **tool** `get_instagram_reels_insights` — تحليلات ريلز إنستغرام (plays + reach + engagement) — مخصص لفيديوهات Reels.
+- 🛠️ **tool** `get_instagram_reels_account_insights` — تحليلات Reels على مستوى حساب إنستغرام (plays/reach/saved/shares) — يجمع insights أحدث Reels within days.
 - 🛠️ **tool** `publish_instagram_carousel_from_media` — نشر كاروسيل إنستغرام مباشرة من مجلد محلي (media/*.jpeg) بدون رابط عام — يدعم Product Tagging.
 - 🛠️ **tool** `publish_instagram_reel_from_media` — نشر ريلز إنستغرام من ملف فيديو محلي (media/*.mp4) — يرفع تلقائيا لاستضافة دائمة ثم ينشر.
 - 🛠️ **tool** `publish_threads_post` — نشر منشور Threads (عبر Graph API v19+ إن كان متاحًا).

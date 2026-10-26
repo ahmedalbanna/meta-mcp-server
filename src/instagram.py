@@ -234,7 +234,12 @@ def register(mcp):
     @concurrency_limit()
     @write_guard
     def publish_instagram_photo(
-        image_url: str, caption: str = "", instagram_business_id: str = "", product_ids: str = "", product_x: float = 0.5, product_y: float = 0.5
+        image_url: str,
+        caption: str = "",
+        instagram_business_id: str = "",
+        product_ids: str = "",
+        product_x: float = 0.5,
+        product_y: float = 0.5,
     ) -> str:
         """
         نشر صورة على إنستغرام — يدعم Product Tagging.
@@ -347,7 +352,12 @@ def register(mcp):
     @concurrency_limit()
     @write_guard
     def publish_instagram_carousel(
-        image_urls: str, caption: str = "", instagram_business_id: str = "", product_ids: str = "", product_x: float = 0.5, product_y: float = 0.5
+        image_urls: str,
+        caption: str = "",
+        instagram_business_id: str = "",
+        product_ids: str = "",
+        product_x: float = 0.5,
+        product_y: float = 0.5,
     ) -> str:
         """
         نشر ألبوم كاروسيل على إنستغرام — يدعم Product Tagging (IG Shopping).
@@ -820,6 +830,129 @@ def register(mcp):
         except Exception as e:
             return json_dumps(handle_error(e, "get_instagram_reels_insights"))
 
+    @mcp.tool()
+    @concurrency_limit()
+    def get_instagram_reels_account_insights(
+        instagram_business_id: str = "",
+        limit: int = 10,
+        days: int = 30,
+    ) -> str:
+        """تحليلات Reels على مستوى حساب إنستغرام (plays/reach/saved/shares) — يجمع insights
+        أحدث Reels within `days` days ويرتبها حسب plays.
+
+        instagram_business_id: حساب Instagram Business (افتراضي FB_IG_USER_ID)
+        limit: عدد Reels المُحلَّلة (1-25)
+        days: نافذة التحليل بالأيام (افتراضي 30)
+        """
+        try:
+            from datetime import datetime, timedelta, timezone
+
+            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            if not ig_id:
+                return json_dumps({"error": "حدد instagram_business_id أو اضبط FB_IG_USER_ID في .env"})
+            limit = max(1, min(int(limit), 25))
+            days = max(1, int(days))
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+            # 1) recent media (fetch a bit more to filter Reels)
+            media_resp = api_call(
+                "GET",
+                f"{ig_id}/media",
+                {
+                    "fields": "id,caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count",
+                    "limit": max(limit, 25),
+                },
+            )
+            media_list = media_resp.get("data", []) if isinstance(media_resp, dict) else []
+
+            reels = []
+            for m in media_list:
+                is_reel = m.get("media_product_type") == "REELS" or (
+                    m.get("media_type") == "VIDEO" and m.get("media_product_type") in (None, "REELS")
+                )
+                if not is_reel:
+                    continue
+                ts = None
+                try:
+                    dt = datetime.fromisoformat(str(m.get("timestamp", "")).replace("Z", "+00:00"))
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    ts = dt
+                except Exception:
+                    ts = None
+                if ts is not None and ts < cutoff:
+                    continue
+
+                plays = reach = saved = shares = total_interactions = None
+                try:
+                    ins = api_call(
+                        "GET", f"{m['id']}/insights", {"metric": "plays,reach,saved,shares,total_interactions"}
+                    )
+                    rows = ins.get("data", []) if isinstance(ins, dict) else []
+                    for row in rows:
+                        name = row.get("name")
+                        vals = row.get("values") or []
+                        val = vals[0].get("value") if vals and isinstance(vals[0], dict) else None
+                        if name == "plays":
+                            plays = val
+                        elif name == "reach":
+                            reach = val
+                        elif name == "saved":
+                            saved = val
+                        elif name == "shares":
+                            shares = val
+                        elif name == "total_interactions":
+                            total_interactions = val
+                except Exception:
+                    pass
+
+                reels.append(
+                    {
+                        "media_id": m.get("id"),
+                        "permalink": m.get("permalink"),
+                        "timestamp": m.get("timestamp"),
+                        "caption": (m.get("caption") or "")[:120],
+                        "likes": m.get("like_count"),
+                        "comments": m.get("comments_count"),
+                        "plays": plays,
+                        "reach": reach,
+                        "saved": saved,
+                        "shares": shares,
+                        "total_interactions": total_interactions,
+                    }
+                )
+
+            reels.sort(key=lambda r: r.get("plays") or 0, reverse=True)
+
+            def _sum(key):
+                vals = [r.get(key) for r in reels if isinstance(r.get(key), (int, float))]
+                return sum(vals) if vals else None
+
+            totals = {
+                "reels_analysed": len(reels),
+                "plays": _sum("plays"),
+                "reach": _sum("reach"),
+                "saved": _sum("saved"),
+                "shares": _sum("shares"),
+                "total_interactions": _sum("total_interactions"),
+                "likes": _sum("likes"),
+                "comments": _sum("comments"),
+            }
+            avg_plays = round(totals["plays"] / len(reels), 1) if totals["plays"] is not None and reels else None
+
+            return json_dumps(
+                {
+                    "account": ig_id,
+                    "window_days": days,
+                    "totals": totals,
+                    "avg_plays_per_reel": avg_plays,
+                    "top_reels": reels[:limit],
+                    "note": "تحليلات Reels (plays/reach) — قد تتطلب صلاحيات insights على مستوى media",
+                }
+            )
+        except Exception as e:
+            return json_dumps(handle_error(e, "get_instagram_reels_account_insights"))
+
     def _host_local_for_ig(file_path: str) -> str:
         """رفع صورة محلية لإنستغرام → رابط دائم (Cloudinary) أو مؤقت (uguu.se fallback)."""
         try:
@@ -849,7 +982,12 @@ def register(mcp):
     @concurrency_limit()
     @write_guard
     def publish_instagram_carousel_from_media(
-        caption: str = "", media_dir: str = "media", instagram_business_id: str = "", product_ids: str = "", product_x: float = 0.5, product_y: float = 0.5
+        caption: str = "",
+        media_dir: str = "media",
+        instagram_business_id: str = "",
+        product_ids: str = "",
+        product_x: float = 0.5,
+        product_y: float = 0.5,
     ) -> str:
         """نشر كاروسيل إنستغرام مباشرة من مجلد محلي (media/*.jpeg) بدون رابط عام — يدعم Product Tagging.
 
@@ -893,12 +1031,18 @@ def register(mcp):
                 if not cid:
                     return json_dumps(child)
                 child_ids.append(cid)
-            container = api_call("POST", f"{ig_id}/media", {"media_type": "CAROUSEL", "children": ",".join(child_ids), "caption": caption})
+            container = api_call(
+                "POST",
+                f"{ig_id}/media",
+                {"media_type": "CAROUSEL", "children": ",".join(child_ids), "caption": caption},
+            )
             creation_id = container.get("id")
             if not creation_id:
                 return json_dumps(container)
             result = api_call("POST", f"{ig_id}/media_publish", {"creation_id": creation_id})
-            return json_dumps({"success": True, "children": child_ids, "container": container, "publish": result, "hosted_urls": urls})
+            return json_dumps(
+                {"success": True, "children": child_ids, "container": container, "publish": result, "hosted_urls": urls}
+            )
         except Exception as e:
             return json_dumps(handle_error(e, "publish_instagram_carousel_from_media"))
 
@@ -906,7 +1050,11 @@ def register(mcp):
     @concurrency_limit()
     @write_guard
     def publish_instagram_reel_from_media(
-        caption: str = "", video_path: str = "media/reel.mp4", thumb_offset: int = 0, share_to_feed: bool = True, instagram_business_id: str = ""
+        caption: str = "",
+        video_path: str = "media/reel.mp4",
+        thumb_offset: int = 0,
+        share_to_feed: bool = True,
+        instagram_business_id: str = "",
     ) -> str:
         """نشر ريلز إنستغرام من ملف فيديو محلي (media/*.mp4) — يرفع تلقائيا لاستضافة دائمة ثم ينشر.
 
