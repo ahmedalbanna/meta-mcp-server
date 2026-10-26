@@ -272,8 +272,10 @@ def register(mcp):
             avg_eng = None
             total_eng = None
 
+        # Consistent with posts_in_window: recency is measured from posts that
+        # fall inside the analysis window (not from the whole fetched set).
         last_post_days = None
-        stamps = [t for t in (_parse_iso(p.get("created_time")) for p in posts) if t]
+        stamps = [t for t in (_parse_iso(p.get("created_time")) for p in window_posts) if t]
         if stamps:
             last_post_days = round((time.time() - max(stamps)) / SECONDS_PER_DAY, 1)
 

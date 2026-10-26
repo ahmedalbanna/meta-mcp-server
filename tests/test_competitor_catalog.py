@@ -167,6 +167,13 @@ def test_build_pipeline_handles_store_without_data(mock_meta_sdk_recorded, tmp_p
 
 
 def test_build_push_to_meta_creates_staging_products(mock_meta_sdk_recorded, tmp_path):
+    import src.competitor_catalog as _cc
+    import src.config as _c
+    import src.helpers as _h
+
+    _h.ENABLE_WRITES = True
+    _c.ENABLE_WRITES = True
+    _cc.ENABLE_WRITES = True
     store = [_post(1, 200, 20, "طقم كارتير استيل 12000 ريال")]
     recorder = Recorder()
     competitor_catalog.register(recorder)
@@ -206,6 +213,13 @@ def test_build_push_to_meta_creates_staging_products(mock_meta_sdk_recorded, tmp
 
 
 def test_publish_catalog_draft_updates_visibility(mock_meta_sdk_recorded):
+    import src.competitor_catalog as _cc
+    import src.config as _c
+    import src.helpers as _h
+
+    _h.ENABLE_WRITES = True
+    _c.ENABLE_WRITES = True
+    _cc.ENABLE_WRITES = True
     calls = []
 
     def api(method, path, params=None):

@@ -31,8 +31,8 @@ from src.competitor_content import (
     oembed_image,
     parse_ts,
 )
-from src.config import INSTAGRAM_BUSINESS_ID
-from src.helpers import api_call, handle_error, json_dumps, sanitize_filename, sanitize_path
+from src.config import ENABLE_WRITES, INSTAGRAM_BUSINESS_ID
+from src.helpers import api_call, handle_error, json_dumps, sanitize_filename, sanitize_path, write_guard
 from src.throttle import concurrency_limit
 
 logger = logging.getLogger(__name__)
@@ -295,25 +295,33 @@ def register(mcp):
 
             pushed = []
             if push_to_meta and draft:
-                for d in draft:
-                    params = {
-                        "name": d["name"],
-                        "price": str(round(d["price"], 2)) if d["price"] else "0",
-                        "currency": d["currency"],
-                        "description": d["description"],
-                        "availability": "in stock",
-                        "brand": d["brand"],
-                        "condition": d["condition"],
-                        "product_type": d["product_type"],
-                        "visibility": "staging",  # draft — not publicly visible
-                    }
-                    if d["image_url"]:
-                        params["image_url"] = d["image_url"]
-                    try:
-                        res = api_call("POST", f"{catalog_id}/products", params)
-                        pushed.append({"name": d["name"], "id": res.get("id"), "visibility": "staging"})
-                    except Exception as e:
-                        pushed.append({"name": d["name"], "error": str(e)[:150]})
+                if not ENABLE_WRITES:
+                    pushed.append(
+                        {
+                            "error": "عمليات الكتابة معطلة (FB_ENABLE_WRITES=false). فعّلها في .env ثم أعد تشغيل الخادم.",
+                            "guard": True,
+                        }
+                    )
+                else:
+                    for d in draft:
+                        params = {
+                            "name": d["name"],
+                            "price": str(round(d["price"], 2)) if d["price"] else "0",
+                            "currency": d["currency"],
+                            "description": d["description"],
+                            "availability": "in stock",
+                            "brand": d["brand"],
+                            "condition": d["condition"],
+                            "product_type": d["product_type"],
+                            "visibility": "staging",  # draft — not publicly visible
+                        }
+                        if d["image_url"]:
+                            params["image_url"] = d["image_url"]
+                        try:
+                            res = api_call("POST", f"{catalog_id}/products", params)
+                            pushed.append({"name": d["name"], "id": res.get("id"), "visibility": "staging"})
+                        except Exception as e:
+                            pushed.append({"name": d["name"], "error": str(e)[:150]})
 
             return json_dumps(
                 {
@@ -339,6 +347,7 @@ def register(mcp):
 
     @mcp.tool()
     @concurrency_limit()
+    @write_guard
     def publish_catalog_draft(catalog_id: str, product_ids: str = "") -> str:
         """نشر مسودات الكتالوج: تحويل visibility من staging إلى published.
 
