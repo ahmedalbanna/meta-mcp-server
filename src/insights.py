@@ -31,7 +31,7 @@ DATE_PRESETS = [
 ]
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register insights tools."""
 
     from facebook_business.adobjects.ad import Ad
@@ -62,9 +62,11 @@ def register(mcp):
     ) -> str:
         """تحليلات على مستوى الحساب الإعلاني."""
         try:
-            fields = _validate(date_preset, metrics)
-            account = AdAccount(resolve_ad_account_id(ad_account_id))
-            insights = account.get_insights(params={"date_preset": date_preset, "fields": fields})
+            _validate(date_preset, metrics)
+            from src.core.services import Services
+            from src.services.insights_service import InsightsService
+            svc = InsightsService(services) if services is not None else InsightsService(Services.default())
+            insights = svc.get_account_insights(ad_account_id, date_preset, metrics)
             return _respond(insights)
         except Exception as e:
             return json_dumps(handle_error(e, "get_account_insights"))
@@ -79,8 +81,11 @@ def register(mcp):
     ) -> str:
         """تحليلات حملة معينة."""
         try:
-            fields = _validate(date_preset, metrics)
-            insights = Campaign(campaign_id).get_insights(params={"date_preset": date_preset, "fields": fields})
+            _validate(date_preset, metrics)
+            from src.core.services import Services
+            from src.services.insights_service import InsightsService
+            svc = InsightsService(services) if services is not None else InsightsService(Services.default())
+            insights = svc.get_campaign_insights(campaign_id, date_preset, metrics)
             return _respond(insights)
         except Exception as e:
             return json_dumps(handle_error(e, "get_campaign_insights"))
@@ -95,8 +100,11 @@ def register(mcp):
     ) -> str:
         """تحليلات مجموعة إعلانية معينة."""
         try:
-            fields = _validate(date_preset, metrics)
-            insights = AdSet(adset_id).get_insights(params={"date_preset": date_preset, "fields": fields})
+            _validate(date_preset, metrics)
+            from src.core.services import Services
+            from src.services.insights_service import InsightsService
+            svc = InsightsService(services) if services is not None else InsightsService(Services.default())
+            insights = svc.get_adset_insights(adset_id, date_preset, metrics)
             return _respond(insights)
         except Exception as e:
             return json_dumps(handle_error(e, "get_adset_insights"))
@@ -111,8 +119,11 @@ def register(mcp):
     ) -> str:
         """تحليلات إعلان معين."""
         try:
-            fields = _validate(date_preset, metrics)
-            insights = Ad(ad_id).get_insights(params={"date_preset": date_preset, "fields": fields})
+            _validate(date_preset, metrics)
+            from src.core.services import Services
+            from src.services.insights_service import InsightsService
+            svc = InsightsService(services) if services is not None else InsightsService(Services.default())
+            insights = svc.get_ad_insights(ad_id, date_preset, metrics)
             return _respond(insights)
         except Exception as e:
             return json_dumps(handle_error(e, "get_ad_insights"))
@@ -199,11 +210,11 @@ def register(mcp):
                 change = ((c - p) / p) * 100
                 is_anomaly = False
                 if (
-                    m == "ctr"
-                    and change < -threshold
-                    or m == "cpc"
-                    and change > threshold
-                    or (m == "cpm" and change > threshold or abs(change) > threshold * 1.5)
+                    (m == "ctr"
+                    and change < -threshold)
+                    or (m == "cpc"
+                    and change > threshold)
+                    or ((m == "cpm" and change > threshold) or abs(change) > threshold * 1.5)
                 ):
                     is_anomaly = True
                 if is_anomaly:

@@ -18,7 +18,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 import time
-import uuid
 from typing import Any
 
 from src.config import REPORT_DIR, SCHEDULER_DB_URL, ensure_report_dir
@@ -130,7 +129,7 @@ def _save_tasks(tasks: list[dict[str, Any]]) -> None:
     SCHEDULE_FILE.write_text(json.dumps(tasks, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register scheduler tools."""
 
     from src.helpers import handle_error, json_dumps, write_guard
@@ -153,71 +152,10 @@ def register(mcp):
         cron: تعبير cron اختياري (مثال "0 9 * * *") — يتطلب APScheduler إن وُجد
         """
         try:
-            if not tool_name:
-                return json_dumps({"error": "tool_name مطلوب"})
-            params = {}
-            if params_json:
-                try:
-                    params = json.loads(params_json)
-                    if not isinstance(params, dict):
-                        return json_dumps({"error": "params_json يجب أن يكون كائن JSON"})
-                except Exception:
-                    return json_dumps({"error": "params_json ليس JSON صالح"})
-
-            # Validate cron if provided
-            if cron:
-                try:
-                    # Try APScheduler cron validation
-                    from apscheduler.triggers.cron import CronTrigger  # type: ignore
-
-                    CronTrigger.from_crontab(cron)
-                except ImportError:
-                    return json_dumps({"error": "cron يتطلب APScheduler. ثبّت: pip install apscheduler", "cron": cron})
-                except Exception as e:
-                    return json_dumps({"error": f"cron غير صالح: {e}"})
-            elif run_at == 0:
-                # Default to 60s from now if neither cron nor run_at
-                run_at = int(time.time()) + 60
-
-            task_id = uuid.uuid4().hex[:10]
-            task = {
-                "id": task_id,
-                "name": name,
-                "tool_name": tool_name,
-                "params": params,
-                "run_at": run_at,
-                "cron": cron,
-                "created_at": int(time.time()),
-                "status": "scheduled",
-            }
-            tasks = _load_tasks()
-            tasks.append(task)
-            _save_tasks(tasks)
-            # Phase 8.3: also persist to APScheduler if available
-            try:
-                sched = _get_apscheduler()
-                if sched is not None:
-                    from datetime import datetime as _dt
-
-                    if cron:
-                        sched.add_job(
-                            _dispatch_tool,
-                            "cron",
-                            id=task_id,
-                            name=name,
-                            args=[tool_name, params],
-                            replace_existing=True,
-                        )
-                    elif run_at:
-                        run_date = _dt.fromtimestamp(run_at)
-                        sched.add_job(
-                            _dispatch_tool, "date", run_date=run_date, id=task_id, name=name, args=[tool_name, params], replace_existing=True
-                        )
-            except Exception as e:
-                logger.debug("APScheduler persist failed (fallback to JSON): %s", e)
-            return json_dumps(
-                {"success": True, "task": task, "total": len(tasks), "apscheduler": _get_apscheduler() is not None}
-            )
+            from src.core.services import Services
+            from src.services.scheduler_service import SchedulerService
+            svc = SchedulerService(services) if services is not None else SchedulerService(Services.default())
+            return json_dumps(svc.schedule_task(name, tool_name, params_json, run_at, cron))
         except Exception as e:
             return json_dumps(handle_error(e, "schedule_task"))
 
@@ -226,10 +164,10 @@ def register(mcp):
     def list_scheduled_tasks(status: str = "") -> str:
         """قائمة المهام المجدولة (اختياري فلترة بالحالة: scheduled|done|cancelled)."""
         try:
-            tasks = _load_tasks()
-            if status:
-                tasks = [t for t in tasks if t.get("status") == status]
-            return json_dumps({"tasks": tasks, "count": len(tasks), "file": str(SCHEDULE_FILE)})
+            from src.core.services import Services
+            from src.services.scheduler_service import SchedulerService
+            svc = SchedulerService(services) if services is not None else SchedulerService(Services.default())
+            return json_dumps(svc.list_scheduled_tasks(status))
         except Exception as e:
             return json_dumps(handle_error(e, "list_scheduled_tasks"))
 
@@ -239,22 +177,10 @@ def register(mcp):
     def cancel_scheduled_task(task_id: str) -> str:
         """إلغاء مهمة مجدولة حسب المعرف."""
         try:
-            tasks = _load_tasks()
-            orig = len(tasks)
-            tasks = [t for t in tasks if t.get("id") != task_id]
-            if len(tasks) == orig:
-                return json_dumps({"error": f"المهمة {task_id} غير موجودة"})
-            _save_tasks(tasks)
-            try:
-                sched = _get_apscheduler()
-                if sched is not None:
-                    try:
-                        sched.remove_job(task_id)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-            return json_dumps({"success": True, "cancelled": task_id, "remaining": len(tasks)})
+            from src.core.services import Services
+            from src.services.scheduler_service import SchedulerService
+            svc = SchedulerService(services) if services is not None else SchedulerService(Services.default())
+            return json_dumps(svc.cancel_scheduled_task(task_id))
         except Exception as e:
             return json_dumps(handle_error(e, "cancel_scheduled_task"))
 
@@ -263,11 +189,13 @@ def register(mcp):
     def get_scheduled_task(task_id: str) -> str:
         """تفاصيل مهمة مجدولة واحدة."""
         try:
-            tasks = _load_tasks()
-            for t in tasks:
-                if t.get("id") == task_id:
-                    return json_dumps(t)
-            return json_dumps({"error": f"المهمة {task_id} غير موجودة"})
+            from src.core.services import Services
+            from src.services.scheduler_service import SchedulerService
+            svc = SchedulerService(services) if services is not None else SchedulerService(Services.default())
+            task = svc.get_scheduled_task(task_id)
+            if task is None:
+                return json_dumps({"error": f"المهمة {task_id} غير موجودة"})
+            return json_dumps(task)
         except Exception as e:
             return json_dumps(handle_error(e, "get_scheduled_task"))
 

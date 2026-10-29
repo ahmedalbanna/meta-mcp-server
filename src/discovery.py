@@ -13,7 +13,7 @@ from src.helpers import api_call, handle_error, json_dumps
 from src.throttle import concurrency_limit
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register discovery + config tools."""
 
     @mcp.tool()
@@ -21,11 +21,10 @@ def register(mcp):
     def list_pages(limit: int = 25) -> str:
         """قائمة صفحات فيسبوك التي تديرها الحسابات المرتبطة بالتوكن."""
         try:
-            data = api_call(
-                "GET",
-                "me/accounts",
-                {"fields": "name,id,category,link,access_token", "limit": limit},
-            )
+            from src.core.services import Services
+            from src.services.discovery_service import DiscoveryService
+            svc = DiscoveryService(services) if services is not None else DiscoveryService(Services.default())
+            data = svc.list_pages(limit)
             return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "list_pages"))
@@ -35,14 +34,10 @@ def register(mcp):
     def list_ad_accounts(limit: int = 25) -> str:
         """قائمة الحسابات الإعلانية المتاحة لهذا التوكن."""
         try:
-            data = api_call(
-                "GET",
-                "me/adaccounts",
-                {
-                    "fields": "name,account_id,currency,account_status,amount_spent",
-                    "limit": limit,
-                },
-            )
+            from src.core.services import Services
+            from src.services.discovery_service import DiscoveryService
+            svc = DiscoveryService(services) if services is not None else DiscoveryService(Services.default())
+            data = svc.list_ad_accounts(limit)
             return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "list_ad_accounts"))
@@ -55,36 +50,11 @@ def register(mcp):
         page_id اختياري؛ إن تُرك فارغًا يفحص كل الصفحات المتاحة.
         """
         try:
-            if page_id:
-                data = api_call(
-                    "GET",
-                    page_id,
-                    {"fields": "name,instagram_business_account{id,username}"},
-                )
-                return json_dumps(data)
-            pages = api_call("GET", "me/accounts", {"fields": "name,id"})
-            out = []
-            for p in pages.get("data", []):
-                row = {
-                    "page_id": p.get("id"),
-                    "page_name": p.get("name"),
-                    "instagram": None,
-                }
-                try:
-                    detail = api_call(
-                        "GET",
-                        p["id"],
-                        {"fields": "instagram_business_account{id,username}"},
-                    )
-                    ig = detail.get("instagram_business_account") or {}
-                    row["instagram"] = {
-                        "id": ig.get("id"),
-                        "username": ig.get("username"),
-                    }
-                except Exception:
-                    row["instagram"] = "غير مرتبط أو بدون صلاحية"
-                out.append(row)
-            return json_dumps(out)
+            from src.core.services import Services
+            from src.services.discovery_service import DiscoveryService
+            svc = DiscoveryService(services) if services is not None else DiscoveryService(Services.default())
+            data = svc.discover_ig_user(page_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "discover_ig_user"))
 
@@ -96,17 +66,10 @@ def register(mcp):
         input_token اختياري؛ إن تُرك فارغًا يُفحص توكن .env الحالي.
         """
         try:
-            token = input_token or META_ACCESS_TOKEN
-            if not APP_ID or not APP_SECRET:
-                return json_dumps({"error": "حدد FB_APP_ID و FB_APP_SECRET في .env"})
-            data = api_call(
-                "GET",
-                "debug_token",
-                {
-                    "input_token": token,
-                    "access_token": f"{APP_ID}|{APP_SECRET}",
-                },
-            )
+            from src.core.services import Services
+            from src.services.discovery_service import DiscoveryService
+            svc = DiscoveryService(services) if services is not None else DiscoveryService(Services.default())
+            data = svc.debug_access_token(input_token)
             return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "debug_access_token"))
@@ -118,15 +81,18 @@ def register(mcp):
         from src.config import (
             AD_ACCOUNT_ID,
             ADS_ALLOW_ACTIVATE,
-            APP_ID,
+            ANALYTICS_TZ,
             BUSINESS_ID,
             DRY_RUN,
             ENABLE_WRITES,
+            FB_CROSS_PLATFORM_TIKTOK,
+            FB_CURRENCY_DEFAULT,
+            FB_ENABLE_OCR,
+            FB_PHONE_COUNTRY_CODE,
             GRAPH_VERSION,
             INSTAGRAM_BUSINESS_ID,
             MAX_DAILY_BUDGET,
             MAX_LIFETIME_BUDGET,
-            META_ACCESS_TOKEN,
             PAGE_ACCESS_TOKEN,
             PAGE_ID,
         )
@@ -149,6 +115,13 @@ def register(mcp):
                 "instagram_business_id": INSTAGRAM_BUSINESS_ID or "غير محدد",
                 "business_id": BUSINESS_ID or "غير محدد",
                 "app_id": APP_ID or "غير محدد",
+                "analytics": {
+                    "tz": ANALYTICS_TZ,
+                    "currency_default": FB_CURRENCY_DEFAULT,
+                    "phone_country_code": FB_PHONE_COUNTRY_CODE,
+                    "ocr_enabled": FB_ENABLE_OCR,
+                    "cross_platform_tiktok": FB_CROSS_PLATFORM_TIKTOK,
+                },
                 "guardrails": {
                     "enable_writes": ENABLE_WRITES,
                     "dry_run": DRY_RUN,

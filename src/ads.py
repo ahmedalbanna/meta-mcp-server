@@ -2,76 +2,59 @@ import asyncio
 import logging
 import time
 
-from src.config import AD_ACCOUNT_ID, BASE_DIR, resolve_ad_account_id
+from src.config import AD_ACCOUNT_ID, resolve_ad_account_id
 
 logger = logging.getLogger(__name__)
 
 
-def register(mcp):
+def _build_object_story_spec(
+    page_id: str,
+    message: str,
+    image_hash: str = "",
+    image_url: str = "",
+    video_id: str = "",
+    link: str = "",
+    headline: str = "",
+    call_to_action: str = "",
+) -> dict:
+    """Build an object_story_spec dict for ad creative creation."""
+    media: dict[str, object] = {}
+    if image_hash:
+        media["image_hash"] = image_hash
+    elif image_url:
+        media["image_url"] = image_url
+    if link:
+        media["link"] = link
+    if headline:
+        media["name"] = headline
+    if call_to_action:
+        media["call_to_action"] = {"type": call_to_action}
+    if video_id:
+        media["video_id"] = video_id
+        story_key = "video_data"
+    else:
+        story_key = "link_data"
+    return {"page_id": page_id, story_key: {**media, "message": message}}
+
+def register(mcp, services=None):
     """Register ads and creatives tools."""
 
-    from facebook_business.adobjects.ad import Ad
     from facebook_business.adobjects.adaccount import AdAccount
     from facebook_business.adobjects.adcreative import AdCreative
-    from facebook_business.adobjects.adimage import AdImage
-    from facebook_business.adobjects.adset import AdSet
-    from facebook_business.adobjects.advideo import AdVideo
 
-    from src.helpers import handle_error, json_dumps, sanitize_path, to_dict, write_guard
+    from src.helpers import handle_error, json_dumps, to_dict, write_guard
     from src.throttle import concurrency_limit
-
-    def _build_object_story_spec(
-        page_id: str,
-        message: str,
-        image_hash: str = "",
-        image_url: str = "",
-        video_id: str = "",
-        link: str = "",
-        headline: str = "",
-        call_to_action: str = "",
-    ) -> dict:
-        """Build an object_story_spec dict for ad creative creation."""
-        media: dict[str, object] = {}
-        if image_hash:
-            media["image_hash"] = image_hash
-        elif image_url:
-            media["image_url"] = image_url
-        if link:
-            media["link"] = link
-        if headline:
-            media["name"] = headline
-        if call_to_action:
-            media["call_to_action"] = {"type": call_to_action}
-        if video_id:
-            media["video_id"] = video_id
-            story_key = "video_data"
-        else:
-            story_key = "link_data"
-        return {"page_id": page_id, story_key: {**media, "message": message}}
 
     @mcp.tool()
     @concurrency_limit()
     def list_ads(adset_id: str = "", limit: int = 25, ad_account_id: str = "") -> str:
         """قائمة الإعلانات (يمكن تحديد مجموعة إعلانية معينة)."""
         try:
-            from src.utils import paginate
-
-            fields = [
-                Ad.Field.name,
-                Ad.Field.status,
-                Ad.Field.creative,
-                Ad.Field.adset_id,
-                Ad.Field.created_time,
-                Ad.Field.id,
-            ]
-
-            def _getter(params):
-                if adset_id:
-                    return AdSet(adset_id).get_ads(params=params)
-                return AdAccount(resolve_ad_account_id(ad_account_id)).get_ads(params=params)
-
-            rows = paginate(_getter, fields=fields, limit=limit)
-            return json_dumps(rows)
+            from src.core.services import Services
+            from src.services.ads_service import AdsService
+            svc = AdsService(services) if services is not None else AdsService(Services.default())
+            data = svc.list_ads(adset_id, limit, ad_account_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "list_ads"))
 
@@ -80,18 +63,11 @@ def register(mcp):
     def get_ad(ad_id: str) -> str:
         """تفاصيل إعلان واحد."""
         try:
-            ad = Ad(ad_id)
-            info = ad.api_get(
-                fields=[
-                    Ad.Field.name,
-                    Ad.Field.status,
-                    Ad.Field.creative,
-                    Ad.Field.adset_id,
-                    Ad.Field.created_time,
-                    Ad.Field.updated_time,
-                ]
-            )
-            return json_dumps(to_dict(info))
+            from src.core.services import Services
+            from src.services.ads_service import AdsService
+            svc = AdsService(services) if services is not None else AdsService(Services.default())
+            data = svc.get_ad(ad_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_ad"))
 
@@ -101,13 +77,10 @@ def register(mcp):
     def update_ad_status(ad_id: str, status: str) -> str:
         """تغيير حالة إعلان (ACTIVE, PAUSED, DELETED, ARCHIVED)."""
         try:
-            valid = {"ACTIVE", "PAUSED", "DELETED", "ARCHIVED"}
-            status = status.upper()
-            if status not in valid:
-                return json_dumps({"error": f"status غير صالح. القيم: {', '.join(sorted(valid))}"})
-            ad = Ad(ad_id)
-            ad.api_update(params={Ad.Field.status: status})
-            return json_dumps({"success": True, "ad_id": ad_id, "new_status": status})
+            from src.core.services import Services
+            from src.services.ads_service import AdsService
+            svc = AdsService(services) if services is not None else AdsService(Services.default())
+            return json_dumps(svc.update_status(ad_id, status))
         except Exception as e:
             return json_dumps(handle_error(e, "update_ad_status"))
 
@@ -120,32 +93,10 @@ def register(mcp):
         قدّم image_url (رابط خارجي) أو file_path (مسار محلي).
         """
         try:
-            if not image_url and not file_path:
-                return json_dumps({"error": "قدّم image_url أو file_path"})
-            image = AdImage(parent_id=AD_ACCOUNT_ID)
-            params = {}
-            if image_url:
-                params[AdImage.Field.url] = image_url
-            if file_path:
-                try:
-                    # Scope file access to BASE_DIR/media to prevent traversal outside project
-                    resolved = sanitize_path(file_path, BASE_DIR)
-                except ValueError as e:
-                    return json_dumps({"error": f"مسار غير صالح: {e}"})
-                if not resolved.is_file():
-                    return json_dumps({"error": f"الملف غير موجود: {file_path}"})
-                params[AdImage.Field.filename] = str(resolved)
-            if name:
-                params[AdImage.Field.name] = name
-            result = image.api_create(parent_id=AD_ACCOUNT_ID, params=params)
-            data = to_dict(result) if result is not None else {}
-            return json_dumps(
-                {
-                    "hash": data.get("hash"),
-                    "image_id": data.get("id"),
-                    "details": data,
-                }
-            )
+            from src.core.services import Services
+            from src.services.ads_service import AdsService
+            svc = AdsService(services) if services is not None else AdsService(Services.default())
+            return json_dumps(svc.upload_image(name, image_url, file_path))
         except Exception as e:
             return json_dumps(handle_error(e, "upload_image"))
 
@@ -158,24 +109,10 @@ def register(mcp):
         قدّم file_path (مسار محلي) أو video_url (رابط مباشر).
         """
         try:
-            if not file_path and not video_url:
-                return json_dumps({"error": "قدّم file_path أو video_url"})
-            video = AdVideo(parent_id=AD_ACCOUNT_ID)
-            params = {}
-            if file_path:
-                try:
-                    resolved = sanitize_path(file_path, BASE_DIR)
-                except ValueError as e:
-                    return json_dumps({"error": f"مسار غير صالح: {e}"})
-                if not resolved.is_file():
-                    return json_dumps({"error": f"الملف غير موجود: {file_path}"})
-                params[AdVideo.Field.filename] = str(resolved)
-            if video_url:
-                params[AdVideo.Field.file_url] = video_url
-            if title:
-                params[AdVideo.Field.title] = title
-            video.api_create(parent_id=AD_ACCOUNT_ID, params=params)
-            return json_dumps({"video_id": video.get_id(), "title": title})
+            from src.core.services import Services
+            from src.services.ads_service import AdsService
+            svc = AdsService(services) if services is not None else AdsService(Services.default())
+            return json_dumps(svc.upload_video(title, file_path, video_url))
         except Exception as e:
             return json_dumps(handle_error(e, "upload_video"))
 
@@ -199,17 +136,10 @@ def register(mcp):
         call_to_action مثل: LEARN_MORE, SHOP_NOW, BUY_NOW, SIGN_UP
         """
         try:
-            acct = resolve_ad_account_id("")
-            account = AdAccount(acct)
-            object_story_spec = _build_object_story_spec(
-                page_id, message, image_hash, image_url, video_id, link, headline, call_to_action
-            )
-            params = {
-                AdCreative.Field.name: name,
-                AdCreative.Field.object_story_spec: json_dumps(object_story_spec),
-            }
-            creative = account.create_ad_creative(params=params)
-            return json_dumps(to_dict(creative))
+            from src.core.services import Services
+            from src.services.ads_service import AdsService
+            svc = AdsService(services) if services is not None else AdsService(Services.default())
+            return json_dumps(svc.create_ad_creative(name, page_id, message, image_hash, image_url, video_id, link, headline, call_to_action))
         except Exception as e:
             return json_dumps(handle_error(e, "create_ad_creative"))
 
@@ -235,24 +165,10 @@ def register(mcp):
         الصفحة page_id يجب أن تكون مرتبطة بالحساب الإعلاني.
         """
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            object_story_spec = _build_object_story_spec(
-                page_id, message, image_hash, image_url, video_id, link, headline, call_to_action
-            )
-            creative = account.create_ad_creative(
-                params={
-                    AdCreative.Field.name: creative_name,
-                    AdCreative.Field.object_story_spec: json_dumps(object_story_spec),
-                }
-            )
-            params = {
-                Ad.Field.name: name,
-                "adset_id": adset_id,
-                "creative_id": creative.get_id(),
-                Ad.Field.status: status,
-            }
-            ad = account.create_ad(params=params)
-            return json_dumps(to_dict(ad))
+            from src.core.services import Services
+            from src.services.ads_service import AdsService
+            svc = AdsService(services) if services is not None else AdsService(Services.default())
+            return json_dumps(svc.create_ad(adset_id, name, creative_name, page_id, message, image_hash, image_url, video_id, link, headline, call_to_action, status))
         except Exception as e:
             return json_dumps(handle_error(e, "create_ad"))
 

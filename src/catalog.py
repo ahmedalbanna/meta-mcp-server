@@ -7,54 +7,21 @@ from src.config import BUSINESS_ID, COMMERCE_ACCOUNT_ID
 logger = logging.getLogger(__name__)
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register catalog & commerce tools."""
 
     import json as _json
 
-    from facebook_business.adobjects.business import Business
     from facebook_business.adobjects.commercemerchantsettings import CommerceMerchantSettings
     from facebook_business.adobjects.commerceorder import CommerceOrder
     from facebook_business.adobjects.productcatalog import ProductCatalog
     from facebook_business.adobjects.productfeed import ProductFeed
     from facebook_business.adobjects.productitem import ProductItem
-    from facebook_business.adobjects.productset import ProductSet
 
     from src.helpers import api_call, handle_error, json_dumps, to_dict, write_guard
     from src.throttle import concurrency_limit
     from src.utils import paginate
 
-    CATALOG_FIELDS = [
-        ProductCatalog.Field.id,
-        ProductCatalog.Field.name,
-        ProductCatalog.Field.product_count,
-        ProductCatalog.Field.feed_count,
-        ProductCatalog.Field.business,
-        ProductCatalog.Field.is_local_catalog,
-        ProductCatalog.Field.default_image_url,
-        ProductCatalog.Field.fallback_image_url,
-    ]
-    SET_FIELDS = [
-        ProductSet.Field.id,
-        ProductSet.Field.name,
-        ProductSet.Field.filter,
-        ProductSet.Field.product_count,
-    ]
-    PRODUCT_FIELDS = [
-        ProductItem.Field.id,
-        ProductItem.Field.retailer_id,
-        ProductItem.Field.name,
-        ProductItem.Field.description,
-        ProductItem.Field.brand,
-        ProductItem.Field.price,
-        ProductItem.Field.currency,
-        ProductItem.Field.availability,
-        ProductItem.Field.image_url,
-        "images",
-        ProductItem.Field.url,
-        ProductItem.Field.status,
-        ProductItem.Field.product_catalog,
-    ]
 
     def _require_business_id(business_id: str) -> str:
         return business_id or BUSINESS_ID
@@ -71,15 +38,11 @@ def register(mcp):
     def list_catalogs(business_id: str = "", limit: int = 25) -> str:
         """قائمة كتالوجات المنتجات التابعة لنشاط تجاري."""
         try:
-            bid = _require_business_id(business_id)
-            if not bid:
-                return json_dumps({"error": "حدد FB_BUSINESS_ID في .env أو مرّر business_id"})
-            rows = paginate(
-                lambda params: Business(bid).get_owned_product_catalogs(params=params),
-                fields=CATALOG_FIELDS,
-                limit=limit,
-            )
-            return json_dumps(rows)
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            data = svc.list_catalogs(business_id, limit)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "list_catalogs"))
 
@@ -88,8 +51,11 @@ def register(mcp):
     def get_catalog(catalog_id: str) -> str:
         """تفاصيل كتالوج واحد."""
         try:
-            info = ProductCatalog(catalog_id).api_get(fields=CATALOG_FIELDS)
-            return json_dumps(to_dict(info))
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            data = svc.get_catalog(catalog_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_catalog"))
 
@@ -98,20 +64,10 @@ def register(mcp):
     def get_catalog_settings(catalog_id: str) -> str:
         """إعدادات الكتالوج (الصور الافتراضية، المتجر، الفئات...)."""
         try:
-            info = ProductCatalog(catalog_id).api_get(
-                fields=[
-                    ProductCatalog.Field.store_catalog_settings,
-                    ProductCatalog.Field.default_image_url,
-                    ProductCatalog.Field.fallback_image_url,
-                    ProductCatalog.Field.da_display_settings,
-                    ProductCatalog.Field.catalog_store,
-                    ProductCatalog.Field.feed_count,
-                    ProductCatalog.Field.product_count,
-                    ProductCatalog.Field.is_catalog_segment,
-                    ProductCatalog.Field.is_local_catalog,
-                ]
-            )
-            return json_dumps(to_dict(info))
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            return json_dumps(svc.get_catalog_settings(catalog_id))
         except Exception as e:
             return json_dumps(handle_error(e, "get_catalog_settings"))
 
@@ -121,11 +77,10 @@ def register(mcp):
     def create_catalog(name: str, business_id: str = "") -> str:
         """إنشاء كتالوج منتجات جديد."""
         try:
-            bid = _require_business_id(business_id)
-            if not bid:
-                return json_dumps({"error": "حدد FB_BUSINESS_ID في .env أو مرّر business_id"})
-            catalog = Business(bid).create_owned_product_catalog(params={ProductCatalog.Field.name: name})
-            return json_dumps(to_dict(catalog))
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            return json_dumps(svc.create_catalog(name, business_id))
         except Exception as e:
             return json_dumps(handle_error(e, "create_catalog"))
 
@@ -135,8 +90,10 @@ def register(mcp):
     def delete_catalog(catalog_id: str) -> str:
         """حذف كتالوج نهائيًا."""
         try:
-            result = ProductCatalog(catalog_id).api_delete()
-            return json_dumps({"success": True, "catalog_id": catalog_id, "result": to_dict(result)})
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            return json_dumps(svc.delete_catalog(catalog_id))
         except Exception as e:
             return json_dumps(handle_error(e, "delete_catalog"))
 
@@ -149,12 +106,10 @@ def register(mcp):
     def list_product_sets(catalog_id: str, limit: int = 25) -> str:
         """قائمة مجموعات المنتجات داخل كتالوج."""
         try:
-            rows = paginate(
-                lambda params: ProductCatalog(catalog_id).get_product_sets(params=params),
-                fields=SET_FIELDS,
-                limit=limit,
-            )
-            return json_dumps(rows)
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            return json_dumps(svc.list_product_sets(catalog_id, limit))
         except Exception as e:
             return json_dumps(handle_error(e, "list_product_sets"))
 
@@ -163,8 +118,10 @@ def register(mcp):
     def get_product_set(product_set_id: str) -> str:
         """تفاصيل مجموعة منتجات (تتضمن فلتر الاختيار)."""
         try:
-            info = ProductSet(product_set_id).api_get(fields=SET_FIELDS)
-            return json_dumps(to_dict(info))
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            return json_dumps(svc.get_product_set(product_set_id))
         except Exception as e:
             return json_dumps(handle_error(e, "get_product_set"))
 
@@ -178,11 +135,10 @@ def register(mcp):
         [{"product_type": {"i_contains": "ملابس"}}] أو {"price": {"less_than": 100}}
         """
         try:
-            params = {ProductSet.Field.name: name}
-            if filters_json:
-                params[ProductSet.Field.filter] = filters_json
-            product_set = ProductCatalog(catalog_id).create_product_set(params=params)
-            return json_dumps(to_dict(product_set))
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            return json_dumps(svc.create_product_set(catalog_id, name, filters_json))
         except Exception as e:
             return json_dumps(handle_error(e, "create_product_set"))
 
@@ -192,8 +148,10 @@ def register(mcp):
     def delete_product_set(product_set_id: str) -> str:
         """حذف مجموعة منتجات."""
         try:
-            result = ProductSet(product_set_id).api_delete()
-            return json_dumps({"success": True, "product_set_id": product_set_id, "result": to_dict(result)})
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            return json_dumps(svc.delete_product_set(product_set_id))
         except Exception as e:
             return json_dumps(handle_error(e, "delete_product_set"))
 
@@ -206,14 +164,13 @@ def register(mcp):
     def list_products(catalog_id: str, limit: int = 25, filter: str = "") -> str:
         """قائمة المنتجات في كتالوج (يمكن إضافة فلتر JSON)."""
         try:
-
-            def getter(params):
-                if filter:
-                    params["filter"] = filter
-                return ProductCatalog(catalog_id).get_products(params=params)
-
-            rows = paginate(getter, fields=PRODUCT_FIELDS, limit=limit)
-            return json_dumps(rows)
+            if not catalog_id:
+                return json_dumps({"error": "catalog_id مطلوب"})
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            data = svc.list_products(catalog_id, limit, filter)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "list_products"))
 
@@ -222,8 +179,11 @@ def register(mcp):
     def get_product(product_id: str) -> str:
         """تفاصيل منتج واحد."""
         try:
-            info = ProductItem(product_id).api_get(fields=PRODUCT_FIELDS)
-            return json_dumps(to_dict(info))
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            data = svc.get_product(product_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_product"))
 
@@ -253,29 +213,12 @@ def register(mcp):
         price / sale_price بالعملة العادية (مثال 19.99). availability: in stock | out of stock.
         """
         try:
-            params = {
-                ProductItem.Field.name: name,
-                ProductItem.Field.price: str(round(price, 2)) if price else "0",
-                ProductItem.Field.currency: currency,
-            }
-            optional = {
-                ProductItem.Field.description: description,
-                ProductItem.Field.image_url: image_url,
-                ProductItem.Field.url: url,
-                ProductItem.Field.availability: availability,
-                ProductItem.Field.brand: brand,
-                ProductItem.Field.retailer_id: retailer_id,
-                ProductItem.Field.gtin: gtin,
-                ProductItem.Field.condition: condition,
-                ProductItem.Field.product_type: product_type,
-                ProductItem.Field.category: category,
-                ProductItem.Field.custom_label_0: custom_label_0,
-            }
-            if sale_price:
-                optional[ProductItem.Field.sale_price] = str(sale_price)
-            params.update({k: v for k, v in optional.items() if v})
-            product = ProductCatalog(catalog_id).create_product(params=params)
-            return json_dumps(to_dict(product))
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            return json_dumps(svc.create_product(catalog_id, name, price, currency, description, image_url,
+                                                url, availability, brand, retailer_id, gtin, condition,
+                                                sale_price, product_type, category, custom_label_0))
         except Exception as e:
             return json_dumps(handle_error(e, "create_product"))
 
@@ -302,33 +245,12 @@ def register(mcp):
     ) -> str:
         """تعديل بيانات منتج. الحقول المُرسلة فقط تُحدّث. لمسح حقل أرسله كـ فارغ ("")."""
         try:
-            params = {}
-            _str_fields = [
-                (name, ProductItem.Field.name),
-                (currency, ProductItem.Field.currency),
-                (description, ProductItem.Field.description),
-                (image_url, ProductItem.Field.image_url),
-                (url, ProductItem.Field.url),
-                (availability, ProductItem.Field.availability),
-                (brand, ProductItem.Field.brand),
-                (retailer_id, ProductItem.Field.retailer_id),
-                (gtin, ProductItem.Field.gtin),
-                (condition, ProductItem.Field.condition),
-                (product_type, ProductItem.Field.product_type),
-                (category, ProductItem.Field.category),
-                (custom_label_0, ProductItem.Field.custom_label_0),
-            ]
-            for val, field in _str_fields:
-                if val:
-                    params[field] = val
-            if price:
-                params[ProductItem.Field.price] = str(round(price, 2))
-            if sale_price:
-                params[ProductItem.Field.sale_price] = str(round(sale_price, 2))
-            if not params:
-                return json_dumps({"error": "حدد حقلًا واحدًا على الأقل للتعديل"})
-            result = ProductItem(product_id).api_update(params=params)
-            return json_dumps({"success": True, "product_id": product_id, "result": to_dict(result)})
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            return json_dumps(svc.update_product(product_id, name, price, currency, description, image_url,
+                                                 url, availability, brand, retailer_id, gtin, condition,
+                                                 sale_price, product_type, category, custom_label_0))
         except Exception as e:
             return json_dumps(handle_error(e, "update_product"))
 
@@ -338,8 +260,10 @@ def register(mcp):
     def delete_product(product_id: str) -> str:
         """حذف منتج من الكتالوج."""
         try:
-            result = ProductItem(product_id).api_delete()
-            return json_dumps({"success": True, "product_id": product_id, "result": to_dict(result)})
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            return json_dumps(svc.delete_product(product_id))
         except Exception as e:
             return json_dumps(handle_error(e, "delete_product"))
 
@@ -455,19 +379,11 @@ def register(mcp):
     def get_product_feed(feed_id: str) -> str:
         """تفاصيل خلاصة منتجات واحدة (الجدولة، الحالة، الرابط)."""
         try:
-            info = ProductFeed(feed_id).api_get(
-                fields=[
-                    "id",
-                    "name",
-                    "schedule",
-                    "latest_upload",
-                    "filter",
-                    "country",
-                    "default_currency",
-                    "file_type",
-                ]
-            )
-            return json_dumps(to_dict(info))
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            data = svc.get_product_feed(feed_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_product_feed"))
 
@@ -476,37 +392,11 @@ def register(mcp):
     def get_product_feed_diagnostics(feed_id: str, limit: int = 5) -> str:
         """تشخيص خلاصة منتجات: ملخص أخطاء وتحذيرات آخر رفع + تفاصيل الخلاصة."""
         try:
-            feed_info = ProductFeed(feed_id).api_get(fields=["id", "name", "schedule", "latest_upload", "file_type"])
-            feed_dict = to_dict(feed_info)
-            uploads = paginate(
-                lambda params: ProductFeed(feed_id).get_uploads(params=params),
-                fields=[
-                    "id",
-                    "status",
-                    "start_time",
-                    "end_time",
-                    "error_count",
-                    "warning_count",
-                    "num_deleted_items",
-                    "num_updated_items",
-                    "num_hidden_items",
-                    "error_report",
-                ],
-                limit=limit,
-            )
-            total_errors = sum(int(u.get("error_count") or 0) for u in uploads)
-            total_warnings = sum(int(u.get("warning_count") or 0) for u in uploads)
-            return json_dumps(
-                {
-                    "feed": feed_dict,
-                    "uploads": uploads,
-                    "summary": {
-                        "total_errors": total_errors,
-                        "total_warnings": total_warnings,
-                        "last_status": uploads[0].get("status") if uploads else "unknown",
-                    },
-                }
-            )
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            data = svc.get_product_feed_diagnostics(feed_id, limit)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_product_feed_diagnostics"))
 
@@ -542,24 +432,11 @@ def register(mcp):
     def get_commerce_merchant_settings(business_id: str = "") -> str:
         """إعدادات التجارة (المتجر) المرتبطة بنشاط تجاري."""
         try:
-            bid = _require_business_id(business_id)
-            if not bid:
-                return json_dumps({"error": "حدد FB_BUSINESS_ID في .env أو مرّر business_id"})
-            rows = paginate(
-                lambda params: Business(bid).get_commerce_merchant_settings(params=params),
-                fields=[
-                    "id",
-                    "display_name",
-                    "contact_email",
-                    "merchant_page",
-                    "payment_provider",
-                    "merchant_status",
-                    "facebook_channel",
-                    "instagram_channel",
-                ],
-                limit=25,
-            )
-            return json_dumps(rows)
+            from src.core.services import Services
+            from src.services.catalog_service import CatalogService
+            svc = CatalogService(services) if services is not None else CatalogService(Services.default())
+            data = svc.get_commerce_merchant_settings(business_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_commerce_merchant_settings"))
 

@@ -31,8 +31,9 @@ from src.competitor_content import (
     oembed_image,
     parse_ts,
 )
-from src.config import ENABLE_WRITES, INSTAGRAM_BUSINESS_ID
+from src.config import ENABLE_WRITES, FB_ENABLE_OCR, INSTAGRAM_BUSINESS_ID
 from src.helpers import api_call, handle_error, json_dumps, sanitize_filename, sanitize_path, write_guard
+from src.ocr import ocr_price_for_image
 from src.throttle import concurrency_limit
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ logger = logging.getLogger(__name__)
 _DIGIT_MAP = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
 
 # "12 الف" / "12 ألف" -> thousands; "6500 ريال" -> absolute.
-_THOUSANDS_RE = re.compile(r"(\d[\d.,]*)\s*(?:الف|ألف|الاف|الف ريال)")
+_THOUSANDS_RE = re.compile(r"(\d[\d.,]*)\s*(?:ألف|الف|ألاف)")
 _RIYAL_RE = re.compile(r"(\d[\d.,]*)\s*(?:ريال|ر\.ي|ريال يمني|ريالاً)")
 
 _REFERENCE_NOTE = "صور المنافسين = مرجع فقط؛ استبدليها بصور منتجاتكِ قبل النشر"
@@ -142,7 +143,7 @@ def _write_catalog_draft(out_root: Path, draft: list) -> tuple[Path, Path]:
     return json_path, md_path
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register the competitor -> draft-catalog pipeline tools."""
 
     def _collect(handle: str, days: int, top_n: int, out_root: Path) -> tuple[list, dict]:
@@ -204,6 +205,20 @@ def register(mcp):
                         downloaded += 1
             except Exception as e:
                 entry["image_error"] = str(e)[:120]
+
+            # OCR price fallback/supplement (Phase 2.1)
+            entry["price_source"] = "caption" if entry["price"] is not None else None
+            if entry["price"] is None and FB_ENABLE_OCR and (entry.get("image_url") or entry["image_files"]):
+                try:
+                    src_img = str(folder / entry["image_files"][0]) if entry["image_files"] else entry.get("image_url")
+                    ocr_res = ocr_price_for_image(src_img) if src_img else {"prices": []}
+                    prices = ocr_res.get("prices") or []
+                    if prices:
+                        entry["price"] = prices[0]
+                        entry["price_source"] = "ocr"
+                        entry["ocr_prices"] = prices
+                except Exception as e:
+                    entry["ocr_error"] = str(e)[:120]
             entries.append(entry)
 
         _write_store_report(folder, handle, days, entries, downloaded)
@@ -275,6 +290,7 @@ def register(mcp):
                         {
                             "name": e["name"],
                             "price": e["price"],
+                            "price_source": e.get("price_source"),
                             "currency": "YER",
                             "description": (e["caption"] or "")[:600],
                             "image_url": e["image_url"],
@@ -349,75 +365,25 @@ def register(mcp):
     @concurrency_limit()
     @write_guard
     def publish_catalog_draft(catalog_id: str, product_ids: str = "") -> str:
-        """نشر مسودات الكتالوج: تحويل visibility من staging إلى published.
-
-        catalog_id: معرف الكتالوج
-        product_ids: معرّفات المنتجات مفصولة بفواصل — إن تُرك فارغاً ينشر كل المسودات
-        ⚠️ انشري فقط بعد استبدال صور المنافسين بصور منتجاتكِ.
-        """
+        """نشر مسودات الكتالوج: تحويل visibility من staging إلى published."""
         try:
-            if not catalog_id:
-                return json_dumps({"error": "catalog_id مطلوب"})
-            ids = [p.strip() for p in product_ids.split(",") if p.strip()]
-            if not ids:
-                # find every staging product in the catalog
-                data = api_call(
-                    "GET",
-                    f"{catalog_id}/products",
-                    {"fields": "id,name,visibility", "filter": json.dumps({"visibility": {"eq": "staging"}})},
-                )
-                ids = [str(p.get("id")) for p in (data.get("data") or []) if p.get("id")]
-                if not ids:
-                    return json_dumps({"message": "لا توجد منتجات مسودة (staging) في هذا الكتالوج"})
-
-            results = []
-            for pid in ids[:100]:
-                try:
-                    res = api_call("POST", pid, {"visibility": "published"})
-                    results.append({"id": pid, "published": bool(res.get("success", True)), "result": res})
-                except Exception as e:
-                    results.append({"id": pid, "error": str(e)[:150]})
-            ok = sum(1 for r in results if r.get("published"))
-            return json_dumps(
-                {
-                    "catalog_id": catalog_id,
-                    "attempted": len(results),
-                    "published": ok,
-                    "results": results,
-                    "warning": "تأكدي أن الصور منتجاتكِ قبل النشر",
-                }
-            )
+            from src.core.services import Services
+            from src.services.competitor_catalog_service import CompetitorCatalogService
+            svc = CompetitorCatalogService(services) if services is not None else CompetitorCatalogService(Services.default())
+            return json_dumps(svc.publish_drafts(catalog_id, product_ids))
         except Exception as e:
             return json_dumps(handle_error(e, "publish_catalog_draft"))
-
     @mcp.tool()
     @concurrency_limit()
     def list_catalog_drafts(catalog_id: str, limit: int = 50) -> str:
         """عرض منتجات المسودة (visibility=staging) في كتالوج — قبل النشر."""
         try:
-            if not catalog_id:
-                return json_dumps({"error": "catalog_id مطلوب"})
-            data = api_call(
-                "GET",
-                f"{catalog_id}/products",
-                {
-                    "fields": "id,name,price,currency,image_url,visibility,description",
-                    "filter": json.dumps({"visibility": {"eq": "staging"}}),
-                    "limit": max(1, min(limit, 100)),
-                },
-            )
-            rows = data.get("data") or []
-            return json_dumps(
-                {
-                    "catalog_id": catalog_id,
-                    "draft_count": len(rows),
-                    "products": rows,
-                    "hint": "publish_catalog_draft(catalog_id) لنشرها بعد مراجعتها",
-                }
-            )
+            from src.core.services import Services
+            from src.services.competitor_catalog_service import CompetitorCatalogService
+            svc = CompetitorCatalogService(services) if services is not None else CompetitorCatalogService(Services.default())
+            return json_dumps(svc.list_drafts(catalog_id, limit))
         except Exception as e:
             return json_dumps(handle_error(e, "list_catalog_drafts"))
-
     @mcp.resource("competitor-catalog://pipeline")
     async def competitor_catalog_resource() -> str:
         """خط أنابيب كتالوج المنافسين."""

@@ -30,7 +30,7 @@ USER_FIELDS = [
 ]
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register Business Manager user tools."""
 
     from facebook_business.adobjects.business import Business
@@ -50,14 +50,10 @@ def register(mcp):
     def list_business_users(business_id: str = "", limit: int = 25) -> str:
         """قائمة مستخدمي Business Manager وأدوارهم."""
         try:
-            bid = _require_business_id(business_id)
-            if not bid:
-                return json_dumps({"error": "حدد FB_BUSINESS_ID في .env أو مرّر business_id"})
-            rows = paginate(
-                lambda params: Business(bid).get_business_users(params=params),
-                fields=USER_FIELDS,
-                limit=limit,
-            )
+            from src.core.services import Services
+            from src.services.business_service import BusinessService
+            svc = BusinessService(services) if services is not None else BusinessService(Services.default())
+            rows = svc.list_users(business_id, limit)
             return json_dumps(rows)
         except Exception as e:
             return json_dumps(handle_error(e, "list_business_users"))
@@ -67,8 +63,11 @@ def register(mcp):
     def get_business_user(user_id: str) -> str:
         """تفاصيل مستخدم Business Manager واحد."""
         try:
-            info = BusinessUser(user_id).api_get(fields=USER_FIELDS)
-            return json_dumps(to_dict(info))
+            from src.core.services import Services
+            from src.services.business_service import BusinessService
+            svc = BusinessService(services) if services is not None else BusinessService(Services.default())
+            info = svc.get_user(user_id)
+            return json_dumps(info)
         except Exception as e:
             return json_dumps(handle_error(e, "get_business_user"))
 
@@ -81,15 +80,11 @@ def register(mcp):
         role: ADMIN | EMPLOYEE | AGENCY | SYSTEM_USER.
         """
         try:
-            bid = _require_business_id(business_id)
-            if not bid:
-                return json_dumps({"error": "حدد FB_BUSINESS_ID في .env أو مرّر business_id"})
-            r = _validate_role(role)
-            params = {"email": email, "role": r}
-            if name:
-                params["name"] = name
-            user = Business(bid).create_business_user(params=params)
-            return json_dumps(to_dict(user))
+            from src.core.services import Services
+            from src.services.business_service import BusinessService
+            svc = BusinessService(services) if services is not None else BusinessService(Services.default())
+            user = svc.invite_user(email, role, name, business_id)
+            return json_dumps(user)
         except Exception as e:
             return json_dumps(handle_error(e, "invite_business_user"))
 
@@ -99,9 +94,11 @@ def register(mcp):
     def update_business_user_role(user_id: str, role: str) -> str:
         """تغيير دور مستخدم في Business Manager."""
         try:
-            r = _validate_role(role)
-            result = BusinessUser(user_id).api_update(params={"role": r})
-            return json_dumps({"user_id": user_id, "role": r, "result": to_dict(result)})
+            from src.core.services import Services
+            from src.services.business_service import BusinessService
+            svc = BusinessService(services) if services is not None else BusinessService(Services.default())
+            result = svc.update_role(user_id, role)
+            return json_dumps(result)
         except Exception as e:
             return json_dumps(handle_error(e, "update_business_user_role"))
 
@@ -111,8 +108,11 @@ def register(mcp):
     def delete_business_user(user_id: str) -> str:
         """إزالة مستخدم من Business Manager نهائيًا."""
         try:
-            result = BusinessUser(user_id).api_delete()
-            return json_dumps({"user_id": user_id, "deleted": True, "result": to_dict(result)})
+            from src.core.services import Services
+            from src.services.business_service import BusinessService
+            svc = BusinessService(services) if services is not None else BusinessService(Services.default())
+            result = svc.delete_user(user_id)
+            return json_dumps(result)
         except Exception as e:
             return json_dumps(handle_error(e, "delete_business_user"))
 

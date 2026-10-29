@@ -61,7 +61,7 @@ def cmd_doctor(_args) -> int:
         for _, fn in list(r.tools.items())[:3]:
             out = fn(
                 **{
-                    k: "test" if p.annotation == str else 1
+                    k: "test" if p.annotation is str else 1
                     for k, p in __import__("inspect").signature(fn).parameters.items()
                     if p.default == __import__("inspect").Parameter.empty
                 }

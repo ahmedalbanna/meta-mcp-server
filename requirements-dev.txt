@@ -6,3 +6,4 @@ mypy==1.10.0
 types-requests
 pip-audit==2.7.3
 pre-commit==4.0.1
+hypothesis>=6.100

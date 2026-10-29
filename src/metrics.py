@@ -150,7 +150,7 @@ def metrics_tool_decorator(fn):
     return wrapper
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register metrics MCP tools (Phase 4.1)."""
 
     from src.helpers import handle_error, json_dumps
@@ -161,22 +161,10 @@ def register(mcp):
     def get_metrics(format: str = "json") -> str:
         """مقاييس الأداء الحالية (Prometheus أو JSON). format: json | prometheus"""
         try:
-            if format.strip().lower() == "prometheus":
-                return json_dumps({"prometheus": render_prometheus()})
-            snap = get_snapshot()
-            # Convert tuple keys to string for JSON
-            tool_calls = {f"{k[0]}:{k[1]}": v for k, v in snap["tool_calls"].items()}
-            return json_dumps(
-                {
-                    "tool_calls": tool_calls,
-                    "api_calls": snap["api_calls"],
-                    "api_errors": snap["api_errors"],
-                    "rate_limits": snap["rate_limits"],
-                    "webhook_events": snap["webhook_events"],
-                    "uptime": round(snap["uptime"], 1),
-                    "tool_duration_samples": {k: len(v) for k, v in snap["tool_duration"].items()},
-                }
-            )
+            from src.core.services import Services
+            from src.services.metrics_service import MetricsService
+            svc = MetricsService(services) if services is not None else MetricsService(Services.default())
+            return json_dumps(svc.get_metrics(format))
         except Exception as e:
             return json_dumps(handle_error(e, "get_metrics"))
 
@@ -185,7 +173,10 @@ def register(mcp):
     def get_metrics_prometheus() -> str:
         """مقاييس بصيغة Prometheus exposition (مغلفة كـ JSON)."""
         try:
-            return json_dumps({"prometheus": render_prometheus()})
+            from src.core.services import Services
+            from src.services.metrics_service import MetricsService
+            svc = MetricsService(services) if services is not None else MetricsService(Services.default())
+            return json_dumps(svc.get_prometheus())
         except Exception as e:
             return json_dumps({"error": str(e)})
 

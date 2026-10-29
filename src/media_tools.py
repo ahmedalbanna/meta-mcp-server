@@ -9,7 +9,6 @@ import logging
 from pathlib import Path
 
 from src.helpers import json_dumps, sanitize_path
-from src.media_hosting import host_image, host_many, host_video
 from src.throttle import concurrency_limit
 
 logger = logging.getLogger(__name__)
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 MEDIA_ROOT = Path(__file__).resolve().parent.parent / "media"
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register media-hosting tools."""
 
     @mcp.tool()
@@ -30,19 +29,10 @@ def register(mcp):
         استخدمه قبل publish_instagram_photo / publish_page_photo / create_product.
         """
         try:
-            if not file_path:
-                return json_dumps({"error": "file_path مطلوب"})
-            url = host_image(file_path)
-            return json_dumps(
-                {
-                    "file_path": file_path,
-                    "public_url": url,
-                    "permanent": "cloudinary.com" in url,
-                    "note": "استخدم هذا الرابط في image_url / image_hash"
-                    if "cloudinary" in url
-                    else "رابط مؤقت (72h) — اضبط CLOUDINARY_URL لدائم",
-                }
-            )
+            from src.core.services import Services
+            from src.services.media_tools_service import MediaToolsService
+            svc = MediaToolsService(services) if services is not None else MediaToolsService(Services.default())
+            return json_dumps(svc.host_image_url(file_path))
         except Exception as e:
             return json_dumps({"error": f"host_image: {e}"})
 
@@ -51,16 +41,10 @@ def register(mcp):
     def host_video_url(file_path: str) -> str:
         """رفع فيديو محلي إلى استضافة عامة وإرجاع رابط URL."""
         try:
-            if not file_path:
-                return json_dumps({"error": "file_path مطلوب"})
-            url = host_video(file_path)
-            return json_dumps(
-                {
-                    "file_path": file_path,
-                    "public_url": url,
-                    "permanent": "cloudinary.com" in url,
-                }
-            )
+            from src.core.services import Services
+            from src.services.media_tools_service import MediaToolsService
+            svc = MediaToolsService(services) if services is not None else MediaToolsService(Services.default())
+            return json_dumps(svc.host_video_url(file_path))
         except Exception as e:
             return json_dumps({"error": f"host_video: {e}"})
 
@@ -69,17 +53,10 @@ def register(mcp):
     def host_many_images(file_paths: str) -> str:
         """رفع عدة صور دفعة واحدة (مسارات مفصولة بفواصل) وإرجاع روابطها."""
         try:
-            paths = [p.strip() for p in file_paths.split(",") if p.strip()]
-            if not paths:
-                return json_dumps({"error": "file_paths مطلوب (مسارات مفصولة بفواصل)"})
-            urls = host_many(paths)
-            return json_dumps(
-                {
-                    "count": len(urls),
-                    "urls": urls,
-                    "permanent": all("cloudinary.com" in u for u in urls),
-                }
-            )
+            from src.core.services import Services
+            from src.services.media_tools_service import MediaToolsService
+            svc = MediaToolsService(services) if services is not None else MediaToolsService(Services.default())
+            return json_dumps(svc.host_many_images(file_paths))
         except Exception as e:
             return json_dumps({"error": f"host_many: {e}"})
 

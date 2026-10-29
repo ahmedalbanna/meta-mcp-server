@@ -54,7 +54,7 @@ def sanitize_path(path_str: str, allowed_root: Path) -> Path:
     # attempts, even on Windows where pathlib considers them relative — this
     # keeps the behaviour consistent across platforms and matches the tests.
     if path_str.startswith("/") or path_str.startswith("\\\\"):
-        raise ValueError(f"Path escapes allowed directory: {path_str!r}")
+        raise ValueError(f"Path escapes allowed directory: {path_str!r}") from None
 
     candidate = Path(path_str)
     if candidate.is_absolute():
@@ -63,14 +63,14 @@ def sanitize_path(path_str: str, allowed_root: Path) -> Path:
         try:
             resolved = candidate.resolve()
         except Exception:
-            raise ValueError(f"Path escapes allowed directory: {path_str!r}")
+            raise ValueError(f"Path escapes allowed directory: {path_str!r}") from None
     else:
         resolved = (root_resolved / path_str).resolve()
 
     try:
         resolved.relative_to(root_resolved)
     except ValueError:
-        raise ValueError(f"Path escapes allowed directory: {path_str!r}")
+        raise ValueError(f"Path escapes allowed directory: {path_str!r}") from None
     return resolved
 
 

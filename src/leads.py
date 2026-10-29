@@ -9,7 +9,6 @@ from src.config import PAGE_ID
 logger = logging.getLogger(__name__)
 from src.helpers import get_page_api, handle_error, json_dumps, to_dict, write_guard
 from src.throttle import concurrency_limit
-from src.utils import paginate
 
 LEAD_FORM_FIELDS = [
     "id",
@@ -37,11 +36,9 @@ LEAD_FIELDS = [
 ]
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register lead ads & forms tools (page-scoped token)."""
 
-    from facebook_business.adobjects.lead import Lead
-    from facebook_business.adobjects.leadgenform import LeadgenForm
     from facebook_business.adobjects.page import Page
 
     def _page(node_id: str = "") -> Page:
@@ -52,12 +49,11 @@ def register(mcp):
     def list_lead_gen_forms(page_id: str = "", limit: int = 25) -> str:
         """قائمة نماذج جذب العملاء (Lead Gen Forms) على الصفحة."""
         try:
-            rows = paginate(
-                lambda params: _page(page_id).get_lead_gen_forms(params=params),
-                fields=LEAD_FORM_FIELDS,
-                limit=limit,
-            )
-            return json_dumps(rows)
+            from src.core.services import Services
+            from src.services.leads_service import LeadsService
+            svc = LeadsService(services) if services is not None else LeadsService(Services.default())
+            data = svc.list_lead_gen_forms(page_id, limit)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "list_lead_gen_forms"))
 
@@ -66,24 +62,11 @@ def register(mcp):
     def get_lead_gen_form(form_id: str) -> str:
         """تفاصيل نموذج جذب عملاء واحد (الأسئلة، الإخلاء القانوني، الصفحة...)."""
         try:
-            info = LeadgenForm(form_id, api=get_page_api()).api_get(
-                fields=[
-                    "id",
-                    "name",
-                    "status",
-                    "locale",
-                    "created_time",
-                    "page",
-                    "questions",
-                    "context_card",
-                    "legal_content",
-                    "privacy_policy",
-                    "thankyou_page",
-                    "qualified_lead_count",
-                    "disqualified_lead_count",
-                ]
-            )
-            return json_dumps(to_dict(info))
+            from src.core.services import Services
+            from src.services.leads_service import LeadsService
+            svc = LeadsService(services) if services is not None else LeadsService(Services.default())
+            data = svc.get_lead_gen_form(form_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_lead_gen_form"))
 
@@ -92,12 +75,11 @@ def register(mcp):
     def get_form_leads(form_id: str, limit: int = 25) -> str:
         """الرصاصات (Leads) المسجّلة عبر نموذج جذب عملاء معيّن."""
         try:
-            rows = paginate(
-                lambda params: LeadgenForm(form_id, api=get_page_api()).get_leads(params=params),
-                fields=LEAD_FIELDS,
-                limit=limit,
-            )
-            return json_dumps(rows)
+            from src.core.services import Services
+            from src.services.leads_service import LeadsService
+            svc = LeadsService(services) if services is not None else LeadsService(Services.default())
+            data = svc.get_form_leads(form_id, limit)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_form_leads"))
 
@@ -106,8 +88,11 @@ def register(mcp):
     def get_lead(lead_id: str) -> str:
         """تفاصيل رصاصة واحدة (إجابات الحقول: الاسم، الهاتف، البريد...)."""
         try:
-            info = Lead(lead_id, api=get_page_api()).api_get(fields=LEAD_FIELDS)
-            return json_dumps(to_dict(info))
+            from src.core.services import Services
+            from src.services.leads_service import LeadsService
+            svc = LeadsService(services) if services is not None else LeadsService(Services.default())
+            data = svc.get_lead(lead_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_lead"))
 
@@ -130,21 +115,12 @@ def register(mcp):
         locale: مثال ar_AR أو en_US.
         """
         try:
-            params = {
-                "name": name,
-                "privacy_policy": {"url": privacy_policy_url},
-                "question_page_custom_headline": question_page_headline,
-                "locale": locale,
-            }
-            if thankyou_page_headline or thankyou_page_body:
-                thankyou = {}
-                if thankyou_page_headline:
-                    thankyou["message"] = thankyou_page_headline
-                if thankyou_page_body:
-                    thankyou["body"] = thankyou_page_body
-                params["thankyou_page"] = thankyou
-            form = _page(page_id).create_lead_gen_form(params=params)
-            return json_dumps(to_dict(form))
+            from src.core.services import Services
+            from src.services.leads_service import LeadsService
+            svc = LeadsService(services) if services is not None else LeadsService(Services.default())
+            data = svc.create_lead_gen_form(name, privacy_policy_url, question_page_headline, page_id,
+                                            thankyou_page_headline, thankyou_page_body, locale)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "create_lead_gen_form"))
 
@@ -154,13 +130,10 @@ def register(mcp):
     def subscribe_leadgen_webhook(page_id: str = "", subscribed_fields: str = "leadgen") -> str:
         """اشتراك الصفحة في Webhook الرصاص (leadgen). يتطلب صلاحيات pages_manage_metadata."""
         try:
-            from src.helpers import page_api_call
-
-            pid = page_id or PAGE_ID
-            if not pid:
-                return json_dumps({"error": "page_id مطلوب (أو حدد FB_PAGE_ID في .env)"})
-            result = page_api_call("POST", f"{pid}/subscribed_apps", {"subscribed_fields": subscribed_fields})
-            return json_dumps({"page_id": pid, "subscribed_fields": subscribed_fields, "result": to_dict(result)})
+            from src.core.services import Services
+            from src.services.leads_service import LeadsService
+            svc = LeadsService(services) if services is not None else LeadsService(Services.default())
+            return json_dumps(svc.subscribe_leadgen_webhook(page_id, subscribed_fields))
         except Exception as e:
             return json_dumps(handle_error(e, "subscribe_leadgen_webhook"))
 
@@ -169,19 +142,10 @@ def register(mcp):
     def get_lead_field_mapping(lead_id: str) -> str:
         """تحويل field_data لرصاصة إلى قاموس مسطح {field_name: values} لتسهيل المعالجة."""
         try:
-            info = Lead(lead_id, api=get_page_api()).api_get(fields=LEAD_FIELDS)
-            data = to_dict(info)
-            field_data = data.get("field_data", [])
-            mapping = {}
-            for item in field_data:
-                name = item.get("name", "unknown")
-                values = item.get("values", [])
-                # Meta returns values as list of strings; flatten single values
-                if len(values) == 1:
-                    mapping[name] = values[0]
-                else:
-                    mapping[name] = values
-            return json_dumps({"lead_id": lead_id, "mapping": mapping, "raw": data})
+            from src.core.services import Services
+            from src.services.leads_service import LeadsService
+            svc = LeadsService(services) if services is not None else LeadsService(Services.default())
+            return json_dumps(svc.get_lead_field_mapping(lead_id))
         except Exception as e:
             return json_dumps(handle_error(e, "get_lead_field_mapping"))
 

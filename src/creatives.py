@@ -81,7 +81,7 @@ _TEMPLATES = {
 }
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register creative preview & template tools."""
 
     from src.helpers import api_call, handle_error, json_dumps, to_dict
@@ -101,9 +101,11 @@ def register(mcp):
         ad_format: DESKTOP_FEED_STANDARD | MOBILE_FEED_STANDARD | INSTAGRAM_STANDARD | INSTAGRAM_STORY_STANDARD | INSTAGRAM_REELS ...
         """
         try:
-            fmt = _validate_format(ad_format)
-            data = api_call("POST", f"{ad_id}/previews", {"ad_format": fmt})
-            return json_dumps(to_dict(data))
+            from src.core.services import Services
+            from src.services.creatives_service import CreativesService
+            svc = CreativesService(services) if services is not None else CreativesService(Services.default())
+            data = svc.generate_ad_preview(ad_id, ad_format)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "generate_ad_preview"))
 
@@ -112,9 +114,11 @@ def register(mcp):
     def generate_creative_preview(ad_creative_id: str, ad_format: str = "DESKTOP_FEED_STANDARD") -> str:
         """توليد معاينة إعلان من معرّف الإبداع (AdCreative) مباشرة."""
         try:
-            fmt = _validate_format(ad_format)
-            data = api_call("POST", f"{ad_creative_id}/previews", {"ad_format": fmt})
-            return json_dumps(to_dict(data))
+            from src.core.services import Services
+            from src.services.creatives_service import CreativesService
+            svc = CreativesService(services) if services is not None else CreativesService(Services.default())
+            data = svc.generate_creative_preview(ad_creative_id, ad_format)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "generate_creative_preview"))
 
@@ -133,29 +137,11 @@ def register(mcp):
                    OUTCOME_ENGAGEMENT | OUTCOME_APP_PROMOTION | OUTCOME_AWARENESS | OUTCOME_SALES
         """
         try:
-            obj = objective.strip().upper()
-            if obj not in _TEMPLATES:
-                raise ValueError(f"objective غير صالح: {objective}. الاختيارات: {', '.join(sorted(_TEMPLATES))}")
-            tpl = _TEMPLATES[obj]
-            fill = {
-                "business": business_name or "علامتك التجارية",
-                "product": product_name or "منتجك",
-                "offer": offer or "عرض خاص",
-            }
-            return json_dumps(
-                {
-                    "objective": obj,
-                    "creative_type": tpl["creative_type"],
-                    "suggested_format": tpl["format"],
-                    "primary_text": tpl["primary_text"].format(**fill),
-                    "headline": tpl["headline"].format(**fill),
-                    "description": tpl["description"].format(**fill),
-                    "cta": tpl["cta"],
-                    "cta_options": CTA_OPTIONS.get(obj, []),
-                    "audience": audience or "الجمهور المستهدف",
-                    "note": "هذه نصيحة تلقائية — راجعها وعدّلها قبل النشر.",
-                }
-            )
+            from src.core.services import Services
+            from src.services.creatives_service import CreativesService
+            svc = CreativesService(services) if services is not None else CreativesService(Services.default())
+            data = svc.generate_creative_template(objective, business_name, product_name, offer, audience)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "generate_creative_template"))
 

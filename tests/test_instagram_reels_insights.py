@@ -1,5 +1,4 @@
 import json
-from unittest import mock
 
 from tests.conftest import Recorder
 

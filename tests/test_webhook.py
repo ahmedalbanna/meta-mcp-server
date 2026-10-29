@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 
 def test_verify_token_accepts_matching_token(monkeypatch):
     import webhook_server

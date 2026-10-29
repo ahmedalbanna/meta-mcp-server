@@ -154,14 +154,6 @@ def test_hashtag_analyzer_no_hashtags(recorder):
     assert "message" in out
 
 
-def test_is_contact_hashtag_separates_phones_from_marketing_tags():
-    assert content_tools._is_contact_hashtag("#+967777000123")
-    assert content_tools._is_contact_hashtag("#0777000000")
-    assert not content_tools._is_contact_hashtag("#كارتير")
-    assert not content_tools._is_contact_hashtag("#Dior2026")  # letters still dominate
-    assert not content_tools._is_contact_hashtag("#Butterfly")
-
-
 def test_hashtag_analyzer_skips_contact_hashtags(recorder):
     posts = _published_posts(
         ("p1", 20, "للطلب #+967777000111 #كارتير"),

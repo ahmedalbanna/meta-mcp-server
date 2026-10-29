@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 
-from src.config import AD_ACCOUNT_ID, resolve_ad_account_id
+from src.config import AD_ACCOUNT_ID
 
 logger = logging.getLogger(__name__)
 from src.utils import normalize_pii
@@ -11,7 +11,7 @@ LOOKALIKE_TYPES = ["SIMILARITY", "REACH", "CUSTOM_RATIO"]
 RETENTION_SECONDS_90D = 7776000
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register custom audience tools."""
 
     from facebook_business.adobjects.adaccount import AdAccount
@@ -53,20 +53,11 @@ def register(mcp):
     def list_custom_audiences(limit: int = 25, ad_account_id: str = "") -> str:
         """قائمة الجماهير المخصصة في الحساب."""
         try:
-            from src.utils import paginate
-
-            fields = [
-                CustomAudience.Field.name,
-                CustomAudience.Field.subtype,
-                "approximate_count",
-                CustomAudience.Field.id,
-            ]
-            rows = paginate(
-                lambda params: AdAccount(resolve_ad_account_id(ad_account_id)).get_custom_audiences(params=params),
-                fields=fields,
-                limit=limit,
-            )
-            return json_dumps(rows)
+            from src.core.services import Services
+            from src.services.audiences_service import AudiencesService
+            svc = AudiencesService(services) if services is not None else AudiencesService(Services.default())
+            data = svc.list_custom_audiences(limit, ad_account_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "list_custom_audiences"))
 
@@ -81,16 +72,10 @@ def register(mcp):
     ) -> str:
         """إنشاء جمهور مخصص جديد."""
         try:
-            account = AdAccount(resolve_ad_account_id(ad_account_id))
-            audience = account.create_custom_audience(
-                params={
-                    CustomAudience.Field.name: name,
-                    CustomAudience.Field.subtype: "CUSTOM",
-                    CustomAudience.Field.description: description,
-                    "customer_file_source": customer_file_source,
-                }
-            )
-            return json_dumps(to_dict(audience))
+            from src.core.services import Services
+            from src.services.audiences_service import AudiencesService
+            svc = AudiencesService(services) if services is not None else AudiencesService(Services.default())
+            return json_dumps(svc.create_custom_audience(name, description, customer_file_source, ad_account_id))
         except Exception as e:
             return json_dumps(handle_error(e, "create_custom_audience"))
 
@@ -110,20 +95,10 @@ def register(mcp):
         hash_pii=true (الافتراضي): تُشفر البريد والهاتف SHA-256 قبل الإرسال (مواصفة Meta).
         """
         try:
-            audience = CustomAudience(audience_id)
-            schema, users = _build_user_schema(emails, phone_numbers, user_ids, hash_pii)
-            if not users:
-                return json_dumps({"error": "قدّم بريدًا أو أرقام هواتف أو معرفات"})
-            result = audience.add_users(schema=schema, users=users)
-            return json_dumps(
-                {
-                    "success": True,
-                    "audience_id": audience_id,
-                    "added": len(users),
-                    "hashed": hash_pii,
-                    "result": to_dict(result),
-                }
-            )
+            from src.core.services import Services
+            from src.services.audiences_service import AudiencesService
+            svc = AudiencesService(services) if services is not None else AudiencesService(Services.default())
+            return json_dumps(svc.add_users(audience_id, emails, phone_numbers, user_ids, hash_pii))
         except Exception as e:
             return json_dumps(handle_error(e, "add_users_to_custom_audience"))
 
@@ -139,20 +114,10 @@ def register(mcp):
     ) -> str:
         """إزالة مستخدمين من جمهور مخصص (نفس صيغة الإضافة)."""
         try:
-            audience = CustomAudience(audience_id)
-            schema, users = _build_user_schema(emails, phone_numbers, user_ids, hash_pii)
-            if not users:
-                return json_dumps({"error": "قدّم بريدًا أو أرقام هواتف أو معرفات"})
-            result = audience.remove_users(schema=schema, users=users)
-            return json_dumps(
-                {
-                    "success": True,
-                    "audience_id": audience_id,
-                    "removed": len(users),
-                    "hashed": hash_pii,
-                    "result": to_dict(result),
-                }
-            )
+            from src.core.services import Services
+            from src.services.audiences_service import AudiencesService
+            svc = AudiencesService(services) if services is not None else AudiencesService(Services.default())
+            return json_dumps(svc.remove_users(audience_id, emails, phone_numbers, user_ids, hash_pii))
         except Exception as e:
             return json_dumps(handle_error(e, "remove_users_from_custom_audience"))
 
@@ -339,21 +304,11 @@ def register(mcp):
     def get_custom_audience_insights(audience_id: str) -> str:
         """تفاصيل جمهور مخصص: الحجم، المصدر، الحالة، تاريخ الإنشاء."""
         try:
-            audience = CustomAudience(audience_id)
-            audience.api_read(
-                fields=[
-                    "id",
-                    "name",
-                    "description",
-                    "approximate_count",
-                    "customer_file_source",
-                    "delivery_info",
-                    "status",
-                    "time_created",
-                    "time_updated",
-                ]
-            )
-            return json_dumps(to_dict(audience))
+            from src.core.services import Services
+            from src.services.audiences_service import AudiencesService
+            svc = AudiencesService(services) if services is not None else AudiencesService(Services.default())
+            data = svc.get_custom_audience_insights(audience_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_custom_audience_insights"))
 

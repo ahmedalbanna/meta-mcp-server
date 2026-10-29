@@ -2,16 +2,15 @@ import asyncio
 import logging
 import time
 
-from src.config import AD_ACCOUNT_ID, resolve_ad_account_id
+from src.config import AD_ACCOUNT_ID
 
 logger = logging.getLogger(__name__)
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register campaigns tools."""
 
     from facebook_business.adobjects.adaccount import AdAccount
-    from facebook_business.adobjects.campaign import Campaign
 
     from src.helpers import handle_error, json_dumps, to_dict, write_guard
     from src.throttle import concurrency_limit
@@ -25,28 +24,11 @@ def register(mcp):
         ad_account_id: معرف حساب إعلاني بديل (اختياري — افتراضي FB_AD_ACCOUNT_ID / الأول في FB_AD_ACCOUNT_IDS)
         """
         try:
-            from src.utils import paginate
-
-            fields = [
-                Campaign.Field.name,
-                Campaign.Field.status,
-                Campaign.Field.objective,
-                Campaign.Field.daily_budget,
-                Campaign.Field.lifetime_budget,
-                Campaign.Field.created_time,
-                Campaign.Field.id,
-            ]
-            extra = {}
-            if status:
-                extra["filtering"] = json_dumps([{"field": "status", "operator": "EQUAL", "value": status}])
-            acct = resolve_ad_account_id(ad_account_id)
-            rows = paginate(
-                lambda params: AdAccount(acct).get_campaigns(params=params),
-                fields=fields,
-                params=extra or None,
-                limit=limit,
-            )
-            return json_dumps(rows)
+            from src.core.services import Services
+            from src.services.campaigns_service import CampaignsService
+            svc = CampaignsService(services) if services is not None else CampaignsService(Services.default())
+            data = svc.list_campaigns(status, limit, ad_account_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "list_campaigns"))
 
@@ -55,20 +37,11 @@ def register(mcp):
     def get_campaign(campaign_id: str) -> str:
         """تفاصيل حملة واحدة."""
         try:
-            campaign = Campaign(campaign_id)
-            info = campaign.api_get(
-                fields=[
-                    Campaign.Field.name,
-                    Campaign.Field.status,
-                    Campaign.Field.objective,
-                    Campaign.Field.daily_budget,
-                    Campaign.Field.lifetime_budget,
-                    Campaign.Field.buying_type,
-                    Campaign.Field.created_time,
-                    Campaign.Field.updated_time,
-                ]
-            )
-            return json_dumps(to_dict(info))
+            from src.core.services import Services
+            from src.services.campaigns_service import CampaignsService
+            svc = CampaignsService(services) if services is not None else CampaignsService(Services.default())
+            data = svc.get_campaign(campaign_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_campaign"))
 
@@ -104,35 +77,11 @@ def register(mcp):
         ad_account_id: معرف حساب إعلاني بديل (اختياري)
         """
         try:
-            # v27 deprecation: map old objectives to new OUTCOME_* with warning
-            orig_objective = objective
-            objective = _DEPRECATED_OBJECTIVES.get(objective.strip().upper(), objective.strip().upper())
-            if orig_objective.strip().upper() in _DEPRECATED_OBJECTIVES:
-                import logging
-
-                logging.getLogger(__name__).warning(
-                    "objective '%s' deprecated — mapped to '%s' for Graph %s",
-                    orig_objective,
-                    objective,
-                    __import__("src.config", fromlist=["GRAPH_VERSION"]).GRAPH_VERSION,
-                )
-            acct = resolve_ad_account_id(ad_account_id)
-            account = AdAccount(acct)
-            params = {
-                Campaign.Field.name: name,
-                Campaign.Field.objective: objective,
-                Campaign.Field.status: status,
-                Campaign.Field.special_ad_categories: [],
-                "is_adset_budget_sharing_enabled": False,
-            }
-            if daily_budget and daily_budget > 0:
-                params[Campaign.Field.daily_budget] = daily_budget
-            if lifetime_budget and lifetime_budget > 0:
-                params[Campaign.Field.lifetime_budget] = lifetime_budget
-            if not (daily_budget or lifetime_budget):
-                return json_dumps({"error": "يجب تحديد ميزانية يومية أو إجمالية"})
-            campaign = account.create_campaign(params=params)
-            return json_dumps(to_dict(campaign))
+            from src.core.services import Services
+            from src.services.campaigns_service import CampaignsService
+            svc = CampaignsService(services) if services is not None else CampaignsService(Services.default())
+            data = svc.create_campaign(name, objective, daily_budget, lifetime_budget, status, ad_account_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "create_campaign"))
 
@@ -145,15 +94,11 @@ def register(mcp):
         status: ACTIVE, PAUSED, DELETED, ARCHIVED
         """
         try:
-            valid = {"ACTIVE", "PAUSED", "DELETED", "ARCHIVED"}
-            status = status.upper()
-            if status not in valid:
-                return json_dumps({"error": f"status غير صالح. القيم: {', '.join(sorted(valid))}"})
-            campaign = Campaign(campaign_id)
-            result = campaign.api_update(params={Campaign.Field.status: status})
-            return json_dumps(
-                {"success": True, "campaign_id": campaign_id, "new_status": status, "result": to_dict(result)}
-            )
+            from src.core.services import Services
+            from src.services.campaigns_service import CampaignsService
+            svc = CampaignsService(services) if services is not None else CampaignsService(Services.default())
+            data = svc.update_status(campaign_id, status)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "update_campaign_status"))
 
@@ -163,16 +108,11 @@ def register(mcp):
     def update_campaign_budget(campaign_id: str, daily_budget: int = 0, lifetime_budget: int = 0) -> str:
         """تعديل ميزانية حملة (بالعملة الصغرى)."""
         try:
-            campaign = Campaign(campaign_id)
-            params = {}
-            if daily_budget and daily_budget > 0:
-                params[Campaign.Field.daily_budget] = daily_budget
-            if lifetime_budget and lifetime_budget > 0:
-                params[Campaign.Field.lifetime_budget] = lifetime_budget
-            if not params:
-                return json_dumps({"error": "حدد ميزانية يومية أو إجمالية"})
-            result = campaign.api_update(params=params)
-            return json_dumps({"success": True, "campaign_id": campaign_id, "result": to_dict(result)})
+            from src.core.services import Services
+            from src.services.campaigns_service import CampaignsService
+            svc = CampaignsService(services) if services is not None else CampaignsService(Services.default())
+            data = svc.update_budget(campaign_id, daily_budget, lifetime_budget)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "update_campaign_budget"))
 
@@ -182,9 +122,11 @@ def register(mcp):
     def delete_campaign(campaign_id: str) -> str:
         """حذف حملة نهائيًا."""
         try:
-            campaign = Campaign(campaign_id)
-            result = campaign.api_delete()
-            return json_dumps({"success": True, "campaign_id": campaign_id, "result": to_dict(result)})
+            from src.core.services import Services
+            from src.services.campaigns_service import CampaignsService
+            svc = CampaignsService(services) if services is not None else CampaignsService(Services.default())
+            data = svc.delete(campaign_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "delete_campaign"))
 

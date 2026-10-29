@@ -5,7 +5,6 @@ from pathlib import Path
 
 from src.config import (
     AD_ACCOUNT_ID,
-    INSTAGRAM_BUSINESS_ID,
     PAGE_ID,
     REPORT_DIR,
     ensure_report_dir,
@@ -72,7 +71,7 @@ def _summarise(rows: list[dict], metrics: list) -> dict:
     return summary
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register reports tools."""
 
     from facebook_business.adobjects.adaccount import AdAccount
@@ -111,7 +110,10 @@ def register(mcp):
         try:
             ensure_report_dir()
             metric_list = [m.strip() for m in metrics.split(",") if m.strip()]
-            rows = _fetch_rows(AD_ACCOUNT_ID, date_preset, metric_list)
+            from src.core.services import Services
+            from src.services.reports_service import ReportsService
+            _rsvc = ReportsService(services) if services is not None else ReportsService(Services.default())
+            rows = _rsvc.fetch_campaign_rows(AD_ACCOUNT_ID, date_preset, metric_list)
             base = filename or f"campaign_report_{date_preset}"
             if filename:
                 try:
@@ -189,41 +191,21 @@ def register(mcp):
         """
         try:
             ensure_report_dir()
-            from src.helpers import api_call, init_meta_api
+            from src.helpers import init_meta_api
 
             init_meta_api()
-            media = api_call(
-                "GET",
-                f"{INSTAGRAM_BUSINESS_ID}/media",
-                {"fields": "id,caption,media_type,timestamp,permalink", "limit": limit},
-            )
+            from src.core.services import Services
+            from src.services.reports_service import ReportsService
+            _rsvc = ReportsService(services) if services is not None else ReportsService(Services.default())
+            raw_rows = _rsvc.fetch_instagram_report_rows(limit)
             rows = []
-            for item in media.get("data", []):
-                mid = item.get("id")
-                caption = item.get("caption", "")
+            for item in raw_rows:
+                caption = item.get("caption", "") or ""
                 caption_short = (
                     (caption[:CAPTION_TRUNCATE_LENGTH] + "...") if len(caption) > CAPTION_TRUNCATE_LENGTH else caption
                 )
-                row = {
-                    "id": mid,
-                    "caption": caption_short,
-                    "media_type": item.get("media_type", ""),
-                    "timestamp": item.get("timestamp", ""),
-                    "permalink": item.get("permalink", ""),
-                }
-                try:
-                    insights = api_call(
-                        "GET",
-                        f"{mid}/insights",
-                        {"metric": ",".join(IG_MEDIA_METRICS)},
-                    )
-                    for ins in insights.get("data", []):
-                        name = ins.get("name", "")
-                        values = ins.get("values", [])
-                        row[name] = values[-1].get("value", 0) if values else 0
-                except Exception as e:
-                    logger.warning("Failed to fetch insights for media %s: %s", mid, e)
-                rows.append(row)
+                item["caption"] = caption_short
+                rows.append(item)
 
             base = filename or "instagram_report"
             if filename:

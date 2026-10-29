@@ -4,7 +4,7 @@ import asyncio
 import logging
 import time
 
-from src.config import AD_ACCOUNT_ID, BUSINESS_ID, resolve_ad_account_id
+from src.config import AD_ACCOUNT_ID
 
 logger = logging.getLogger(__name__)
 from src.helpers import handle_error, json_dumps, to_dict, write_guard
@@ -24,20 +24,21 @@ BALANCE_FIELDS = [
 ]
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register wallet/finance tools."""
 
     from facebook_business.adobjects.adaccount import AdAccount
-    from facebook_business.adobjects.business import Business
 
     @mcp.tool()
     @concurrency_limit()
     def get_account_balance(ad_account_id: str = "") -> str:
         """رصيد الحساب الإعلاني والإنفاق وحد الإنفاق والعملة."""
         try:
-            account = AdAccount(resolve_ad_account_id(ad_account_id))
-            info = account.api_get(fields=BALANCE_FIELDS)
-            return json_dumps(to_dict(info))
+            from src.core.services import Services
+            from src.services.finance_service import FinanceService
+            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+            data = svc.get_account_balance(ad_account_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_account_balance"))
 
@@ -46,9 +47,11 @@ def register(mcp):
     def get_spend_cap(ad_account_id: str = "") -> str:
         """حدود الإنفاق الحالية للحساب الإعلاني."""
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            info = account.api_get(fields=["spend_cap", "amount_spent", "balance", "currency"])
-            return json_dumps(to_dict(info))
+            from src.core.services import Services
+            from src.services.finance_service import FinanceService
+            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+            data = svc.get_spend_cap(ad_account_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_spend_cap"))
 
@@ -61,10 +64,10 @@ def register(mcp):
         مثال: 100000 = 1000 دولار. ضع 0 لإزالة الحد.
         """
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            params = {"spend_cap": spend_cap} if spend_cap > 0 else {"spend_cap": 0}
-            result = account.api_update(params=params)
-            return json_dumps({"success": True, "spend_cap": spend_cap, "result": to_dict(result)})
+            from src.core.services import Services
+            from src.services.finance_service import FinanceService
+            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+            return json_dumps(svc.update_spend_cap(spend_cap))
         except Exception as e:
             return json_dumps(handle_error(e, "update_spend_cap"))
 
@@ -73,14 +76,11 @@ def register(mcp):
     def get_transactions(limit: int = 25) -> str:
         """سجل معاملات الحساب الإعلاني. ملاحظة: أزالت Meta حافة /transactions من Graph API بالكامل — الفواتير متاحة من Business Manager > Billing."""
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            info = account.api_get(fields=["funding_source_details", "spend_cap", "balance"])
-            return json_dumps(
-                {
-                    "account_financials": to_dict(info),
-                    "note": "حافة act_x/transactions أزيلت من Graph API من Meta (تعود بـ error 100 في كل الإصدارات). المعاملات التفصيلية متاحة يدويًا من Business Manager > Billing > Transactions.",
-                }
-            )
+            from src.core.services import Services
+            from src.services.finance_service import FinanceService
+            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+            data = svc.get_transactions(limit)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_transactions"))
 
@@ -89,21 +89,11 @@ def register(mcp):
     def get_payment_methods() -> str:
         """طرق الدفع المرتبطة بالحساب (مصدر التمويل)."""
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            info = account.api_get(
-                fields=[
-                    "funding_source",
-                    "funding_source_details",
-                    "extended_credit_invoice_group",
-                    "is_prepay_account",
-                ]
-            )
-            return json_dumps(
-                {
-                    "funding": to_dict(info),
-                    "note": "إضافة/حذف بطاقات دفع غير مدعومة عبر API؛ تتم يدويًا من Business Manager > Settings > Payment Methods",
-                }
-            )
+            from src.core.services import Services
+            from src.services.finance_service import FinanceService
+            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+            data = svc.get_payment_methods()
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_payment_methods"))
 
@@ -112,18 +102,10 @@ def register(mcp):
     def get_business_info(business_id: str = "") -> str:
         """معلومات Business Manager (الفوترة، اسم النشاط، الحالة)."""
         try:
-            biz_id = business_id or BUSINESS_ID
-            if not biz_id:
-                return json_dumps({"error": "حدد BUSINESS_ID في ملف .env"})
-            business = Business(biz_id)
-            info = business.api_get(
-                fields=[
-                    Business.Field.name,
-                    Business.Field.verification_status,
-                    Business.Field.timezone_id,
-                ]
-            )
-            return json_dumps(to_dict(info))
+            from src.core.services import Services
+            from src.services.finance_service import FinanceService
+            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+            return json_dumps(svc.get_business_info(business_id))
         except Exception as e:
             return json_dumps(handle_error(e, "get_business_info"))
 
@@ -132,12 +114,10 @@ def register(mcp):
     def list_account_users() -> str:
         """المستخدمون المرتبطون بالحساب الإعلاني وصلاحياتهم."""
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            params = {"fields": ["id", "name", "tasks"]}
-            if BUSINESS_ID:
-                params["business"] = BUSINESS_ID
-            users = account.get_assigned_users(params=params)
-            return json_dumps([to_dict(u) for u in users])
+            from src.core.services import Services
+            from src.services.finance_service import FinanceService
+            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+            return json_dumps(svc.list_account_users())
         except Exception as e:
             return json_dumps(handle_error(e, "list_account_users"))
 
@@ -150,10 +130,10 @@ def register(mcp):
         tasks مفصولة بفواصل من: ADVERTISE, ANALYZE, MANAGE, DRAFT
         """
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            task_list = [t.strip() for t in tasks.split(",") if t.strip()]
-            account.create_assigned_user(params={"user": user_id, "tasks": task_list})
-            return json_dumps({"success": True, "user_id": user_id, "tasks": task_list})
+            from src.core.services import Services
+            from src.services.finance_service import FinanceService
+            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+            return json_dumps(svc.assign_user(user_id, tasks))
         except Exception as e:
             return json_dumps(handle_error(e, "assign_user_to_account"))
 
@@ -163,9 +143,10 @@ def register(mcp):
     def remove_user_from_account(user_id: int) -> str:
         """إزالة مستخدم من الحساب الإعلاني."""
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            account.delete_assigned_users(params={"user": user_id})
-            return json_dumps({"success": True, "user_id": user_id})
+            from src.core.services import Services
+            from src.services.finance_service import FinanceService
+            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+            return json_dumps(svc.remove_user(user_id))
         except Exception as e:
             return json_dumps(handle_error(e, "remove_user_from_account"))
 

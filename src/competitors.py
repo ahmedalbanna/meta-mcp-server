@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 from src.competitor_content import fetch_business_media
 from src.config import INSTAGRAM_BUSINESS_ID, PAGE_ID
+from src.hashtags import marketing_hashtags
 from src.helpers import api_call, handle_error, json_dumps, page_api_call
 from src.throttle import concurrency_limit
 
@@ -81,8 +82,6 @@ _CTA_MARKERS = (
     "cod",
 )
 
-# Any non-space run after '#' — works for Arabic and Latin hashtags.
-_HASHTAG_RE = re.compile(r"#([^\s#.,!?؛،؟]+)")
 
 # Instagram handles: 1-30 chars, letters/digits/dots/underscores only.
 _IG_HANDLE_RE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
@@ -114,7 +113,7 @@ def _content_signals(posts: list) -> dict:
         return {"posts_analysed": 0}
     hashtags: list[str] = []
     for cap in captions:
-        hashtags.extend("#" + m for m in _HASHTAG_RE.findall(cap))
+        hashtags.extend(marketing_hashtags(cap))
     top = Counter(h.lower() for h in hashtags).most_common(10)
     lowered = [c.lower() for c in captions]
     cta_posts = sum(1 for c in lowered if any(m in c for m in _CTA_MARKERS))
@@ -175,7 +174,7 @@ def _verdict(profile: dict) -> dict:
     return {"score": score, "level": level, "notes": notes or ["لا ملاحظات سلبية"]}
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register competitive-intelligence tools."""
 
     def _api(method: str, path: str, params: dict, page_id: str = "") -> Any:
@@ -379,26 +378,12 @@ def register(mcp):
             q = " ".join(parts)
             if not q:
                 return json_dumps({"error": "حدد كلمة مفتاحية (query) على الأقل"})
-            data = api_call(
-                "GET",
-                "search",
-                {
-                    "q": q,
-                    "type": "page",
-                    "fields": "name,id,fan_count,category,link,verification_status",
-                    "limit": max(1, min(limit, 50)),
-                },
-            )
-            rows = data.get("data", []) if isinstance(data, dict) else []
-            if exclude_our_page and PAGE_ID:
-                rows = [r for r in rows if str(r.get("id")) != str(PAGE_ID)]
-            out = {
-                "query": q,
-                "count": len(rows),
-                "results": rows,
-                "next_step": "analyze_competitor_page(page_id) لتحليل أي صفحة، أو compare_competitors(ids) للمقارنة",
-            }
-            if not rows:
+            from src.core.services import Services
+            from src.services.competitor_service import CompetitorService
+            svc = CompetitorService(services) if services is not None else CompetitorService(Services.default())
+            out = svc.search_business_pages(query, city, limit, exclude_our_page)
+            out["next_step"] = "analyze_competitor_page(page_id) لتحليل أي صفحة، أو compare_competitors(ids) للمقارنة"
+            if not out.get("results"):
                 # Meta returns an empty list (not an error) when the app lacks
                 # the Page Public Content Access feature — say so explicitly.
                 out["empty_reason"] = _PPCA_HINT
@@ -520,6 +505,8 @@ def register(mcp):
             if not handle:
                 return json_dumps({"error": "handle مطلوب"})
             handle = handle.lstrip("@")
+            if not INSTAGRAM_BUSINESS_ID:
+                return json_dumps({"error": "FB_IG_USER_ID غير مضبوط — اضبطه أو استخدم discover_ig_user", "guard": "ig_business_required"})
             if not _IG_HANDLE_RE.match(handle):
                 return json_dumps({"error": f"handle غير صالح: {handle!r} (أحرف/أرقام/./_ فقط، 1-30)"})
             report = {"handle": handle, "window_days": days}
@@ -559,7 +546,7 @@ def register(mcp):
                     "top_hashtags": [
                         {"tag": t, "count": n}
                         for t, n in Counter(
-                            h for m in media for h in _HASHTAG_RE.findall(m.get("caption") or "")
+                            t for m in media for t in marketing_hashtags(m.get("caption") or "")
                         ).most_common(8)
                     ],
                     "latest_posts": [
@@ -784,7 +771,7 @@ def register(mcp):
             comments = [int(m.get("comments_count") or 0) for m in media]
             hashtags: list[str] = []
             for m in media:
-                hashtags.extend("#" + tag for tag in _HASHTAG_RE.findall(m.get("caption") or ""))
+                hashtags.extend(marketing_hashtags(m.get("caption") or ""))
             followers = biz.get("followers_count") or 0
             avg_likes = round(sum(likes) / len(likes), 1) if likes else 0
             avg_comments = round(sum(comments) / len(comments), 1) if comments else 0
@@ -819,6 +806,87 @@ def register(mcp):
             )
         except Exception as e:
             return json_dumps(handle_error(e, "discover_instagram_business"))
+
+    # ------------------------------------------------------------------
+    # Helpers (monitoring)
+    # ------------------------------------------------------------------
+    def _extract_price_safe(caption: str):
+        import re as _re
+        text = (caption or "")
+        # Arabic digits
+        text = text.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
+        m = _re.search(r"(\d[\d.,]*)\s*(?:الف|ألف)", text)
+        if m:
+            try:
+                return round(float(m.group(1).replace(",", "")) * 1000, 2)
+            except ValueError:
+                pass
+        m = _re.search(r"(\d[\d.,]*)\s*(?:ريال|ر\.ي|YER)", text)
+        if m:
+            try:
+                return float(m.group(1).replace(",", ""))
+            except ValueError:
+                pass
+        return None
+
+    def _num_diff(a, b):
+        if a is None or b is None:
+            return None
+        try:
+            return round(float(a) - float(b), 4)
+        except (TypeError, ValueError):
+            return None
+
+    # ------------------------------------------------------------------
+    # Competitor monitoring over time (Phase 2.2 / 2.3)
+    # ------------------------------------------------------------------
+
+    @mcp.tool()
+    @concurrency_limit()
+    def snapshot_competitor(handle: str, platform: str = "instagram", days: int = 30) -> str:
+        """حفظ لقطة (snapshot) لمنافس في SQLite لمراقبة التغييرات au fil du temps.
+
+        handle: اسم حساب IG (بدون @) — أو page_id لفيسبوك
+        platform: instagram (افتراضي) | facebook
+        days: نافذة التحليل (افتراضي 30)
+
+        شغّلها دورياً (scheduler) لبناء سجل تاريخي. استخدم diff_competitor_snapshots
+        لمقارنة آخر لقطتين.
+        """
+        try:
+            from src.core.services import Services
+            from src.services.competitor_service import CompetitorService
+            svc = CompetitorService(services) if services is not None else CompetitorService(Services.default())
+            result = svc.snapshot(handle, platform, days)
+            return json_dumps(result)
+        except Exception as e:
+            return json_dumps(handle_error(e, "snapshot_competitor"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    def list_competitor_snapshots(handle: str, platform: str = "instagram", limit: int = 10) -> str:
+        """سرد لقطات منافس المحفوظة (الأحدث أولاً)."""
+        try:
+            from src.core.services import Services
+            from src.services.competitor_service import CompetitorService
+            svc = CompetitorService(services) if services is not None else CompetitorService(Services.default())
+            result = svc.list_snapshots(handle, platform, limit)
+            return json_dumps(result)
+        except Exception as e:
+            return json_dumps(handle_error(e, "list_competitor_snapshots"))
+
+    @mcp.tool()
+    @concurrency_limit()
+    def diff_competitor_snapshots(handle: str, platform: str = "instagram") -> str:
+        """مقارنة آخر لقطتين لمنافس: تغيّر المتابعين، التفاعل، الأسعار."""
+        try:
+            from src.core.services import Services
+            from src.services.competitor_service import CompetitorService
+            svc = CompetitorService(services) if services is not None else CompetitorService(Services.default())
+            result = svc.diff(handle, platform)
+            return json_dumps(result)
+        except Exception as e:
+            return json_dumps(handle_error(e, "diff_competitor_snapshots"))
 
     @mcp.resource("competitors://overview")
     async def competitors_resource() -> str:

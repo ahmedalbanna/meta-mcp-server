@@ -26,16 +26,18 @@ def test_sanitize_filename_strips_path_components():
 
 
 def test_sanitize_filename_rejects_empty():
-    from src.helpers import sanitize_filename
     import pytest
+
+    from src.helpers import sanitize_filename
 
     with pytest.raises(ValueError):
         sanitize_filename("")
 
 
 def test_sanitize_filename_rejects_special_chars():
-    from src.helpers import sanitize_filename
     import pytest
+
+    from src.helpers import sanitize_filename
 
     with pytest.raises(ValueError):
         sanitize_filename("file:name")
@@ -50,8 +52,9 @@ def test_sanitize_path_stays_inside_root(tmp_path):
 
 
 def test_sanitize_path_rejects_escape(tmp_path):
-    from src.helpers import sanitize_path
     import pytest
+
+    from src.helpers import sanitize_path
 
     with pytest.raises(ValueError):
         sanitize_path("../../etc/passwd", tmp_path)

@@ -12,6 +12,7 @@ from mcp.server.fastmcp import FastMCP
 from src import (
     ads,
     adsets,
+    analytics,
     audiences,
     automation,
     breakdowns,
@@ -23,6 +24,7 @@ from src import (
     competitors,
     content_tools,
     creatives,
+    cross_platform,
     discovery,
     events,
     finance,
@@ -32,6 +34,7 @@ from src import (
     media_tools,
     messenger,
     metrics,
+    page_builder,
     pages,
     reports,
     scheduler,
@@ -40,6 +43,7 @@ from src import (
     yemen_bundle,
 )
 from src.config import validate_config
+from src.core.services import Services
 from src.helpers import init_meta_api
 from src.throttle import MAX_CONCURRENT
 
@@ -75,6 +79,7 @@ def main() -> None:
     _install_exception_hook()
     log.info("حد التوازي لطلبات Graph API: %d", MAX_CONCURRENT)
 
+    services = Services.default()
     # Register all tool modules (Phase 5 distributed resources/prompts per module)
     for module in (
         discovery,
@@ -82,10 +87,12 @@ def main() -> None:
         adsets,
         ads,
         insights,
+        analytics,
         breakdowns,
         reports,
         audiences,
         pages,
+        page_builder,
         instagram,
         media_tools,
         leads,
@@ -96,6 +103,7 @@ def main() -> None:
         business,
         creatives,
         content_tools,
+        cross_platform,
         competitor_content,
         competitors,
         competitor_catalog,
@@ -106,7 +114,7 @@ def main() -> None:
         metrics,
         yemen_bundle,
     ):
-        module.register(mcp)
+        module.register(mcp, services)
         log.info("تم تسجيل وحدة %s", module.__name__.split(".")[-1])
 
     mcp_transport = os.getenv("MCP_TRANSPORT", "stdio")
@@ -117,12 +125,12 @@ def main() -> None:
     if mcp_transport in ("sse", "streamable-http", "http"):
         try:
             # FastMCP 1.29+ supports host/port kwargs for HTTP transports
-            mcp.run(transport=mcp_transport, host=mcp_host, port=mcp_port)
+            mcp.run(transport=mcp_transport, host=mcp_host, port=mcp_port)  # type: ignore[call-arg,arg-type]
         except TypeError:
             # Fallback for older FastMCP that only accepts transport
-            mcp.run(transport=mcp_transport)
+            mcp.run(transport=mcp_transport)  # type: ignore[arg-type]  # type: ignore[arg-type]
     else:
-        mcp.run(transport=mcp_transport)
+        mcp.run(transport=mcp_transport)  # type: ignore[arg-type]
 
 
 if __name__ == "__main__":

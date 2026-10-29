@@ -1,0 +1,185 @@
+"""Catalog service (Phase B)."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from facebook_business.adobjects.business import Business
+from facebook_business.adobjects.productcatalog import ProductCatalog
+from facebook_business.adobjects.productfeed import ProductFeed
+from facebook_business.adobjects.productitem import ProductItem
+from facebook_business.adobjects.productset import ProductSet
+
+from src.config import BUSINESS_ID
+from src.core.services import Services
+from src.helpers import to_dict
+from src.utils import paginate
+
+SET_FIELDS = ["id", "name", "filter"]
+
+
+class CatalogService:
+    def __init__(self, services: Services) -> None:
+        self.services = services
+        self.config = services.config
+        self.api = services.api
+
+    def _require_business_id(self, business_id: str) -> str:
+        return business_id or BUSINESS_ID
+
+    # --- read ---
+    def list_catalogs(self, business_id: str = "", limit: int = 25) -> Any:
+        bid = self._require_business_id(business_id)
+        if not bid:
+            return {"error": "business_id مطلوب"}
+        return self.api.get(f"{bid}/owned_product_catalogs", {"fields": "id,name,product_count", "limit": limit})
+
+    def get_catalog(self, catalog_id: str) -> Any:
+        return self.api.get(catalog_id, {"fields": "id,name,product_count,vertical"})
+
+    def get_catalog_settings(self, catalog_id: str) -> Any:
+        return self.api.get(catalog_id, {
+            "fields": "store_catalog_settings,default_image_url,fallback_image_url,da_display_settings,"
+                      "catalog_store,feed_count,product_count,is_catalog_segment,is_local_catalog"
+        })
+
+    def list_product_sets(self, catalog_id: str, limit: int = 25) -> Any:
+        rows = paginate(lambda params: ProductCatalog(catalog_id).get_product_sets(params=params),
+                        fields=SET_FIELDS, limit=limit)
+        return rows
+
+    def get_product_set(self, product_set_id: str) -> Any:
+        return to_dict(ProductSet(product_set_id).api_get(fields=SET_FIELDS))
+
+    def list_products(self, catalog_id: str, limit: int = 25, filter: str = "") -> Any:
+        params: dict[str, Any] = {"fields": "id,name,price,currency,availability,image_url,url", "limit": limit}
+        if filter:
+            params["filter"] = filter
+        return self.api.get(f"{catalog_id}/products", params)
+
+    def get_product(self, product_id: str) -> Any:
+        return self.api.get(product_id, {"fields": "id,name,price,currency,availability,image_url,url,description,brand"})
+
+    # --- write ---
+    def create_catalog(self, name: str, business_id: str = "") -> Any:
+        bid = self._require_business_id(business_id)
+        if not bid:
+            raise ValueError("حدد FB_BUSINESS_ID في .env أو مرّر business_id")
+        catalog = Business(bid).create_owned_product_catalog(params={ProductCatalog.Field.name: name})
+        return to_dict(catalog)
+
+    def delete_catalog(self, catalog_id: str) -> dict[str, Any]:
+        result = ProductCatalog(catalog_id).api_delete()
+        return {"success": True, "catalog_id": catalog_id, "result": to_dict(result)}
+
+    def create_product_set(self, catalog_id: str, name: str, filters_json: str = "") -> Any:
+        params: dict[str, Any] = {ProductSet.Field.name: name}
+        if filters_json:
+            params[ProductSet.Field.filter] = filters_json
+        return to_dict(ProductCatalog(catalog_id).create_product_set(params=params))
+
+    def delete_product_set(self, product_set_id: str) -> dict[str, Any]:
+        result = ProductSet(product_set_id).api_delete()
+        return {"success": True, "product_set_id": product_set_id, "result": to_dict(result)}
+
+    def create_product(self, catalog_id: str, name: str, price: float = 0.0, currency: str = "USD",
+                       description: str = "", image_url: str = "", url: str = "", availability: str = "in stock",
+                       brand: str = "", retailer_id: str = "", gtin: str = "", condition: str = "new",
+                       sale_price: float = 0.0, product_type: str = "", category: str = "",
+                       custom_label_0: str = "") -> Any:
+        params: dict[str, Any] = {
+            ProductItem.Field.name: name,
+            ProductItem.Field.price: str(round(price, 2)) if price else "0",
+            ProductItem.Field.currency: currency,
+        }
+        optional = {
+            ProductItem.Field.description: description,
+            ProductItem.Field.image_url: image_url,
+            ProductItem.Field.url: url,
+            ProductItem.Field.availability: availability,
+            ProductItem.Field.brand: brand,
+            ProductItem.Field.retailer_id: retailer_id,
+            ProductItem.Field.gtin: gtin,
+            ProductItem.Field.condition: condition,
+            ProductItem.Field.product_type: product_type,
+            ProductItem.Field.category: category,
+            ProductItem.Field.custom_label_0: custom_label_0,
+        }
+        if sale_price:
+            optional[ProductItem.Field.sale_price] = str(sale_price)
+        params.update({k: v for k, v in optional.items() if v})
+        return to_dict(ProductCatalog(catalog_id).create_product(params=params))
+
+    def update_product(self, product_id: str, name: str = "", price: float = 0.0, currency: str = "",
+                       description: str = "", image_url: str = "", url: str = "", availability: str = "",
+                       brand: str = "", retailer_id: str = "", gtin: str = "", condition: str = "",
+                       sale_price: float = 0.0, product_type: str = "", category: str = "",
+                       custom_label_0: str = "") -> dict[str, Any]:
+        params: dict[str, Any] = {}
+        _str_fields = [
+            (name, ProductItem.Field.name),
+            (currency, ProductItem.Field.currency),
+            (description, ProductItem.Field.description),
+            (image_url, ProductItem.Field.image_url),
+            (url, ProductItem.Field.url),
+            (availability, ProductItem.Field.availability),
+            (brand, ProductItem.Field.brand),
+            (retailer_id, ProductItem.Field.retailer_id),
+            (gtin, ProductItem.Field.gtin),
+            (condition, ProductItem.Field.condition),
+            (product_type, ProductItem.Field.product_type),
+            (category, ProductItem.Field.category),
+            (custom_label_0, ProductItem.Field.custom_label_0),
+        ]
+        for val, field in _str_fields:
+            if val:
+                params[field] = val
+        if price:
+            params[ProductItem.Field.price] = str(round(price, 2))
+        if sale_price:
+            params[ProductItem.Field.sale_price] = str(round(sale_price, 2))
+        if not params:
+            raise ValueError("حدد حقلًا واحدًا على الأقل للتعديل")
+        result = ProductItem(product_id).api_update(params=params)
+        return {"success": True, "product_id": product_id, "result": to_dict(result)}
+
+    def delete_product(self, product_id: str) -> dict[str, Any]:
+        result = ProductItem(product_id).api_delete()
+        return {"success": True, "product_id": product_id, "result": to_dict(result)}
+
+    def get_product_feed(self, feed_id: str) -> Any:
+        return to_dict(ProductFeed(feed_id).api_get(fields=["id", "name", "schedule", "latest_upload",
+                                                            "filter", "country", "default_currency", "file_type"]))
+
+    def get_product_feed_diagnostics(self, feed_id: str, limit: int = 5) -> Any:
+        feed_info = ProductFeed(feed_id).api_get(fields=["id", "name", "schedule", "latest_upload", "file_type"])
+        feed_dict = to_dict(feed_info)
+        uploads = paginate(
+            lambda params: ProductFeed(feed_id).get_uploads(params=params),
+            fields=["id", "status", "start_time", "end_time", "error_count", "warning_count",
+                    "num_deleted_items", "num_updated_items", "num_hidden_items", "error_report"],
+            limit=limit,
+        )
+        total_errors = sum(int(u.get("error_count") or 0) for u in uploads)
+        total_warnings = sum(int(u.get("warning_count") or 0) for u in uploads)
+        return {
+            "feed": feed_dict,
+            "uploads": uploads,
+            "summary": {
+                "total_errors": total_errors,
+                "total_warnings": total_warnings,
+                "last_status": uploads[0].get("status") if uploads else "unknown",
+            },
+        }
+
+    def get_commerce_merchant_settings(self, business_id: str = "") -> Any:
+        bid = business_id or self.config.business_id
+        if not bid:
+            raise ValueError("حدد FB_BUSINESS_ID في .env أو مرّر business_id")
+        rows = paginate(
+            lambda params: Business(bid).get_commerce_merchant_settings(params=params),
+            fields=["id", "display_name", "contact_email", "merchant_page", "payment_provider",
+                    "merchant_status", "facebook_channel", "instagram_channel"],
+            limit=25,
+        )
+        return rows

@@ -11,7 +11,7 @@ from src.throttle import concurrency_limit
 SECONDS_PER_DAY = 86400
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register automated rules (ad rules) tools."""
 
     from facebook_business.adobjects.adaccount import AdAccount
@@ -21,9 +21,11 @@ def register(mcp):
     def list_auto_rules(limit: int = 25) -> str:
         """قائمة القواعد التلقائية في الحساب الإعلاني."""
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            rules = account.get_ad_rules_library(params={"limit": limit})
-            return json_dumps([to_dict(r) for r in rules])
+            from src.core.services import Services
+            from src.services.automation_service import AutomationService
+            svc = AutomationService(services) if services is not None else AutomationService(Services.default())
+            data = svc.list_auto_rules(limit)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "list_auto_rules"))
 
@@ -46,17 +48,11 @@ def register(mcp):
         execution_spec='{"execution_type":"value","execution_options":[{"field":"STATUS","operator":"EQUAL","value":"PAUSED"}]}'
         """
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            params = {
-                "name": name,
-                "evaluation_spec": evaluation_spec,
-                "execution_spec": execution_spec,
-                "status": status,
-            }
-            if schedule_spec:
-                params["schedule_spec"] = schedule_spec
-            rule = account.create_ad_rules_library(params=params)
-            return json_dumps(to_dict(rule))
+            from src.core.services import Services
+            from src.services.automation_service import AutomationService
+            svc = AutomationService(services) if services is not None else AutomationService(Services.default())
+            data = svc.create_auto_rule(name, evaluation_spec, execution_spec, schedule_spec, status)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "create_auto_rule"))
 
@@ -81,27 +77,11 @@ def register(mcp):
         action: PAUSE, ACTIVATE (لتفعيل/إيقاف)
         """
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            execution_options = [
-                {"field": "STATUS", "operator": "EQUAL", "value": "PAUSED" if action == "PAUSE" else "ACTIVE"}
-            ]
-            execution_spec = {
-                "execution_type": "value",
-                "execution_options": execution_options,
-            }
-            evaluation_spec = {
-                "evaluation_type": "schedule",
-                "filters": [{"field": field, "operator": operator, "value": value}],
-                "trigger": {"type": "schedule", "time_zone": time_zone, "time_in_minutes": [0]},
-            }
-            params = {
-                "name": name,
-                "evaluation_spec": json.dumps(evaluation_spec),
-                "execution_spec": json.dumps(execution_spec),
-                "status": status,
-            }
-            rule = account.create_ad_rules_library(params=params)
-            return json_dumps(to_dict(rule))
+            from src.core.services import Services
+            from src.services.automation_service import AutomationService
+            svc = AutomationService(services) if services is not None else AutomationService(Services.default())
+            data = svc.create_simple_auto_rule(name, object_type, field, operator, value, action, time_zone, status)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "create_simple_auto_rule"))
 
@@ -111,11 +91,11 @@ def register(mcp):
     def delete_auto_rule(rule_id: str) -> str:
         """حذف قاعدة تلقائية."""
         try:
-            from facebook_business.adobjects.adrule import AdRule
-
-            rule = AdRule(rule_id)
-            rule.api_delete()
-            return json_dumps({"success": True, "rule_id": rule_id})
+            from src.core.services import Services
+            from src.services.automation_service import AutomationService
+            svc = AutomationService(services) if services is not None else AutomationService(Services.default())
+            data = svc.delete_auto_rule(rule_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "delete_auto_rule"))
 
@@ -124,10 +104,11 @@ def register(mcp):
     def get_auto_rules_history(days: int = 7) -> str:
         """سجل تنفيذ القواعد التلقائية خلال الأيام الأخيرة."""
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            since = int(time.time()) - days * SECONDS_PER_DAY
-            history = account.get_ad_rules_history(params={"start_time": since, "end_time": int(time.time())})
-            return json_dumps([to_dict(h) for h in history])
+            from src.core.services import Services
+            from src.services.automation_service import AutomationService
+            svc = AutomationService(services) if services is not None else AutomationService(Services.default())
+            data = svc.get_history(days)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_auto_rules_history"))
 

@@ -6,7 +6,7 @@ import importlib
 import inspect
 import json
 
-from tests.conftest import Recorder, TOOL_MODULES, register_all
+from tests.conftest import TOOL_MODULES, Recorder, register_all
 
 
 def _sample_args(fn):

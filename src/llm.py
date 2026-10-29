@@ -45,7 +45,7 @@ def call_llm(
                 max_tokens=max_tokens,
                 temperature=0.7,
             )
-            return resp.choices[0].message.content.strip() if resp.choices else None
+            return resp.choices[0].message.content.strip() if resp.choices else None  # type: ignore[attr-defined,union-attr]
         except Exception:
             return None
 
@@ -54,17 +54,17 @@ def call_llm(
         try:
             import anthropic  # type: ignore
 
-            client = anthropic.Anthropic(api_key=key)
+            client = anthropic.Anthropic(api_key=key)  # type: ignore[assignment]
             mdl = model or os.getenv("LLM_MODEL") or "claude-3-5-sonnet-20240620"
-            resp = client.messages.create(
+            resp = client.messages.create(  # type: ignore[attr-defined]
                 model=mdl,
                 max_tokens=max_tokens,
                 system=system,
                 messages=[{"role": "user", "content": prompt}],
             )
             # anthropic returns list of content blocks
-            if resp.content and len(resp.content) > 0:
-                block = resp.content[0]
+            if resp.content and len(resp.content) > 0:  # type: ignore[attr-defined]
+                block = resp.content[0]  # type: ignore[attr-defined]
                 text = getattr(block, "text", None) or getattr(block, "content", None) or str(block)
                 return text.strip() if text else None
             return None
@@ -102,6 +102,6 @@ def call_vision(
             ],
             max_tokens=400,
         )
-        return resp.choices[0].message.content.strip() if resp.choices else None
+        return resp.choices[0].message.content.strip() if resp.choices else None  # type: ignore[attr-defined,union-attr]
     except Exception:
         return None

@@ -1,9 +1,7 @@
 """Phase 1 coverage: reports excel, audience hashing, webhook sig, pagination, error contract."""
 
-import json
 import hashlib
-from pathlib import Path
-from unittest import mock
+import json
 
 from tests.conftest import Recorder, register_all
 
@@ -16,7 +14,6 @@ def _register():
 
 def test_reports_excel_generates_file(mock_meta_sdk, tmp_path, monkeypatch):
     """generate_campaign_report with format=excel creates .xlsx."""
-    from src.config import REPORT_DIR
     monkeypatch.setattr("src.reports.REPORT_DIR", tmp_path)
     monkeypatch.setattr("src.config.REPORT_DIR", tmp_path)
     rec = _register()
@@ -27,7 +24,6 @@ def test_reports_excel_generates_file(mock_meta_sdk, tmp_path, monkeypatch):
 
 
 def test_reports_csv_generates_file(mock_meta_sdk, tmp_path, monkeypatch):
-    from src.config import REPORT_DIR
     monkeypatch.setattr("src.reports.REPORT_DIR", tmp_path)
     monkeypatch.setattr("src.config.REPORT_DIR", tmp_path)
     rec = _register()
@@ -61,7 +57,10 @@ def test_webhook_signature_tampered_rejected(monkeypatch):
 
 
 def test_webhook_signature_valid(monkeypatch):
-    import hashlib, hmac, webhook_server
+    import hashlib
+    import hmac
+
+    import webhook_server
     monkeypatch.setattr(webhook_server, "APP_SECRET", "secret")
     body = b'{"entry":[]}'
     sig = "sha256=" + hmac.new(b"secret", body, hashlib.sha256).hexdigest()
@@ -69,8 +68,9 @@ def test_webhook_signature_valid(monkeypatch):
 
 
 def test_sanitize_path_traversal_blocked(tmp_path):
-    from src.helpers import sanitize_path
     import pytest
+
+    from src.helpers import sanitize_path
     with pytest.raises(ValueError):
         sanitize_path("../../etc/passwd", tmp_path)
     with pytest.raises(ValueError):
@@ -108,8 +108,9 @@ def test_pagination_ads_uses_paginate(mock_meta_sdk):
 
 def test_error_contract_includes_code_subcode(mock_meta_sdk):
     """handle_error returns code/subcode fields."""
-    from src.helpers import handle_error
     from facebook_business.exceptions import FacebookRequestError
+
+    from src.helpers import handle_error
     err = FacebookRequestError(
         message="bad",
         request_context={},
@@ -125,8 +126,8 @@ def test_error_contract_includes_code_subcode(mock_meta_sdk):
 
 
 def test_write_guard_rejection_includes_code():
-    from src.helpers import write_guard, json_dumps
     import src.helpers as h
+    from src.helpers import json_dumps, write_guard
     # ensure writes disabled
     orig = h.ENABLE_WRITES
     h.ENABLE_WRITES = False
@@ -163,7 +164,6 @@ def test_bulk_update_products_fixed(mock_meta_sdk):
 
 def test_upload_audience_csv_traversal_blocked(mock_meta_sdk, tmp_path, monkeypatch):
     """upload_custom_audience_csv rejects traversal outside BASE_DIR."""
-    from src.config import BASE_DIR
     rec = _register()
     # use traversal that would escape BASE_DIR
     result = rec.tools["upload_custom_audience_csv"](

@@ -13,11 +13,11 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 from urllib.parse import urlparse
 
-import requests
+import requests  # type: ignore[import-untyped]
 
 from src.config import (
     CLOUDINARY_API_KEY,

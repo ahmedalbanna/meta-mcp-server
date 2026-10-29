@@ -8,7 +8,7 @@ import logging
 from src.config import PAGE_ID
 
 logger = logging.getLogger(__name__)
-from src.helpers import handle_error, json_dumps, page_api_call, write_guard
+from src.helpers import handle_error, json_dumps, write_guard
 from src.throttle import concurrency_limit
 
 MESSENGER_MAX_TEXT_LENGTH = 2000
@@ -17,7 +17,7 @@ CONVERSATION_FIELDS = "id,updated_time,message_count,unread_count,participants,c
 MESSAGE_FIELDS = "id,message,created_time,from,to,sticker,attachments"
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register Messenger inbox tools (raw Graph API, page token)."""
 
     def _pid(page_id: str) -> str:
@@ -28,11 +28,10 @@ def register(mcp):
     def list_conversations(page_id: str = "", limit: int = 25) -> str:
         """محادثات الصفحة على Messenger (الوارد)."""
         try:
-            data = page_api_call(
-                "GET",
-                f"{_pid(page_id)}/conversations",
-                {"fields": CONVERSATION_FIELDS, "limit": limit},
-            )
+            from src.core.services import Services
+            from src.services.messenger_service import MessengerService
+            svc = MessengerService(services) if services is not None else MessengerService(Services.default())
+            data = svc.list_conversations(page_id, limit)
             return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "list_conversations"))
@@ -42,11 +41,10 @@ def register(mcp):
     def get_conversation(conversation_id: str) -> str:
         """تفاصيل محادثة Messenger واحدة."""
         try:
-            data = page_api_call(
-                "GET",
-                conversation_id,
-                {"fields": CONVERSATION_FIELDS},
-            )
+            from src.core.services import Services
+            from src.services.messenger_service import MessengerService
+            svc = MessengerService(services) if services is not None else MessengerService(Services.default())
+            data = svc.get_conversation(conversation_id)
             return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_conversation"))
@@ -56,11 +54,10 @@ def register(mcp):
     def list_conversation_messages(conversation_id: str, limit: int = 25) -> str:
         """رسائل محادثة Messenger محددة."""
         try:
-            data = page_api_call(
-                "GET",
-                f"{conversation_id}/messages",
-                {"fields": MESSAGE_FIELDS, "limit": limit},
-            )
+            from src.core.services import Services
+            from src.services.messenger_service import MessengerService
+            svc = MessengerService(services) if services is not None else MessengerService(Services.default())
+            data = svc.list_conversation_messages(conversation_id, limit)
             return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "list_conversation_messages"))
@@ -70,11 +67,10 @@ def register(mcp):
     def get_messenger_message(message_id: str) -> str:
         """رسالة Messenger واحدة (نص، مرفقات، أطراف)."""
         try:
-            data = page_api_call(
-                "GET",
-                message_id,
-                {"fields": MESSAGE_FIELDS},
-            )
+            from src.core.services import Services
+            from src.services.messenger_service import MessengerService
+            svc = MessengerService(services) if services is not None else MessengerService(Services.default())
+            data = svc.get_message(message_id)
             return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_messenger_message"))
@@ -85,20 +81,10 @@ def register(mcp):
     def send_messenger_message(recipient_id: str, text: str, page_id: str = "") -> str:
         """إرسال رد عبر Messenger إلى المستخدم الذي بدأ المحادثة."""
         try:
-            if len(text) > MESSENGER_MAX_TEXT_LENGTH:
-                return json_dumps(
-                    {"error": f"النص طويل جدًا ({len(text)} حرف). الحد الأقصى {MESSENGER_MAX_TEXT_LENGTH}."}
-                )
-            result = page_api_call(
-                "POST",
-                f"{_pid(page_id)}/messages",
-                {
-                    "recipient": {"id": recipient_id},
-                    "messaging_type": "RESPONSE",
-                    "message": {"text": text},
-                },
-            )
-            return json_dumps({"recipient_id": recipient_id, "result": result})
+            from src.core.services import Services
+            from src.services.messenger_service import MessengerService
+            svc = MessengerService(services) if services is not None else MessengerService(Services.default())
+            return json_dumps(svc.send_message(recipient_id, text, page_id))
         except Exception as e:
             return json_dumps(handle_error(e, "send_messenger_message"))
 
@@ -108,15 +94,10 @@ def register(mcp):
     def mark_messenger_seen(recipient_id: str, page_id: str = "") -> str:
         """وضع علامة "تمت القراءة" على رسائل المستخدم (mark_seen)."""
         try:
-            result = page_api_call(
-                "POST",
-                f"{_pid(page_id)}/messages",
-                {
-                    "recipient": {"id": recipient_id},
-                    "sender_action": "mark_seen",
-                },
-            )
-            return json_dumps({"recipient_id": recipient_id, "result": result})
+            from src.core.services import Services
+            from src.services.messenger_service import MessengerService
+            svc = MessengerService(services) if services is not None else MessengerService(Services.default())
+            return json_dumps(svc.mark_seen(recipient_id, page_id))
         except Exception as e:
             return json_dumps(handle_error(e, "mark_messenger_seen"))
 
@@ -126,16 +107,10 @@ def register(mcp):
     def set_messenger_typing(recipient_id: str, typing: bool = True, page_id: str = "") -> str:
         """إرسال مؤشر الكتابة (typing_on/typing_off) داخل محادثة Messenger."""
         try:
-            action = "typing_on" if typing else "typing_off"
-            result = page_api_call(
-                "POST",
-                f"{_pid(page_id)}/messages",
-                {
-                    "recipient": {"id": recipient_id},
-                    "sender_action": action,
-                },
-            )
-            return json_dumps({"recipient_id": recipient_id, "action": action, "result": result})
+            from src.core.services import Services
+            from src.services.messenger_service import MessengerService
+            svc = MessengerService(services) if services is not None else MessengerService(Services.default())
+            return json_dumps(svc.set_typing(recipient_id, typing, page_id))
         except Exception as e:
             return json_dumps(handle_error(e, "set_messenger_typing"))
 

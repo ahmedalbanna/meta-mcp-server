@@ -62,7 +62,7 @@ def load_saved_events(limit: int = 50) -> list[dict]:
     return events
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register webhook integration tools."""
 
     from src.helpers import json_dumps
@@ -76,21 +76,10 @@ def register(mcp):
         source: queue (ال-events المخزنة في الذاكرة فقط) | saved (الملفات) | both (الاثنان).
         """
         try:
-            events = []
-            if source in ("queue", "both"):
-                events.extend(get_queued_events(limit))
-            if source in ("saved", "both"):
-                saved = load_saved_events(limit)
-                existing_ids = {e.get("id") for e in events}
-                for s in saved:
-                    if s.get("id") not in existing_ids:
-                        events.append(s)
-            return json_dumps(
-                {
-                    "events": events[:limit],
-                    "count": len(events[:limit]),
-                }
-            )
+            from src.core.services import Services
+            from src.services.events_service import EventsService
+            svc = EventsService(services) if services is not None else EventsService(Services.default())
+            return json_dumps(svc.get_webhook_events(limit, source))
         except Exception as e:
             return json_dumps({"error": str(e)})
 
@@ -102,13 +91,10 @@ def register(mcp):
         مفيد للمعالجةBitConverter.
         """
         try:
-            events = pop_queued_events(limit)
-            return json_dumps(
-                {
-                    "events": events,
-                    "count": len(events),
-                }
-            )
+            from src.core.services import Services
+            from src.services.events_service import EventsService
+            svc = EventsService(services) if services is not None else EventsService(Services.default())
+            return json_dumps(svc.pop_webhook_events(limit))
         except Exception as e:
             return json_dumps({"error": str(e)})
 
@@ -117,16 +103,10 @@ def register(mcp):
     def get_webhook_event_count() -> str:
         """عدد أحداث Webhook المخزنة حالياً في الذاكرة والملفات."""
         try:
-            queue_count = len(_event_queue)
-            webhook_dir = REPORT_DIR / "webhooks"
-            file_count = len(list(webhook_dir.glob("event_*.json"))) if webhook_dir.exists() else 0
-            return json_dumps(
-                {
-                    "queued": queue_count,
-                    "saved_files": file_count,
-                    "total": queue_count + file_count,
-                }
-            )
+            from src.core.services import Services
+            from src.services.events_service import EventsService
+            svc = EventsService(services) if services is not None else EventsService(Services.default())
+            return json_dumps(svc.get_event_count())
         except Exception as e:
             return json_dumps({"error": str(e)})
 

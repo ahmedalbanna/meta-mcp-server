@@ -515,7 +515,7 @@ def test_competitor_report_consolidates_everything(mock_meta_sdk_recorded):
     assert ig["avg_likes"] == 155.0
     assert ig["avg_comments"] == 16.0
     assert ig["engagement_rate"] == round(171 / 22719 * 100, 3)
-    assert [h["tag"] for h in ig["top_hashtags"]][:2] == ["#كارتير", "#صنعاء"] or ig["top_hashtags"]
+    assert [h["tag"] for h in ig["top_hashtags"]][:2] == ["#كارتير", "#استيل"]
     # best post first
     assert out["instagram"]["latest_posts"][0]["likes"] == 300
     assert out["instagram"]["latest_posts"][0]["type"] == "VIDEO"
@@ -556,6 +556,9 @@ def test_module_registers_tools_resources_prompts():
         "compare_competitors",
         "discover_instagram_business",
         "competitor_report",
+        "snapshot_competitor",
+        "list_competitor_snapshots",
+        "diff_competitor_snapshots",
     }
     assert len(recorder.resources) >= 2
     assert len(recorder.prompts) >= 2

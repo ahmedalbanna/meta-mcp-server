@@ -9,11 +9,11 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 from src.config import BUSINESS_ID, INSTAGRAM_BUSINESS_ID, PAGE_ID
-from src.helpers import api_call, handle_error, json_dumps, to_dict, write_guard, get_page_api
+from src.helpers import api_call, get_page_api, handle_error, json_dumps, to_dict, write_guard
 from src.throttle import concurrency_limit
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register Yemen bundle tools."""
 
     from facebook_business.adobjects.business import Business
@@ -28,15 +28,15 @@ def register(mcp):
 
             return host_image(path)
         except Exception:
-            import requests
+            import requests  # type: ignore[import-untyped]
 
             with open(path, "rb") as f:
                 r = requests.post("https://uguu.se/upload.php", files={"files[]": f}, timeout=60)
                 r.raise_for_status()
                 data = r.json()
                 if not data.get("success"):
-                    raise RuntimeError(f"host fail: {data}")
-                return data["files"][0]["url"].replace("http://", "https://")
+                    raise RuntimeError(f"host fail: {data}") from None
+                return data["files"][0]["url"].replace("http://", "https://")  # type: ignore[no-any-return]
 
     def _collect_media(media_dir: str = "media", limit: int = 10):
         base = Path(__file__).resolve().parent.parent / media_dir
@@ -145,7 +145,6 @@ def register(mcp):
             catalog_result = None
             if cid:
                 try:
-                    import uuid
 
                     retailer = f"BUT-YEMEN-{int(time.time())}"
                     params = {
@@ -163,9 +162,9 @@ def register(mcp):
                     }
                     prod = ProductCatalog(cid).create_product(params=params)
                     catalog_result = to_dict(prod)
-                    results["catalog"] = {"catalog_id": cid, "product": catalog_result}
+                    results["catalog"] = {"catalog_id": cid, "product": catalog_result}  # type: ignore[assignment]
                 except Exception as e:
-                    results["catalog"] = {"error": str(e), "context": "create_product"}
+                    results["catalog"] = {"error": str(e), "context": "create_product"}  # type: ignore[assignment]
 
             # 4) Facebook album (multiphoto feed post)
             fb_result = None
@@ -181,9 +180,9 @@ def register(mcp):
                 post = page.create_feed(params={"message": caption, "attached_media": attached})
                 fb_dict = to_dict(post)
                 fb_result = {"post_id": fb_dict.get("id"), "photo_ids": photo_ids, "result": fb_dict, "permalink": f"https://www.facebook.com/{fb_dict.get('id','')}"}
-                results["facebook_album"] = fb_result
+                results["facebook_album"] = fb_result  # type: ignore[assignment]
             except Exception as e:
-                results["facebook_album"] = handle_error(e, "publish_yemen_product_bundle:facebook")
+                results["facebook_album"] = handle_error(e, "publish_yemen_product_bundle:facebook")  # type: ignore[assignment]
 
             # 5) Instagram carousel — with optional Product Tagging (IG Shopping)
             ig_result = None
@@ -193,7 +192,7 @@ def register(mcp):
                 # Determine product IDs to tag: explicit product_ids or auto-tag newly created catalog product
                 _pids = [p.strip() for p in (product_ids or "").split(",") if p.strip()]
                 if not _pids and tag_products and catalog_result and catalog_result.get("id"):
-                    _pids = [catalog_result.get("id")]
+                    _pids = [catalog_result.get("id")]  # type: ignore[list-item]
                 child_ids = []
                 for idx, url in enumerate(hosted):
                     params = {"image_url": url, "is_carousel_item": "true"}
@@ -222,12 +221,12 @@ def register(mcp):
                     ig_result["permalink_url"] = info.get("permalink")
                 except Exception:
                     pass
-                results["instagram_carousel"] = ig_result
+                results["instagram_carousel"] = ig_result  # type: ignore[assignment]
             except Exception as e:
-                results["instagram_carousel"] = handle_error(e, "publish_yemen_product_bundle:instagram")
+                results["instagram_carousel"] = handle_error(e, "publish_yemen_product_bundle:instagram")  # type: ignore[assignment]
 
-            results["success"] = True
-            return json_dumps(results, ensure_ascii=False)
+            results["success"] = True  # type: ignore[assignment]
+            return json_dumps(results)
         except Exception as e:
             return json_dumps(handle_error(e, "publish_yemen_product_bundle"))
 
@@ -236,38 +235,11 @@ def register(mcp):
     def get_yemen_bundle_status(catalog_id: str = "", limit: int = 5) -> str:
         """حالة حزمة اليمن — آخر منتجات + آخر منشورات FB/IG للتحقق السريع."""
         try:
-            out = {}
-            # catalog
-            if BUSINESS_ID:
-                try:
-                    from facebook_business.adobjects.business import Business
-
-                    cats = list(Business(BUSINESS_ID).get_owned_product_catalogs(params={"fields": ["id","name","product_count"]}))
-                    out["catalogs"] = [to_dict(c) for c in cats]
-                    if cats and not catalog_id:
-                        cid = cats[0]["id"] if isinstance(cats[0], dict) else to_dict(cats[0])["id"]
-                    else:
-                        cid = catalog_id
-                    if cid:
-                        from facebook_business.adobjects.productcatalog import ProductCatalog
-
-                        prods = list(ProductCatalog(cid).get_products(params={"fields": ["id","name","price","currency"]}))
-                        out["recent_products"] = [to_dict(p) for p in prods[:limit]]
-                except Exception as e:
-                    out["catalog_error"] = str(e)
-            # IG recent
-            try:
-                out["instagram_recent"] = api_call("GET", f"{INSTAGRAM_BUSINESS_ID}/media", {"fields": "id,media_type,permalink,timestamp,caption", "limit": limit})
-            except Exception as e:
-                out["instagram_error"] = str(e)
-            # FB recent via page api
-            try:
-                page = Page(PAGE_ID, api=get_page_api())
-                posts = page.get_posts(params={"fields": ["id","message","permalink_url","created_time"], "limit": limit})
-                out["facebook_recent"] = [to_dict(p) for p in posts]
-            except Exception as e:
-                out["facebook_error"] = str(e)
-            return json_dumps(out, ensure_ascii=False)
+            from src.core.services import Services
+            from src.services.yemen_bundle_service import YemenBundleService
+            svc = YemenBundleService(services) if services is not None else YemenBundleService(Services.default())
+            out = svc.get_status(catalog_id, limit)
+            return json_dumps(out)
         except Exception as e:
             return json_dumps(handle_error(e, "get_yemen_bundle_status"))
 

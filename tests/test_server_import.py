@@ -4,7 +4,7 @@ import importlib
 
 import pytest
 
-from tests.conftest import Recorder, TOOL_MODULES, register_all
+from tests.conftest import TOOL_MODULES, Recorder, register_all
 
 
 def _import_module(name):

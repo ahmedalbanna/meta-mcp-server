@@ -4,7 +4,6 @@ These catch the operator-precedence, sender_action, and waba_id bugs that the
 plain smoke tests (JSON-parse only) missed.
 """
 
-import json
 from unittest import mock
 
 from tests.conftest import Recorder, register_all
@@ -22,7 +21,7 @@ def _call(tool_name, **kwargs):
 
 
 def test_pages_operator_precedence_keeps_suffix(mock_meta_sdk_recorded):
-    result = _call("create_page_event", name="evt", start_time="2026-09-01T18:00:00+0300", page_id="123")
+    _call("create_page_event", name="evt", start_time="2026-09-01T18:00:00+0300", page_id="123")
     calls = mock_meta_sdk_recorded["page_api_call"].call_args_list
     assert calls, "page_api_call was not called"
     endpoint = calls[-1].args[1]

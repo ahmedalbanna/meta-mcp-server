@@ -6,13 +6,12 @@ analyze which hashtags actually perform for our own account.
 """
 
 import logging
-import re
 import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
 from src.config import PAGE_ID
+from src.hashtags import all_hashtags, marketing_hashtags
 from src.helpers import handle_error, json_dumps, page_api_call
 from src.llm import call_llm
 from src.throttle import concurrency_limit
@@ -30,25 +29,6 @@ def _parse_ts(value) -> datetime | None:
         return dt
     except Exception:
         return None
-
-
-def _all_hashtags(text: str) -> list[str]:
-    """Every hashtag in a message, lowercased — no filtering."""
-    return [h.lower() for h in re.findall(r"#[^\s#.,!?؛،؟]+", text or "")]
-
-
-def _is_contact_hashtag(tag: str) -> bool:
-    """True for hashtags that carry contact info rather than marketing intent.
-
-    Pages in this space overuse phone-number tags (#+967777000, #0777000000),
-    which are not marketing signals and drown out real ones. Heuristic: a tag
-    is contact info when it has at least 5 digits, or more digits than letters
-    — so tags with a year (#Dior2026) survive while #777000 does not.
-    """
-    body = tag.lstrip("#")
-    digits = sum(c.isdigit() for c in body)
-    letters = sum(c.isalpha() for c in body)
-    return digits >= 5 or (digits > 0 and digits > letters)
 
 
 def _fetch_our_posts(limit: int = 100, with_message: bool = False) -> tuple[list, str | None]:
@@ -85,7 +65,7 @@ def _post_engagement(post_id: str) -> int:
         return 0
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register content-creation & optimization tools."""
 
     # ------------------------------------------------------------------
@@ -250,58 +230,11 @@ def register(mcp):
         يرجّع: أفضل 5 slots (يوم + ساعة) + أسوأ 3 + توصية.
         """
         try:
-            if days <= 0:
-                return json_dumps({"error": "days يجب أن تكون > 0"})
-            posts, err = _fetch_our_posts(limit=100)
-            if not posts:
-                return json_dumps({"error": err or "لا توجد منشورات", "metric": metric})
-            rows: list[dict[str, Any]] = []
-            for p in posts:
-                cid = str(p.get("id") or "")
-                dt = _parse_ts(p.get("created_time"))
-                if not dt or not cid:
-                    continue
-                rows.append({"dt": dt, "engagement": _post_engagement(cid)})
-
-            if not rows:
-                return json_dumps({"error": "لا توجد منشورات", "metric": metric})
-
-            # bucket by (weekday, hour)
-            buckets: dict[tuple[int, int], list[int]] = defaultdict(list)
-            for r in rows:
-                key = (r["dt"].weekday(), r["dt"].hour)
-                buckets[key].append(r["engagement"])
-
-            slots: list[dict[str, Any]] = []
-            for (wd, hr), vals in buckets.items():
-                slots.append(
-                    {
-                        "weekday": ["الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"][wd],
-                        "weekday_num": wd,
-                        "hour": hr,
-                        "hour_label": f"{hr:02d}:00",
-                        "posts": len(vals),
-                        "avg_engagement": round(sum(vals) / len(vals), 1),
-                        "total_engagement": sum(vals),
-                    }
-                )
-            slots.sort(key=lambda s: (s["avg_engagement"], s["posts"]), reverse=True)
-            best = slots[:5]
-            worst = sorted(slots, key=lambda s: s["avg_engagement"])[:3]
-            return json_dumps(
-                {
-                    "analyzed_posts": len(rows),
-                    "best_slots": best,
-                    "worst_slots": worst,
-                    "recommendation": (
-                        f"انشر على {best[0]['weekday']} في {best[0]['hour_label']} "
-                        f"(متوسط تفاعل {best[0]['avg_engagement']})"
-                        if best
-                        else "لا توجد بيانات كافية"
-                    ),
-                    "note": "يُوصى بـ 3-5 منشورات/أسبوع في أفضل Slots (لا 6 في يوم واحد)",
-                }
-            )
+            from src.core.services import Services
+            from src.services.content_tools_service import ContentToolsService
+            svc = ContentToolsService(services) if services is not None else ContentToolsService(Services.default())
+            data = svc.best_posting_time(days, metric)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "best_posting_time"))
 
@@ -327,9 +260,9 @@ def register(mcp):
             skipped_contact = 0
             for p in posts:
                 cid = str(p.get("id") or "")
-                raw_tags = _all_hashtags(p.get("message") or "")
-                tags = [t for t in raw_tags if not _is_contact_hashtag(t)]
-                skipped_contact += len(raw_tags) - len(tags)
+                message = p.get("message") or ""
+                tags = marketing_hashtags(message)
+                skipped_contact += len(all_hashtags(message)) - len(tags)
                 if not tags or not cid:
                     continue
                 eng = _post_engagement(cid)

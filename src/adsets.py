@@ -1,19 +1,17 @@
 import asyncio
-import json
 import logging
 import time
 
 logger = logging.getLogger(__name__)
 
-from src.config import AD_ACCOUNT_ID, resolve_ad_account_id
+from src.config import AD_ACCOUNT_ID
 
 
-def register(mcp):
+def register(mcp, services=None):
     """Register ad set tools."""
 
     from facebook_business.adobjects.adaccount import AdAccount
     from facebook_business.adobjects.adset import AdSet
-    from facebook_business.adobjects.campaign import Campaign
 
     from src.helpers import handle_error, json_dumps, to_dict, write_guard
     from src.throttle import concurrency_limit
@@ -23,26 +21,11 @@ def register(mcp):
     def list_adsets(campaign_id: str = "", limit: int = 25, ad_account_id: str = "") -> str:
         """قائمة المجموعات الإعلانية (يمكن تحديد حملة معينة)."""
         try:
-            from src.utils import paginate
-
-            fields = [
-                AdSet.Field.name,
-                AdSet.Field.status,
-                AdSet.Field.targeting,
-                AdSet.Field.daily_budget,
-                AdSet.Field.lifetime_budget,
-                AdSet.Field.optimization_goal,
-                AdSet.Field.billing_event,
-                AdSet.Field.id,
-            ]
-
-            def _getter(params):
-                if campaign_id:
-                    return Campaign(campaign_id).get_ad_sets(params=params)
-                return AdAccount(resolve_ad_account_id(ad_account_id)).get_ad_sets(params=params)
-
-            rows = paginate(_getter, fields=fields, limit=limit)
-            return json_dumps(rows)
+            from src.core.services import Services
+            from src.services.adsets_service import AdsetsService
+            svc = AdsetsService(services) if services is not None else AdsetsService(Services.default())
+            data = svc.list_adsets(campaign_id, limit, ad_account_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "list_adsets"))
 
@@ -51,23 +34,11 @@ def register(mcp):
     def get_adset(adset_id: str) -> str:
         """تفاصيل مجموعة إعلانية واحدة."""
         try:
-            adset = AdSet(adset_id)
-            info = adset.api_get(
-                fields=[
-                    AdSet.Field.name,
-                    AdSet.Field.status,
-                    AdSet.Field.targeting,
-                    AdSet.Field.daily_budget,
-                    AdSet.Field.lifetime_budget,
-                    AdSet.Field.optimization_goal,
-                    AdSet.Field.billing_event,
-                    AdSet.Field.bid_amount,
-                    AdSet.Field.pacing_type,
-                    AdSet.Field.start_time,
-                    AdSet.Field.end_time,
-                ]
-            )
-            return json_dumps(to_dict(info))
+            from src.core.services import Services
+            from src.services.adsets_service import AdsetsService
+            svc = AdsetsService(services) if services is not None else AdsetsService(Services.default())
+            data = svc.get_adset(adset_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "get_adset"))
 
@@ -93,30 +64,13 @@ def register(mcp):
         advantage_audience: تفعيل Advantage+ Audience (توسيع الاستهداف تلقائيًا) — افتراضي false للتحكم الدقيق.
         """
         try:
-            if not targeting:
-                targeting = json_dumps({"geo_locations": {"countries": ["US"]}})
-            target = json.loads(targeting)
-            # Phase 2.3: explicit Advantage+ toggle (default 0 = off for deterministic tests)
-            target["targeting_automation"] = {"advantage_audience": 1 if advantage_audience else 0}
-            targeting = json_dumps(target)
-            account = AdAccount(resolve_ad_account_id(ad_account_id))
-            params = {
-                AdSet.Field.name: name,
-                AdSet.Field.optimization_goal: optimization_goal,
-                AdSet.Field.billing_event: billing_event,
-                AdSet.Field.targeting: targeting,
-                AdSet.Field.status: status,
-                "campaign_id": campaign_id,
-            }
-            if daily_budget and daily_budget > 0:
-                params[AdSet.Field.daily_budget] = str(daily_budget)
-            if bid_amount and bid_amount > 0:
-                params[AdSet.Field.bid_strategy] = "LOWEST_COST_WITH_BID_CAP"
-                params[AdSet.Field.bid_amount] = str(bid_amount)
-            else:
-                params[AdSet.Field.bid_strategy] = "LOWEST_COST_WITHOUT_CAP"
-            adset = account.create_ad_set(params=params)
-            return json_dumps(to_dict(adset))
+            from src.core.services import Services
+            from src.services.adsets_service import AdsetsService
+            svc = AdsetsService(services) if services is not None else AdsetsService(Services.default())
+            data = svc.create_adset(name, campaign_id, daily_budget, optimization_goal,
+                                    billing_event, targeting, status, bid_amount,
+                                    advantage_audience, ad_account_id)
+            return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "create_adset"))
 
@@ -126,13 +80,10 @@ def register(mcp):
     def update_adset_status(adset_id: str, status: str) -> str:
         """تغيير حالة مجموعة إعلانية (ACTIVE, PAUSED, DELETED, ARCHIVED)."""
         try:
-            valid = {"ACTIVE", "PAUSED", "DELETED", "ARCHIVED"}
-            status = status.upper()
-            if status not in valid:
-                return json_dumps({"error": f"status غير صالح. القيم: {', '.join(sorted(valid))}"})
-            adset = AdSet(adset_id)
-            adset.api_update(params={AdSet.Field.status: status})
-            return json_dumps({"success": True, "adset_id": adset_id, "new_status": status})
+            from src.core.services import Services
+            from src.services.adsets_service import AdsetsService
+            svc = AdsetsService(services) if services is not None else AdsetsService(Services.default())
+            return json_dumps(svc.update_status(adset_id, status))
         except Exception as e:
             return json_dumps(handle_error(e, "update_adset_status"))
 
@@ -142,16 +93,10 @@ def register(mcp):
     def update_adset_budget(adset_id: str, daily_budget: int = 0, lifetime_budget: int = 0) -> str:
         """تعديل ميزانية مجموعة إعلانية (بالعملة الصغرى)."""
         try:
-            adset = AdSet(adset_id)
-            params = {}
-            if daily_budget and daily_budget > 0:
-                params[AdSet.Field.daily_budget] = daily_budget
-            if lifetime_budget and lifetime_budget > 0:
-                params[AdSet.Field.lifetime_budget] = lifetime_budget
-            if not params:
-                return json_dumps({"error": "حدد ميزانية يومية أو إجمالية"})
-            adset.api_update(params=params)
-            return json_dumps({"success": True, "adset_id": adset_id, "result": params})
+            from src.core.services import Services
+            from src.services.adsets_service import AdsetsService
+            svc = AdsetsService(services) if services is not None else AdsetsService(Services.default())
+            return json_dumps(svc.update_budget(adset_id, daily_budget, lifetime_budget))
         except Exception as e:
             return json_dumps(handle_error(e, "update_adset_budget"))
 
@@ -165,14 +110,10 @@ def register(mcp):
         advantage_audience: None=عدم تغيير، true/false لضبط Advantage+ Audience
         """
         try:
-            target = json.loads(targeting)
-            if advantage_audience is not None:
-                target["targeting_automation"] = {"advantage_audience": 1 if advantage_audience else 0}
-            else:
-                target.setdefault("targeting_automation", {"advantage_audience": 0})
-            adset = AdSet(adset_id)
-            adset.api_update(params={AdSet.Field.targeting: json_dumps(target)})
-            return json_dumps({"success": True, "adset_id": adset_id, "targeting": target})
+            from src.core.services import Services
+            from src.services.adsets_service import AdsetsService
+            svc = AdsetsService(services) if services is not None else AdsetsService(Services.default())
+            return json_dumps(svc.update_targeting(adset_id, targeting, advantage_audience))
         except Exception as e:
             return json_dumps(handle_error(e, "update_adset_targeting"))
 
@@ -185,11 +126,12 @@ def register(mcp):
     ) -> str:
         """تحليلات التسليم لمجموعة إعلانية (delivery insights: spend/reach/frequency)."""
         try:
-            fields = [m.strip() for m in metrics.split(",") if m.strip()]
-            insights = AdSet(adset_id).get_insights(params={"date_preset": date_preset, "fields": fields})
-            rows = [__import__("src.helpers", fromlist=["to_dict"]).to_dict(i) for i in insights]
+            from src.core.services import Services
+            from src.services.adsets_service import AdsetsService
+            svc = AdsetsService(services) if services is not None else AdsetsService(Services.default())
+            rows = svc.get_delivery_insights(adset_id, date_preset, metrics)
             if not rows:
-                return json_dumps({"data": [], "count": 0, "message": "لا توجد بيانات"})
+                return json_dumps({"data": [], "count": 0, "message": "لا توجد بيانات", "adset_id": adset_id})
             return json_dumps({"data": rows, "count": len(rows), "adset_id": adset_id})
         except Exception as e:
             return json_dumps(handle_error(e, "get_adset_delivery_insights"))
