@@ -3,7 +3,7 @@
 import hashlib
 import json
 
-from tests.conftest import Recorder, register_all
+from tests.conftest import TEST_SERVICES, Recorder, register_all
 
 
 def _register():
@@ -14,8 +14,7 @@ def _register():
 
 def test_reports_excel_generates_file(mock_meta_sdk, tmp_path, monkeypatch):
     """generate_campaign_report with format=excel creates .xlsx."""
-    monkeypatch.setattr("src.reports.REPORT_DIR", tmp_path)
-    monkeypatch.setattr("src.config.REPORT_DIR", tmp_path)
+    TEST_SERVICES.config.report_dir = tmp_path
     rec = _register()
     result = rec.tools["generate_campaign_report"](format="excel", filename="test_excel")
     data = json.loads(result)
@@ -24,8 +23,7 @@ def test_reports_excel_generates_file(mock_meta_sdk, tmp_path, monkeypatch):
 
 
 def test_reports_csv_generates_file(mock_meta_sdk, tmp_path, monkeypatch):
-    monkeypatch.setattr("src.reports.REPORT_DIR", tmp_path)
-    monkeypatch.setattr("src.config.REPORT_DIR", tmp_path)
+    TEST_SERVICES.config.report_dir = tmp_path
     rec = _register()
     result = rec.tools["generate_campaign_report"](format="csv", filename="test_csv")
     data = json.loads(result)
@@ -52,6 +50,7 @@ def test_audience_hashing_sha256():
 
 def test_webhook_signature_tampered_rejected(monkeypatch):
     import webhook_server
+
     monkeypatch.setattr(webhook_server, "APP_SECRET", "secret")
     assert webhook_server.verify_signature(b'{"a":1}', "sha256=deadbeef") is False
 
@@ -61,6 +60,7 @@ def test_webhook_signature_valid(monkeypatch):
     import hmac
 
     import webhook_server
+
     monkeypatch.setattr(webhook_server, "APP_SECRET", "secret")
     body = b'{"entry":[]}'
     sig = "sha256=" + hmac.new(b"secret", body, hashlib.sha256).hexdigest()
@@ -70,7 +70,8 @@ def test_webhook_signature_valid(monkeypatch):
 def test_sanitize_path_traversal_blocked(tmp_path):
     import pytest
 
-    from src.helpers import sanitize_path
+    from src.utils import sanitize_path
+
     with pytest.raises(ValueError):
         sanitize_path("../../etc/passwd", tmp_path)
     with pytest.raises(ValueError):
@@ -78,7 +79,8 @@ def test_sanitize_path_traversal_blocked(tmp_path):
 
 
 def test_sanitize_path_allowed(tmp_path):
-    from src.helpers import sanitize_path
+    from src.utils import sanitize_path
+
     (tmp_path / "sub").mkdir()
     p = sanitize_path("sub/file.txt", tmp_path)
     assert str(p).startswith(str(tmp_path))
@@ -110,7 +112,8 @@ def test_error_contract_includes_code_subcode(mock_meta_sdk):
     """handle_error returns code/subcode fields."""
     from facebook_business.exceptions import FacebookRequestError
 
-    from src.helpers import handle_error
+    from src.utils import handle_error
+
     err = FacebookRequestError(
         message="bad",
         request_context={},
@@ -126,15 +129,18 @@ def test_error_contract_includes_code_subcode(mock_meta_sdk):
 
 
 def test_write_guard_rejection_includes_code():
-    import src.helpers as h
-    from src.helpers import json_dumps, write_guard
+    import src.utils as h
+    from src.utils import json_dumps, write_guard
+
     # ensure writes disabled
     orig = h.ENABLE_WRITES
     h.ENABLE_WRITES = False
     try:
+
         @write_guard
         def dummy(a, status="ACTIVE"):
             return json_dumps({"ok": True})
+
         res = dummy(a=1, status="ACTIVE")
         data = json.loads(res)
         assert data.get("guard") is True
@@ -146,7 +152,8 @@ def test_write_guard_rejection_includes_code():
 
 def test_bulk_update_products_fixed(mock_meta_sdk):
     """Regression: bulk_update_products no longer NameError."""
-    import src.helpers as h
+    import src.utils as h
+
     orig = h.ENABLE_WRITES
     h.ENABLE_WRITES = True
     try:
@@ -166,8 +173,6 @@ def test_upload_audience_csv_traversal_blocked(mock_meta_sdk, tmp_path, monkeypa
     """upload_custom_audience_csv rejects traversal outside BASE_DIR."""
     rec = _register()
     # use traversal that would escape BASE_DIR
-    result = rec.tools["upload_custom_audience_csv"](
-        audience_id="999", csv_path="../../etc/passwd", schema="EMAIL"
-    )
+    result = rec.tools["upload_custom_audience_csv"](audience_id="999", csv_path="../../etc/passwd", schema="EMAIL")
     data = json.loads(result)
     assert "error" in data

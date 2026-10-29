@@ -27,10 +27,9 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 from src.competitor_content import fetch_business_media
-from src.config import INSTAGRAM_BUSINESS_ID, PAGE_ID
 from src.hashtags import marketing_hashtags
-from src.helpers import api_call, handle_error, json_dumps, page_api_call
 from src.throttle import concurrency_limit
+from src.utils import handle_error, json_dumps
 
 SECONDS_PER_DAY = 86400
 
@@ -174,8 +173,10 @@ def _verdict(profile: dict) -> dict:
     return {"score": score, "level": level, "notes": notes or ["لا ملاحظات سلبية"]}
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register competitive-intelligence tools."""
+
+    from src.utils import api_call, page_api_call
 
     def _api(method: str, path: str, params: dict, page_id: str = "") -> Any:
         """Route a Graph call through the right token.
@@ -185,7 +186,7 @@ def register(mcp, services=None):
         fall back to the user token, which needs Page Public Content Access.
         """
         data: Any
-        if page_id and PAGE_ID and str(page_id) == str(PAGE_ID):
+        if page_id and services.config.page_id and str(page_id) == str(services.config.page_id):
             data = page_api_call(method, path, params)
         else:
             data = api_call(method, path, params)
@@ -378,9 +379,9 @@ def register(mcp, services=None):
             q = " ".join(parts)
             if not q:
                 return json_dumps({"error": "حدد كلمة مفتاحية (query) على الأقل"})
-            from src.core.services import Services
             from src.services.competitor_service import CompetitorService
-            svc = CompetitorService(services) if services is not None else CompetitorService(Services.default())
+
+            svc = CompetitorService(services)
             out = svc.search_business_pages(query, city, limit, exclude_our_page)
             out["next_step"] = "analyze_competitor_page(page_id) لتحليل أي صفحة، أو compare_competitors(ids) للمقارنة"
             if not out.get("results"):
@@ -436,9 +437,9 @@ def register(mcp, services=None):
             results.append(row)
         # Instagram hashtag search (needs our own IG business id)
         ig_row = {"endpoint": "instagram_hashtag_search", "required_feature": "Instagram Public Content Access"}
-        if INSTAGRAM_BUSINESS_ID:
+        if services.config.instagram_business_id:
             try:
-                api_call("GET", "ig_hashtag_search", {"user_id": INSTAGRAM_BUSINESS_ID, "q": "test"})
+                api_call("GET", "ig_hashtag_search", {"user_id": services.config.instagram_business_id, "q": "test"})
                 ig_row["status"] = "available"
             except Exception as e:
                 from facebook_business.exceptions import FacebookRequestError
@@ -505,8 +506,13 @@ def register(mcp, services=None):
             if not handle:
                 return json_dumps({"error": "handle مطلوب"})
             handle = handle.lstrip("@")
-            if not INSTAGRAM_BUSINESS_ID:
-                return json_dumps({"error": "FB_IG_USER_ID غير مضبوط — اضبطه أو استخدم discover_ig_user", "guard": "ig_business_required"})
+            if not services.config.instagram_business_id:
+                return json_dumps(
+                    {
+                        "error": "FB_IG_USER_ID غير مضبوط — اضبطه أو استخدم discover_ig_user",
+                        "guard": "ig_business_required",
+                    }
+                )
             if not _IG_HANDLE_RE.match(handle):
                 return json_dumps({"error": f"handle غير صالح: {handle!r} (أحرف/أرقام/./_ فقط، 1-30)"})
             report = {"handle": handle, "window_days": days}
@@ -515,7 +521,7 @@ def register(mcp, services=None):
             try:
                 ig = api_call(
                     "GET",
-                    INSTAGRAM_BUSINESS_ID,
+                    services.config.instagram_business_id,
                     {
                         "fields": (
                             f"business_discovery.username({handle})"
@@ -652,8 +658,8 @@ def register(mcp, services=None):
         """
         try:
             ids = [p.strip() for p in (page_ids or "").split(",") if p.strip()]
-            if include_ours and PAGE_ID and str(PAGE_ID) not in ids:
-                ids.append(str(PAGE_ID))
+            if include_ours and services.config.page_id and str(services.config.page_id) not in ids:
+                ids.append(str(services.config.page_id))
             if not ids:
                 return json_dumps({"error": "حدد معرّف صفحة واحدة على الأقل (page_ids)"})
             if len(ids) > 15:
@@ -666,7 +672,7 @@ def register(mcp, services=None):
                     rows.append(_fetch_page_profile(pid, days))
                 except Exception as e:
                     errors.append({"page_id": pid, "error": handle_error(e, "compare_competitors")})
-            ours = str(PAGE_ID)
+            ours = str(services.config.page_id)
             rows.sort(
                 key=lambda r: (
                     r.get("engagement_rate") is not None,
@@ -742,7 +748,7 @@ def register(mcp, services=None):
         المستهدف حساب أعمال/مبدعين عام.
         """
         try:
-            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            ig_id = instagram_business_id or services.config.instagram_business_id
             if not ig_id:
                 return json_dumps({"error": "حدد instagram_business_id أو اضبط FB_IG_USER_ID في .env"})
             handle = username.strip().lstrip("@")
@@ -812,7 +818,8 @@ def register(mcp, services=None):
     # ------------------------------------------------------------------
     def _extract_price_safe(caption: str):
         import re as _re
-        text = (caption or "")
+
+        text = caption or ""
         # Arabic digits
         text = text.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
         m = _re.search(r"(\d[\d.,]*)\s*(?:الف|ألف)", text)
@@ -854,9 +861,9 @@ def register(mcp, services=None):
         لمقارنة آخر لقطتين.
         """
         try:
-            from src.core.services import Services
             from src.services.competitor_service import CompetitorService
-            svc = CompetitorService(services) if services is not None else CompetitorService(Services.default())
+
+            svc = CompetitorService(services)
             result = svc.snapshot(handle, platform, days)
             return json_dumps(result)
         except Exception as e:
@@ -867,9 +874,9 @@ def register(mcp, services=None):
     def list_competitor_snapshots(handle: str, platform: str = "instagram", limit: int = 10) -> str:
         """سرد لقطات منافس المحفوظة (الأحدث أولاً)."""
         try:
-            from src.core.services import Services
             from src.services.competitor_service import CompetitorService
-            svc = CompetitorService(services) if services is not None else CompetitorService(Services.default())
+
+            svc = CompetitorService(services)
             result = svc.list_snapshots(handle, platform, limit)
             return json_dumps(result)
         except Exception as e:
@@ -880,9 +887,9 @@ def register(mcp, services=None):
     def diff_competitor_snapshots(handle: str, platform: str = "instagram") -> str:
         """مقارنة آخر لقطتين لمنافس: تغيّر المتابعين، التفاعل، الأسعار."""
         try:
-            from src.core.services import Services
             from src.services.competitor_service import CompetitorService
-            svc = CompetitorService(services) if services is not None else CompetitorService(Services.default())
+
+            svc = CompetitorService(services)
             result = svc.diff(handle, platform)
             return json_dumps(result)
         except Exception as e:

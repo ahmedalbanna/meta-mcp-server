@@ -6,14 +6,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from facebook_business.adobjects.business import Business
-from facebook_business.adobjects.page import Page
-from facebook_business.adobjects.productcatalog import ProductCatalog
-from facebook_business.adobjects.productitem import ProductItem
-
-from src.config import BUSINESS_ID, INSTAGRAM_BUSINESS_ID, PAGE_ID
 from src.core.services import Services
-from src.helpers import api_call, get_page_api, handle_error, to_dict
+from src.utils import handle_error, to_dict
 
 
 class YemenBundleService:
@@ -24,37 +18,38 @@ class YemenBundleService:
 
     def get_status(self, catalog_id: str = "", limit: int = 5) -> dict[str, Any]:
         out: dict[str, Any] = {}
-        bid = BUSINESS_ID
+        bid = self.config.business_id
         if bid:
             try:
-                cats = list(
-                    Business(bid).get_owned_product_catalogs(params={"fields": ["id", "name", "product_count"]})
-                )
+                data = self.api.get(f"{bid}/owned_product_catalogs", {"fields": "id,name,product_count"})
+                cats = data.get("data", []) if isinstance(data, dict) else []
                 out["catalogs"] = [to_dict(c) for c in cats]
                 if cats and not catalog_id:
                     cid = cats[0]["id"] if isinstance(cats[0], dict) else to_dict(cats[0])["id"]
                 else:
                     cid = catalog_id
                 if cid:
-                    prods = list(
-                        ProductCatalog(cid).get_products(params={"fields": ["id", "name", "price", "currency"]})
-                    )
+                    prods_data = self.api.get(f"{cid}/products", {"fields": "id,name,price,currency"})
+                    prods = prods_data.get("data", []) if isinstance(prods_data, dict) else []
                     out["recent_products"] = [to_dict(p) for p in prods[:limit]]
             except Exception as e:
                 out["catalog_error"] = str(e)
-        ig_id = INSTAGRAM_BUSINESS_ID
+        ig_id = self.config.instagram_business_id
         if ig_id:
             try:
                 out["instagram_recent"] = self.api.get(
-                    f"{ig_id}/media", {"fields": "id,media_type,permalink,timestamp,caption", "limit": limit}
+                    f"{ig_id}/media",
+                    {"fields": "id,media_type,permalink,timestamp,caption", "limit": limit},
                 )
             except Exception as e:
                 out["instagram_error"] = str(e)
         try:
-            page = Page(PAGE_ID, api=get_page_api())
-            posts = page.get_posts(
-                params={"fields": ["id", "message", "permalink_url", "created_time"], "limit": limit}
+            pid = self.config.page_id
+            data = self.api.page_get(
+                f"{pid}/posts",
+                {"fields": "id,message,permalink_url,created_time", "limit": limit},
             )
+            posts = data.get("data", []) if isinstance(data, dict) else []
             out["facebook_recent"] = [to_dict(p) for p in posts]
         except Exception as e:
             out["facebook_error"] = str(e)
@@ -74,7 +69,7 @@ class YemenBundleService:
                 data = r.json()
                 if not data.get("success"):
                     raise RuntimeError(f"host fail: {data}") from None
-                return str(data["files"][0]["url"]).replace("http://", "https://")  # type: ignore[no-any-return]
+                return str(data["files"][0]["url"]).replace("http://", "https://")
 
     def _collect_media(self, media_dir: str = "media", limit: int = 10):
         base = Path(__file__).resolve().parent.parent.parent / media_dir
@@ -107,8 +102,8 @@ class YemenBundleService:
     ) -> dict[str, Any]:
         import json as _json
 
-        pid = page_id or PAGE_ID
-        ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+        pid = page_id or self.config.page_id
+        ig_id = instagram_business_id or self.config.instagram_business_id
 
         files = self._collect_media(media_dir, 10)
         if len(files) < 2:
@@ -164,31 +159,31 @@ class YemenBundleService:
         # Catalog product
         cid = catalog_id
         if not cid:
-            bid = BUSINESS_ID
+            bid = self.config.business_id
             if bid:
-                cats = Business(bid).get_owned_product_catalogs(params={"fields": ["id"]})
-                cats = list(cats)
+                data = self.api.get(f"{bid}/owned_product_catalogs", {"fields": "id"})
+                cats = data.get("data", []) if isinstance(data, dict) else []
                 if cats:
-                    cid = cats[0]["id"] if isinstance(cats[0], dict) else cats[0].api_get(fields=["id"])["id"]
+                    cid = cats[0]["id"] if isinstance(cats[0], dict) else to_dict(cats[0])["id"]
         catalog_result = None
         if cid:
             try:
                 retailer = f"BUT-YEMEN-{int(time.time())}"
-                params = {
-                    ProductItem.Field.name: name,
-                    ProductItem.Field.price: str(int(price)),
-                    ProductItem.Field.currency: currency,
-                    ProductItem.Field.description: description + f" | عرض {offer_days} أيام - تسليم فوري - اليمن",
-                    ProductItem.Field.image_url: hosted[0],
-                    ProductItem.Field.availability: "in stock",
-                    ProductItem.Field.brand: "Dior Cartier",
-                    ProductItem.Field.retailer_id: retailer,
-                    ProductItem.Field.condition: "new",
-                    ProductItem.Field.product_type: "accessories",
-                    ProductItem.Field.custom_label_0: f"Yemen-{offer_days}days",
+                params: dict[str, Any] = {
+                    "name": name,
+                    "price": str(int(price)),
+                    "currency": currency,
+                    "description": description + f" | عرض {offer_days} أيام - تسليم فوري - اليمن",
+                    "image_url": hosted[0],
+                    "availability": "in stock",
+                    "brand": "Dior Cartier",
+                    "retailer_id": retailer,
+                    "condition": "new",
+                    "product_type": "accessories",
+                    "custom_label_0": f"Yemen-{offer_days}days",
                 }
-                prod = ProductCatalog(cid).create_product(params=params)
-                catalog_result = to_dict(prod)
+                prod_data = self.api.post(f"{cid}/products", params)
+                catalog_result = to_dict(prod_data)
                 results["catalog"] = {"catalog_id": cid, "product": catalog_result}
             except Exception as e:
                 results["catalog"] = {"error": str(e), "context": "create_product"}
@@ -196,16 +191,15 @@ class YemenBundleService:
         # Facebook album
         fb_result = None
         try:
-            page = Page(pid, api=get_page_api())
             photo_ids = []
             for url in hosted:
-                photo = page.create_photo(params={"url": url, "published": False})
-                d = to_dict(photo)
+                photo_data = self.api.page_post(f"{pid}/photos", {"url": url, "published": False})
+                d = to_dict(photo_data)
                 photo_ids.append(d.get("id"))
                 time.sleep(0.4)
             attached = [{"media_fbid": x} for x in photo_ids]
-            post = page.create_feed(params={"message": caption, "attached_media": attached})
-            fb_dict = to_dict(post)
+            post_data = self.api.page_post(f"{pid}/feed", {"message": caption, "attached_media": attached})
+            fb_dict = to_dict(post_data)
             fb_result = {
                 "post_id": fb_dict.get("id"),
                 "photo_ids": photo_ids,
@@ -231,14 +225,13 @@ class YemenBundleService:
                     else:
                         tags = [{"product_id": _pids[idx % len(_pids)], "x": 0.5, "y": 0.5}]
                     params["product_tags"] = _json.dumps(tags)
-                child = api_call("POST", f"{ig_id}/media", params)
+                child = self.api.post(f"{ig_id}/media", params)
                 cid_child = child.get("id")
                 if not cid_child:
                     raise RuntimeError(f"IG child fail: {child}")
                 child_ids.append(cid_child)
                 time.sleep(0.4)
-            container = api_call(
-                "POST",
+            container = self.api.post(
                 f"{ig_id}/media",
                 {"media_type": "CAROUSEL", "children": ",".join(child_ids), "caption": caption},
             )
@@ -246,10 +239,15 @@ class YemenBundleService:
             if not creation_id:
                 raise RuntimeError(f"IG container fail: {container}")
             time.sleep(2)
-            pub = api_call("POST", f"{ig_id}/media_publish", {"creation_id": creation_id})
-            ig_result = {"children": child_ids, "container": container, "publish": pub, "permalink": pub.get("id")}
+            pub = self.api.post(f"{ig_id}/media_publish", {"creation_id": creation_id})
+            ig_result = {
+                "children": child_ids,
+                "container": container,
+                "publish": pub,
+                "permalink": pub.get("id"),
+            }
             try:
-                info = api_call("GET", pub.get("id"), {"fields": "permalink,caption"})
+                info = self.api.get(f"{pub.get('id')}", {"fields": "permalink,caption"})
                 ig_result["permalink_url"] = info.get("permalink")
             except Exception:
                 pass

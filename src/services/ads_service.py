@@ -5,14 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from facebook_business.adobjects.ad import Ad
-from facebook_business.adobjects.adaccount import AdAccount
-from facebook_business.adobjects.adset import AdSet
-
-from src.config import resolve_ad_account_id
 from src.core.services import Services
-from src.helpers import to_dict
-from src.utils import paginate
+from src.utils import paginate, to_dict
 
 
 class AdsService:
@@ -20,114 +14,145 @@ class AdsService:
         self.services = services
         self.config = services.config
 
+    def _acct(self, ad_account_id: str = "") -> str:
+        return self.config.resolve_ad_account_id(ad_account_id)
+
     def list_ads(self, adset_id: str = "", limit: int = 25, ad_account_id: str = "") -> Any:
-        fields = [Ad.Field.name, Ad.Field.status, Ad.Field.creative, Ad.Field.adset_id,
-                  Ad.Field.created_time, Ad.Field.id]
+        fields = [
+            "name",
+            "status",
+            "creative",
+            "adset_id",
+            "created_time",
+            "id",
+        ]
 
         def _getter(params):
-            if adset_id:
-                return AdSet(adset_id).get_ads(params=params)
-            return AdAccount(resolve_ad_account_id(ad_account_id)).get_ads(params=params)
+            path = f"{adset_id}/ads" if adset_id else f"{self._acct(ad_account_id)}/ads"
+            return self.services.api.get(path, params)
 
         return paginate(_getter, fields=fields, limit=limit)
 
     def get_ad(self, ad_id: str) -> Any:
-        ad = Ad(ad_id)
-        info = ad.api_get(fields=[Ad.Field.name, Ad.Field.status, Ad.Field.creative,
-                                  Ad.Field.adset_id, Ad.Field.created_time, Ad.Field.updated_time])
-        return to_dict(info)
+        fields = [
+            "name",
+            "status",
+            "creative",
+            "adset_id",
+            "created_time",
+            "updated_time",
+        ]
+        data = self.services.api.get(f"{ad_id}", {"fields": ",".join(fields)})
+        return to_dict(data)
 
     def update_status(self, ad_id: str, status: str) -> dict[str, Any]:
         valid = {"ACTIVE", "PAUSED", "DELETED", "ARCHIVED"}
         status = status.upper()
         if status not in valid:
             raise ValueError(f"status غير صالح. القيم: {', '.join(sorted(valid))}")
-        ad = Ad(ad_id)
-        ad.api_update(params={Ad.Field.status: status})
+        self.services.api.post(f"{ad_id}", {"status": status})
         return {"success": True, "ad_id": ad_id, "new_status": status}
 
     def upload_image(self, name: str = "", image_url: str = "", file_path: str = "") -> Any:
 
-        from src.config import AD_ACCOUNT_ID as _acct
-        from src.config import BASE_DIR
-        from src.helpers import sanitize_path
+        from src.utils import sanitize_path
+
         if not image_url and not file_path:
             raise ValueError("قدّم image_url أو file_path")
-        from facebook_business.adobjects.adimage import AdImage
-        image = AdImage(parent_id=_acct)
-        params = {}
+        acct = self.config.fb_ad_account_id
+        params: dict[str, Any] = {}
         if image_url:
-            params[AdImage.Field.url] = image_url
+            params["url"] = image_url
         if file_path:
-            resolved = sanitize_path(file_path, BASE_DIR)
+            resolved = sanitize_path(file_path, self.config.base_dir)
             if not resolved.is_file():
                 raise FileNotFoundError(f"الملف غير موجود: {file_path}")
-            params[AdImage.Field.filename] = str(resolved)
+            params["filename"] = str(resolved)
         if name:
-            params[AdImage.Field.name] = name
-        result = image.api_create(parent_id=_acct, params=params)
+            params["name"] = name
+        result = self.services.api.post(f"{acct}/adimages", params)
         data = to_dict(result) if result is not None else {}
         return {"hash": data.get("hash"), "image_id": data.get("id"), "details": data}
 
     def upload_video(self, title: str = "", file_path: str = "", video_url: str = "") -> Any:
-        from src.config import AD_ACCOUNT_ID as _acct
-        from src.config import BASE_DIR
-        from src.helpers import sanitize_path
+        from src.utils import sanitize_path
+
         if not file_path and not video_url:
             raise ValueError("قدّم file_path أو video_url")
-        from facebook_business.adobjects.advideo import AdVideo
-        video = AdVideo(parent_id=_acct)
-        params = {}
+        acct = self.config.fb_ad_account_id
+        params: dict[str, Any] = {}
         if file_path:
-            resolved = sanitize_path(file_path, BASE_DIR)
+            resolved = sanitize_path(file_path, self.config.base_dir)
             if not resolved.is_file():
                 raise FileNotFoundError(f"الملف غير موجود: {file_path}")
-            params[AdVideo.Field.filename] = str(resolved)
+            params["filename"] = str(resolved)
         if video_url:
-            params[AdVideo.Field.file_url] = video_url
+            params["file_url"] = video_url
         if title:
-            params[AdVideo.Field.title] = title
-        video.api_create(parent_id=_acct, params=params)
-        return {"video_id": video.get_id(), "title": title}
+            params["title"] = title
+        result = self.services.api.post(f"{acct}/advideos", params)
+        data = to_dict(result) if result is not None else {}
+        return {"video_id": data.get("id"), "title": title}
 
-    def create_ad_creative(self, name: str, page_id: str, message: str, image_hash: str = "",
-                           image_url: str = "", video_id: str = "", link: str = "",
-                           headline: str = "", call_to_action: str = "") -> Any:
-        from facebook_business.adobjects.adaccount import AdAccount
-        from facebook_business.adobjects.adcreative import AdCreative
-
+    def create_ad_creative(
+        self,
+        name: str,
+        page_id: str,
+        message: str,
+        image_hash: str = "",
+        image_url: str = "",
+        video_id: str = "",
+        link: str = "",
+        headline: str = "",
+        call_to_action: str = "",
+    ) -> Any:
         from src.ads import _build_object_story_spec  # module-level
-        from src.config import AD_ACCOUNT_ID
-        account = AdAccount(AD_ACCOUNT_ID)
-        object_story_spec = _build_object_story_spec(page_id, message, image_hash, image_url, video_id, link, headline, call_to_action)
-        creative = account.create_ad_creative(params={
-            AdCreative.Field.name: name,
-            AdCreative.Field.object_story_spec: json.dumps(object_story_spec),
-        })
-        return to_dict(creative)
 
-    def create_ad(self, adset_id: str, name: str, creative_name: str, page_id: str, message: str,
-                  image_hash: str = "", image_url: str = "", video_id: str = "", link: str = "",
-                  headline: str = "", call_to_action: str = "", status: str = "PAUSED") -> Any:
-        import json as _json
-
-        from facebook_business.adobjects.ad import Ad
-        from facebook_business.adobjects.adaccount import AdAccount
-        from facebook_business.adobjects.adcreative import AdCreative
-
-        from src.ads import _build_object_story_spec  # module-level
-        from src.config import resolve_ad_account_id
-        account = AdAccount(resolve_ad_account_id(""))
-        object_story_spec = _build_object_story_spec(page_id, message, image_hash, image_url, video_id, link, headline, call_to_action)
-        creative = account.create_ad_creative(params={
-            AdCreative.Field.name: creative_name,
-            AdCreative.Field.object_story_spec: _json.dumps(object_story_spec),
-        })
-        params = {
-            Ad.Field.name: name,
-            "adset_id": adset_id,
-            "creative_id": creative.get_id(),
-            Ad.Field.status: status,
+        acct = self.config.fb_ad_account_id
+        object_story_spec = _build_object_story_spec(
+            page_id, message, image_hash, image_url, video_id, link, headline, call_to_action
+        )
+        params: dict[str, Any] = {
+            "name": name,
+            "object_story_spec": json.dumps(object_story_spec),
         }
-        ad = account.create_ad(params=params)
-        return to_dict(ad)
+        data = self.services.api.post(f"{acct}/adcreatives", params)
+        return to_dict(data)
+
+    def create_ad(
+        self,
+        adset_id: str,
+        name: str,
+        creative_name: str,
+        page_id: str,
+        message: str,
+        image_hash: str = "",
+        image_url: str = "",
+        video_id: str = "",
+        link: str = "",
+        headline: str = "",
+        call_to_action: str = "",
+        status: str = "PAUSED",
+    ) -> Any:
+        from src.ads import _build_object_story_spec  # module-level
+
+        acct = self.config.resolve_ad_account_id("")
+        object_story_spec = _build_object_story_spec(
+            page_id, message, image_hash, image_url, video_id, link, headline, call_to_action
+        )
+        creative_data = self.services.api.post(
+            f"{acct}/adcreatives",
+            {
+                "name": creative_name,
+                "object_story_spec": json.dumps(object_story_spec),
+            },
+        )
+        creative = to_dict(creative_data) if isinstance(creative_data, dict) else {}
+        params = {
+            "name": name,
+            "adset_id": adset_id,
+            "creative_id": creative.get("id"),
+            "status": status,
+        }
+        data = self.services.api.post(f"{acct}/ads", params)
+        return to_dict(data)

@@ -7,26 +7,23 @@ logger = logging.getLogger(__name__)
 
 import requests  # type: ignore[import-untyped]
 
-from src.config import INSTAGRAM_BUSINESS_ID
-from src.helpers import api_call, handle_error, json_dumps, sanitize_path, write_guard
 from src.throttle import concurrency_limit
+from src.utils import handle_error, json_dumps, sanitize_path, write_guard
 
 MEDIA_DOWNLOAD_DIR = Path(__file__).resolve().parent.parent / "media"
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register Instagram tools (raw Graph API)."""
-
-    from facebook_business.adobjects.igmedia import IGMedia
 
     @mcp.tool()
     @concurrency_limit()
     def get_instagram_account(instagram_business_id: str = "") -> str:
         """معلومات حساب إنستغرام المرتبط بالأعمال."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             data = svc.get_account(instagram_business_id)
             return json_dumps(data)
         except Exception as e:
@@ -37,9 +34,9 @@ def register(mcp, services=None):
     def list_instagram_media(instagram_business_id: str = "", limit: int = 25) -> str:
         """منشورات حساب إنستغرام."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             data = svc.list_media(instagram_business_id, limit)
             return json_dumps(data)
         except Exception as e:
@@ -50,9 +47,9 @@ def register(mcp, services=None):
     def get_instagram_media(media_id: str) -> str:
         """تفاصيل منشور إنستغرام واحد (كابشن، نوع، روابط، وقت النشر)."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             data = svc.get_media(media_id)
             return json_dumps(data)
         except Exception as e:
@@ -63,9 +60,9 @@ def register(mcp, services=None):
     def search_instagram_hashtag(hashtag: str, instagram_business_id: str = "") -> str:
         """البحث عن هاشتاغ على إنستغرام وإرجاع معرّف الهاشتاغ."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             data = svc.search_hashtag(hashtag, instagram_business_id)
             return json_dumps(data)
         except Exception as e:
@@ -81,9 +78,9 @@ def register(mcp, services=None):
     ) -> str:
         """أحدث أو الأكثر تفاعلاً من منشورات هاشتاغ معيّن. media_type: recent | top."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             data = svc.get_hashtag_media(hashtag_id, media_type, limit, instagram_business_id)
             return json_dumps(data)
         except Exception as e:
@@ -94,9 +91,9 @@ def register(mcp, services=None):
     def get_instagram_account_mentions(instagram_business_id: str = "", limit: int = 25) -> str:
         """المنشورات التي ذُكر فيها الحساب (Mentions)."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             data = svc.get_mentions(instagram_business_id, limit)
             return json_dumps(data)
         except Exception as e:
@@ -107,9 +104,9 @@ def register(mcp, services=None):
     def get_instagram_media_children(media_id: str) -> str:
         """جلب عناصر ألبوم كاروسيل (صور/فيديوهات) لمنشور إنستغرام معين."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             return json_dumps(svc.get_media_children(media_id))
         except Exception as e:
             return json_dumps(handle_error(e, "get_instagram_media_children"))
@@ -130,10 +127,10 @@ def register(mcp, services=None):
             else:
                 target = MEDIA_DOWNLOAD_DIR
             target.mkdir(parents=True, exist_ok=True)
-            meta = api_call("GET", media_id, {"fields": "id,media_type,media_url,caption"})
+            meta = services.api.get(media_id, {"fields": "id,media_type,media_url,caption"})
             urls = []
             if meta.get("media_type") == "CAROUSEL_ALBUM":
-                children = api_call("GET", f"{media_id}/children", {"fields": "id,media_type,media_url"})
+                children = services.api.get(f"{media_id}/children", {"fields": "id,media_type,media_url"})
                 urls = [(c["id"], c.get("media_url")) for c in children.get("data", [])]
             else:
                 urls = [(meta.get("id"), meta.get("media_url"))]
@@ -160,9 +157,9 @@ def register(mcp, services=None):
     ) -> str:
         """تحليلات منشور إنستغرام معين."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             return json_dumps(svc.get_media_insights(media_id, metric))
         except Exception as e:
             return json_dumps(handle_error(e, "get_instagram_media_insights"))
@@ -176,7 +173,7 @@ def register(mcp, services=None):
     ) -> str:
         """تحليلات على مستوى حساب إنستغرام. period: day | week | days_28."""
         try:
-            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            ig_id = instagram_business_id or services.config.instagram_business_id
             # Graph v22+: لكل مقياس قيود فترة/نوع مختلفة — نجرب الاستراتيجيتين لكل مقياس
             requested = [m.strip() for m in metric.split(",") if m.strip()]
             results = []
@@ -190,7 +187,7 @@ def register(mcp, services=None):
                 last_err = None
                 for params in attempts:
                     try:
-                        data = api_call("GET", f"{ig_id}/insights", params)
+                        data = services.api.get(f"{ig_id}/insights", params)
                         results.extend(data.get("data", []))
                         fetched = True
                         break
@@ -222,11 +219,12 @@ def register(mcp, services=None):
                      يتطلب instagram_shopping_tag_products + Shop معتمد. الحد 20 تاغ.
         """
         try:
-
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
-            return json_dumps(svc.publish_photo(image_url, caption, instagram_business_id, product_ids, product_x, product_y))
+
+            svc = InstagramService(services)
+            return json_dumps(
+                svc.publish_photo(image_url, caption, instagram_business_id, product_ids, product_x, product_y)
+            )
         except Exception as e:
             return json_dumps(handle_error(e, "publish_instagram_photo"))
 
@@ -241,9 +239,9 @@ def register(mcp, services=None):
     ) -> str:
         """نشر فيديو على إنستغرام (صفحة/تغذية)."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             return json_dumps(svc.publish_video(video_url, caption, cover_url, instagram_business_id))
         except Exception as e:
             return json_dumps(handle_error(e, "publish_instagram_video"))
@@ -260,9 +258,9 @@ def register(mcp, services=None):
     ) -> str:
         """نشر ريلز على إنستغرام."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             return json_dumps(svc.publish_reel(video_url, caption, thumb_offset, share_to_feed, instagram_business_id))
         except Exception as e:
             return json_dumps(handle_error(e, "publish_instagram_reel"))
@@ -278,9 +276,9 @@ def register(mcp, services=None):
     ) -> str:
         """نشر قصة (Story) على إنستغرام. أرسل image_url أو video_url فقط."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             return json_dumps(svc.publish_story(image_url, video_url, link, instagram_business_id))
         except Exception as e:
             return json_dumps(handle_error(e, "publish_instagram_story"))
@@ -305,7 +303,7 @@ def register(mcp, services=None):
         product_x/product_y: إحداثيات التاغ (0.0-1.0) — افتراضي 0.5,0.5 (منتصف الصورة)
         """
         try:
-            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            ig_id = instagram_business_id or services.config.instagram_business_id
             urls = [u.strip() for u in image_urls.split(",") if u.strip()]
             if not urls:
                 return json_dumps(
@@ -339,13 +337,12 @@ def register(mcp, services=None):
                         if len(urls) <= len(pids):
                             tags = [{"product_id": pids[idx % len(pids)], "x": product_x, "y": product_y}]
                     params["product_tags"] = _json.dumps(tags)
-                child = api_call("POST", f"{ig_id}/media", params)
+                child = services.api.post(f"{ig_id}/media", params)
                 cid = child.get("id")
                 if not cid:
                     return json_dumps(child)
                 child_ids.append(cid)
-            container = api_call(
-                "POST",
+            container = services.api.post(
                 f"{ig_id}/media",
                 {
                     "media_type": "CAROUSEL",
@@ -356,7 +353,7 @@ def register(mcp, services=None):
             creation_id = container.get("id")
             if not creation_id:
                 return json_dumps(container)
-            result = api_call("POST", f"{ig_id}/media_publish", {"creation_id": creation_id})
+            result = services.api.post(f"{ig_id}/media_publish", {"creation_id": creation_id})
             return json_dumps({"children": child_ids, "container": container, "publish": result})
         except Exception as e:
             return json_dumps(handle_error(e, "publish_instagram_carousel"))
@@ -370,9 +367,9 @@ def register(mcp, services=None):
         لأن Graph API لا يدعم تعديل كابشن منشور منشور).
         """
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             result = svc.add_comment(media_id, message)
             return json_dumps(result)
         except Exception as e:
@@ -386,9 +383,9 @@ def register(mcp, services=None):
         حذف منشور إنستغرام (يُستخدم في سير عمل: حذف ثم إعادة نشر بكابشن محدّث).
         """
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             result = svc.delete_media(media_id)
             return json_dumps({"id": media_id, "deleted": True, "result": result})
         except Exception as e:
@@ -403,12 +400,12 @@ def register(mcp, services=None):
         بما أن Graph API لا يدعم تعديل الكابشن مباشرة، يُعاد النشر بنفس الصور ثم يُحذف المنشور القديم.
         """
         try:
-            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
-            meta = api_call("GET", media_id, {"fields": "id,media_type,media_url"})
+            ig_id = instagram_business_id or services.config.instagram_business_id
+            meta = services.api.get(media_id, {"fields": "id,media_type,media_url"})
             media_type = meta.get("media_type", "")
 
             if media_type == "CAROUSEL_ALBUM":
-                children = api_call("GET", f"{media_id}/children", {"fields": "id,media_type,media_url"})
+                children = services.api.get(f"{media_id}/children", {"fields": "id,media_type,media_url"})
                 urls = [c["media_url"] for c in children.get("data", []) if c.get("media_url")]
                 if not urls:
                     return json_dumps(
@@ -419,8 +416,7 @@ def register(mcp, services=None):
                     )
                 child_ids = []
                 for url in urls:
-                    child = api_call(
-                        "POST",
+                    child = services.api.post(
                         f"{ig_id}/media",
                         {"image_url": url, "is_carousel_item": "true"},
                     )
@@ -428,8 +424,7 @@ def register(mcp, services=None):
                     if not cid:
                         return json_dumps(child)
                     child_ids.append(cid)
-                container = api_call(
-                    "POST",
+                container = services.api.post(
                     f"{ig_id}/media",
                     {
                         "media_type": "CAROUSEL",
@@ -446,18 +441,18 @@ def register(mcp, services=None):
                             "context": "update_instagram_media_caption",
                         }
                     )
-                container = api_call("POST", f"{ig_id}/media", {"image_url": url, "caption": caption})
+                container = services.api.post(f"{ig_id}/media", {"image_url": url, "caption": caption})
 
             creation_id = container.get("id")
             if not creation_id:
                 return json_dumps(container)
-            result = api_call("POST", f"{ig_id}/media_publish", {"creation_id": creation_id})
+            result = services.api.post(f"{ig_id}/media_publish", {"creation_id": creation_id})
             new_id = result.get("id")
             delete_ok = True
             delete_error = ""
             if new_id:
                 try:
-                    api_call("DELETE", f"{media_id}")
+                    services.api.delete(f"{media_id}")
                 except Exception as del_e:
                     delete_ok = False
                     delete_error = str(del_e)
@@ -482,21 +477,20 @@ def register(mcp, services=None):
         """
         try:
             # Get media details (caption, type, timestamp)
-            media = api_call(
-                "GET",
+            media = services.api.get(
                 media_id,
                 {"fields": "id,caption,media_type,media_product_type,permalink,timestamp,username"},
             )
             # Get engagement insights
             try:
-                insights_raw = IGMedia(media_id).get_insights(
-                    params={"metric": "reach,likes,comments,saved,total_interactions,shares"}
+                insights_data = services.api.get(
+                    f"{media_id}/insights",
+                    {"metric": "reach,likes,comments,saved,total_interactions,shares"},
                 )
                 insights = {}
-                for i in insights_raw:
-                    d = i.export_all_data()
-                    name = d.get("name", "")
-                    values = d.get("values", [])
+                for i in insights_data.get("data", []) if isinstance(insights_data, dict) else []:
+                    name = i.get("name", "")
+                    values = i.get("values", [])
                     if values:
                         insights[name] = values[0].get("value", 0)
             except Exception:
@@ -524,9 +518,9 @@ def register(mcp, services=None):
     def get_instagram_media_comments(media_id: str, limit: int = 25) -> str:
         """التعليقات على منشور إنستغرام."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             return json_dumps(svc.get_media_comments(media_id, limit))
         except Exception as e:
             return json_dumps(handle_error(e, "get_instagram_media_comments"))
@@ -537,9 +531,9 @@ def register(mcp, services=None):
     def reply_to_instagram_comment(comment_id: str, message: str) -> str:
         """الرد على تعليق إنستغرام."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             result = svc.reply_comment(comment_id, message)
             return json_dumps(result)
         except Exception as e:
@@ -551,9 +545,9 @@ def register(mcp, services=None):
     def delete_instagram_comment(comment_id: str) -> str:
         """حذف تعليق إنستغرام."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             result = svc.delete_comment(comment_id)
             return json_dumps({"id": comment_id, "deleted": True, "result": result})
         except Exception as e:
@@ -565,9 +559,9 @@ def register(mcp, services=None):
     def hide_instagram_comment(comment_id: str, hide: bool = True) -> str:
         """إخفاء أو إظهار تعليق على إنستغرام."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             result = svc.hide_comment(comment_id, hide)
             return json_dumps({"id": comment_id, "hidden": hide, "result": result})
         except Exception as e:
@@ -578,9 +572,9 @@ def register(mcp, services=None):
     def list_instagram_stories(instagram_business_id: str = "", limit: int = 25) -> str:
         """قصص إنستغرام (Stories) النشطة للحساب."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             data = svc.list_stories(instagram_business_id, limit)
             return json_dumps(data)
         except Exception as e:
@@ -592,8 +586,8 @@ def register(mcp, services=None):
     def ban_instagram_commenter(instagram_business_id: str, user_id: str) -> str:
         """حظر مستخدم من التعليق على منشورات الحساب (لا يمنع المتابعة)."""
         try:
-            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
-            result = api_call("POST", f"{ig_id}/blocked", {"user_id": user_id})
+            ig_id = instagram_business_id or services.config.instagram_business_id
+            result = services.api.post(f"{ig_id}/blocked", {"user_id": user_id})
             return json_dumps({"blocked_user_id": user_id, "result": result})
         except Exception as e:
             return json_dumps(handle_error(e, "ban_instagram_commenter"))
@@ -607,9 +601,8 @@ def register(mcp, services=None):
         end_time: طابع زمني Unix (ثوانٍ) لانتهاء الكتم.
         """
         try:
-            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
-            result = api_call(
-                "POST",
+            ig_id = instagram_business_id or services.config.instagram_business_id
+            result = services.api.post(
                 f"{ig_id}/muted_commenters",
                 {"user_id": user_id, "end_time": end_time},
             )
@@ -622,9 +615,9 @@ def register(mcp, services=None):
     def list_instagram_conversations(instagram_business_id: str = "", limit: int = 25) -> str:
         """محادثات الرسائل المباشرة (DMs) لحساب إنستغرام."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             data = svc.list_conversations(instagram_business_id, limit)
             return json_dumps(data)
         except Exception as e:
@@ -635,9 +628,9 @@ def register(mcp, services=None):
     def get_instagram_conversation(conversation_id: str) -> str:
         """تفاصيل محادثة مباشرة واحدة على إنستغرام."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             data = svc.get_conversation(conversation_id)
             return json_dumps(data)
         except Exception as e:
@@ -648,9 +641,9 @@ def register(mcp, services=None):
     def list_instagram_conversation_messages(conversation_id: str, limit: int = 25) -> str:
         """رسائل محادثة مباشرة محددة على إنستغرام."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             data = svc.list_conversation_messages(conversation_id, limit)
             return json_dumps(data)
         except Exception as e:
@@ -661,9 +654,9 @@ def register(mcp, services=None):
     def get_instagram_message(message_id: str) -> str:
         """رسالة مباشرة واحدة على إنستغرام."""
         try:
-            from src.core.services import Services
             from src.services.instagram_service import InstagramService
-            svc = InstagramService(services) if services is not None else InstagramService(Services.default())
+
+            svc = InstagramService(services)
             data = svc.get_message(message_id)
             return json_dumps(data)
         except Exception as e:
@@ -675,9 +668,8 @@ def register(mcp, services=None):
     def send_instagram_dm(instagram_business_id: str, recipient_ig_id: str, text: str) -> str:
         """إرسال رسالة مباشرة (DM) عبر إنستغرام إلى مستخدم تواصل مع الحساب."""
         try:
-            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
-            result = api_call(
-                "POST",
+            ig_id = instagram_business_id or services.config.instagram_business_id
+            result = services.api.post(
                 f"{ig_id}/messages",
                 {
                     "recipient": {"id": recipient_ig_id},
@@ -699,9 +691,8 @@ def register(mcp, services=None):
     ) -> str:
         """إرسال رسالة مباشرة (DM) مع صورة عبر إنستغرام."""
         try:
-            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
-            result = api_call(
-                "POST",
+            ig_id = instagram_business_id or services.config.instagram_business_id
+            result = services.api.post(
                 f"{ig_id}/messages",
                 {
                     "recipient": {"id": recipient_ig_id},
@@ -714,8 +705,7 @@ def register(mcp, services=None):
                 },
             )
             if text:
-                api_call(
-                    "POST",
+                services.api.post(
                     f"{ig_id}/messages",
                     {
                         "recipient": {"id": recipient_ig_id},
@@ -738,7 +728,7 @@ def register(mcp, services=None):
             from src.utils import paginate
 
             rows = paginate(
-                lambda params: api_call("GET", f"{media_id}/comments", params),
+                lambda params: services.api.get(f"{media_id}/comments", params),
                 fields=["id", "text", "timestamp", "username", "like_count", "replies"],
                 limit=limit,
             )
@@ -755,11 +745,10 @@ def register(mcp, services=None):
         """تحليلات ريلز إنستغرام (plays + reach + engagement) — مخصص لفيديوهات Reels."""
         try:
             # Reels use same IGMedia insights but metrics differ (plays, etc.)
-            insights = IGMedia(media_id).get_insights(params={"metric": metric})
+            insights_data = services.api.get(f"{media_id}/insights", {"metric": metric})
             out = []
-            for i in insights:
-                d = i.export_all_data()
-                out.append({"name": d.get("name"), "values": d.get("values")})
+            for i in insights_data.get("data", []) if isinstance(insights_data, dict) else []:
+                out.append({"name": i.get("name"), "values": i.get("values")})
             if not out:
                 return json_dumps({"message": "لا توجد بيانات Reels", "media_id": media_id})
             return json_dumps({"media_id": media_id, "insights": out})
@@ -783,7 +772,7 @@ def register(mcp, services=None):
         try:
             from datetime import datetime, timedelta, timezone
 
-            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            ig_id = instagram_business_id or services.config.instagram_business_id
             if not ig_id:
                 return json_dumps({"error": "حدد instagram_business_id أو اضبط FB_IG_USER_ID في .env"})
             limit = max(1, min(int(limit), 25))
@@ -791,8 +780,7 @@ def register(mcp, services=None):
             cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
             # 1) recent media (fetch a bit more to filter Reels)
-            media_resp = api_call(
-                "GET",
+            media_resp = services.api.get(
                 f"{ig_id}/media",
                 {
                     "fields": "id,caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count",
@@ -821,8 +809,8 @@ def register(mcp, services=None):
 
                 plays = reach = saved = shares = total_interactions = None
                 try:
-                    ins = api_call(
-                        "GET", f"{m['id']}/insights", {"metric": "plays,reach,saved,shares,total_interactions"}
+                    ins = services.api.get(
+                        f"{m['id']}/insights", {"metric": "plays,reach,saved,shares,total_interactions"}
                     )
                     rows = ins.get("data", []) if isinstance(ins, dict) else []
                     for row in rows:
@@ -937,7 +925,7 @@ def register(mcp, services=None):
         try:
             from pathlib import Path
 
-            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            ig_id = instagram_business_id or services.config.instagram_business_id
             base = Path(__file__).resolve().parent.parent / media_dir
             if not base.exists():
                 return json_dumps({"error": f"المجلد غير موجود: {base}"})
@@ -963,20 +951,19 @@ def register(mcp, services=None):
                     else:
                         tags = [{"product_id": pids[idx % len(pids)], "x": product_x, "y": product_y}]
                     params["product_tags"] = _json.dumps(tags)
-                child = api_call("POST", f"{ig_id}/media", params)
+                child = services.api.post(f"{ig_id}/media", params)
                 cid = child.get("id")
                 if not cid:
                     return json_dumps(child)
                 child_ids.append(cid)
-            container = api_call(
-                "POST",
+            container = services.api.post(
                 f"{ig_id}/media",
                 {"media_type": "CAROUSEL", "children": ",".join(child_ids), "caption": caption},
             )
             creation_id = container.get("id")
             if not creation_id:
                 return json_dumps(container)
-            result = api_call("POST", f"{ig_id}/media_publish", {"creation_id": creation_id})
+            result = services.api.post(f"{ig_id}/media_publish", {"creation_id": creation_id})
             return json_dumps(
                 {"success": True, "children": child_ids, "container": container, "publish": result, "hosted_urls": urls}
             )
@@ -1006,7 +993,7 @@ def register(mcp, services=None):
 
             from src.media_hosting import host_video
 
-            ig_id = instagram_business_id or INSTAGRAM_BUSINESS_ID
+            ig_id = instagram_business_id or services.config.instagram_business_id
             p = Path(video_path)
             if p.is_dir():
                 # pick first video in dir
@@ -1028,7 +1015,7 @@ def register(mcp, services=None):
                 "share_to_feed": str(share_to_feed).lower(),
                 "thumb_offset_ms": thumb_offset,
             }
-            container = api_call("POST", f"{ig_id}/media", params)
+            container = services.api.post(f"{ig_id}/media", params)
             creation_id = container.get("id")
             if not creation_id:
                 return json_dumps(container)
@@ -1036,7 +1023,7 @@ def register(mcp, services=None):
             import time
 
             time.sleep(5)
-            result = api_call("POST", f"{ig_id}/media_publish", {"creation_id": creation_id})
+            result = services.api.post(f"{ig_id}/media_publish", {"creation_id": creation_id})
             return json_dumps({"success": True, "video_url": video_url, "container": container, "publish": result})
         except Exception as e:
             return json_dumps(handle_error(e, "publish_instagram_reel_from_media"))
@@ -1051,14 +1038,14 @@ def register(mcp, services=None):
         """
         try:
             # Threads is tied to Instagram Business ID; try the threads endpoint
-            ig_id = INSTAGRAM_BUSINESS_ID
+            ig_id = services.config.instagram_business_id
             if not ig_id:
                 return json_dumps({"error": "FB_IG_USER_ID غير مضبوط"})
             params: dict = {"text": text}
             if media_url:
                 params["media_url"] = media_url
             # Attempt threads via Instagram endpoint; if not supported, API returns error
-            data = api_call("POST", f"{ig_id}/threads_profile", params)
+            data = services.api.post(f"{ig_id}/threads_profile", params)
             # Fallback try generic threads endpoint
             if not data or "error" in str(data).lower():
                 return json_dumps(
@@ -1085,7 +1072,7 @@ def register(mcp, services=None):
             # Lightweight per-module overview (calls existing list tool pattern)
             return json_dumps({"module": "instagram", "resource": "instagram://overview", "hint": "نظرة عامة إنستغرام"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "instagram://overview"))
 
@@ -1098,14 +1085,12 @@ def register(mcp, services=None):
     async def recent_instagram_resource() -> str:
         """آخر منشورات إنستغرام."""
         try:
-            from src.config import INSTAGRAM_BUSINESS_ID
-            from src.helpers import api_call
 
             def _fetch():
-                ig_id = INSTAGRAM_BUSINESS_ID
+                ig_id = services.config.instagram_business_id
                 if not ig_id:
                     return {"data": []}
-                return api_call("GET", f"{ig_id}/media", {"fields": "id,caption,media_type,timestamp", "limit": 10})
+                return services.api.get(f"{ig_id}/media", {"fields": "id,caption,media_type,timestamp", "limit": 10})
 
             t0 = time.monotonic()
             data = await asyncio.to_thread(_fetch)
@@ -1113,7 +1098,7 @@ def register(mcp, services=None):
             logger.info("instagram://recent fetched in %.2fs", elapsed)
             return json_dumps(data)
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             logger.exception("instagram://recent failed")
             return json_dumps(handle_error(e, "instagram://recent"))

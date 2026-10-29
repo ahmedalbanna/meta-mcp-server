@@ -4,10 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from facebook_business.adobjects.ad import Ad
-from facebook_business.adobjects.adaccount import AdAccount
-from facebook_business.adobjects.adset import AdSet
-
 from src.breakdowns import (
     ACTION_BREAKDOWN_VALUES,
     ATTRIBUTION_WINDOWS,
@@ -15,15 +11,17 @@ from src.breakdowns import (
     DATE_PRESETS,
     DEFAULT_METRICS,
 )
-from src.config import resolve_ad_account_id
 from src.core.services import Services
-from src.helpers import to_dict
+from src.utils import to_dict
 
 
 class BreakdownsService:
     def __init__(self, services: Services) -> None:
         self.services = services
         self.config = services.config
+
+    def _acct(self, ad_account_id: str = "") -> str:
+        return self.config.resolve_ad_account_id(ad_account_id)
 
     def _validate(self, preset: str, metrics: str, breakdown: str) -> tuple:
         if preset not in DATE_PRESETS:
@@ -42,50 +40,89 @@ class BreakdownsService:
             windows = [w.strip() for w in attribution.split(",") if w.strip()]
             for w in windows:
                 if w not in ATTRIBUTION_WINDOWS:
-                    raise ValueError(f"action_attribution_windows غير صالح: {w}. الاختيارات: {', '.join(ATTRIBUTION_WINDOWS)}")
+                    raise ValueError(
+                        f"action_attribution_windows غير صالح: {w}. الاختيارات: {', '.join(ATTRIBUTION_WINDOWS)}"
+                    )
             params["action_attribution_windows"] = windows
         if action_breakdowns:
             items = [a.strip() for a in action_breakdowns.split(",") if a.strip()]
             for a in items:
                 if a not in ACTION_BREAKDOWN_VALUES:
-                    raise ValueError(f"action_breakdowns غير صالح: {a}. الاختيارات: {', '.join(ACTION_BREAKDOWN_VALUES)}")
+                    raise ValueError(
+                        f"action_breakdowns غير صالح: {a}. الاختيارات: {', '.join(ACTION_BREAKDOWN_VALUES)}"
+                    )
             params["action_breakdowns"] = items
         return params
 
-    def get_account_breakdown(self, breakdown: str = "age,gender", date_preset: str = "last_30d",
-                              metrics: str = ",".join(DEFAULT_METRICS), time_increment: int = 0,
-                              action_attribution_windows: str = "",
-                              action_breakdowns: str = "", ad_account_id: str = "") -> Any:
+    def get_account_breakdown(
+        self,
+        breakdown: str = "age,gender",
+        date_preset: str = "last_30d",
+        metrics: str = ",".join(DEFAULT_METRICS),
+        time_increment: int = 0,
+        action_attribution_windows: str = "",
+        action_breakdowns: str = "",
+        ad_account_id: str = "",
+    ) -> Any:
         fields, bl = self._validate(date_preset, metrics, breakdown)
-        params = self._build_params(date_preset, fields, bl, time_increment,
-                                    action_attribution_windows, action_breakdowns)
-        account = AdAccount(resolve_ad_account_id(ad_account_id))
-        insights = account.get_insights(params=params)
-        return [to_dict(i) for i in insights]
+        params = self._build_params(
+            date_preset, fields, bl, time_increment, action_attribution_windows, action_breakdowns
+        )
+        acct = self._acct(ad_account_id)
+        data = self.services.api.get(f"{acct}/insights", params)
+        rows = data.get("data", []) if isinstance(data, dict) else []
+        return [to_dict(i) for i in rows]
 
-    def get_campaign_breakdown(self, campaign_id: str, breakdown: str = "age,gender",
-                               date_preset: str = "last_30d", metrics: str = ",".join(DEFAULT_METRICS),
-                               time_increment: int = 0, action_attribution_windows: str = "",
-                               action_breakdowns: str = "") -> Any:
+    def get_campaign_breakdown(
+        self,
+        campaign_id: str,
+        breakdown: str = "age,gender",
+        date_preset: str = "last_30d",
+        metrics: str = ",".join(DEFAULT_METRICS),
+        time_increment: int = 0,
+        action_attribution_windows: str = "",
+        action_breakdowns: str = "",
+    ) -> Any:
         fields, bl = self._validate(date_preset, metrics, breakdown)
-        params = self._build_params(date_preset, fields, bl, time_increment, action_attribution_windows, action_breakdowns)
-        insights = AdAccount(campaign_id).get_insights(params=params)
-        return [to_dict(i) for i in insights]
+        params = self._build_params(
+            date_preset, fields, bl, time_increment, action_attribution_windows, action_breakdowns
+        )
+        data = self.services.api.get(f"{campaign_id}/insights", params)
+        rows = data.get("data", []) if isinstance(data, dict) else []
+        return [to_dict(i) for i in rows]
 
-    def get_adset_breakdown(self, adset_id: str, breakdown: str = "age,gender",
-                            date_preset: str = "last_30d", metrics: str = ",".join(DEFAULT_METRICS),
-                            time_increment: int = 0, action_attribution_windows: str = "",
-                            action_breakdowns: str = "") -> Any:
+    def get_adset_breakdown(
+        self,
+        adset_id: str,
+        breakdown: str = "age,gender",
+        date_preset: str = "last_30d",
+        metrics: str = ",".join(DEFAULT_METRICS),
+        time_increment: int = 0,
+        action_attribution_windows: str = "",
+        action_breakdowns: str = "",
+    ) -> Any:
         fields, bl = self._validate(date_preset, metrics, breakdown)
-        params = self._build_params(date_preset, fields, bl, time_increment, action_attribution_windows, action_breakdowns)
-        insights = AdSet(adset_id).get_insights(params=params)
-        return [to_dict(i) for i in insights]
+        params = self._build_params(
+            date_preset, fields, bl, time_increment, action_attribution_windows, action_breakdowns
+        )
+        data = self.services.api.get(f"{adset_id}/insights", params)
+        rows = data.get("data", []) if isinstance(data, dict) else []
+        return [to_dict(i) for i in rows]
 
-    def get_ad_breakdown(self, ad_id: str, breakdown: str = "age,gender",
-                         date_preset: str = "last_30d", metrics: str = ",".join(DEFAULT_METRICS),
-                         time_increment: int = 0, action_attribution_windows: str = "",
-                         action_breakdowns: str = "") -> Any:
+    def get_ad_breakdown(
+        self,
+        ad_id: str,
+        breakdown: str = "age,gender",
+        date_preset: str = "last_30d",
+        metrics: str = ",".join(DEFAULT_METRICS),
+        time_increment: int = 0,
+        action_attribution_windows: str = "",
+        action_breakdowns: str = "",
+    ) -> Any:
         fields, bl = self._validate(date_preset, metrics, breakdown)
-        params = self._build_params(date_preset, fields, bl, time_increment, action_attribution_windows, action_breakdowns)
-        insights = Ad(ad_id).get_insights(params=params)
-        return [to_dict(i) for i in insights]
+        params = self._build_params(
+            date_preset, fields, bl, time_increment, action_attribution_windows, action_breakdowns
+        )
+        data = self.services.api.get(f"{ad_id}/insights", params)
+        rows = data.get("data", []) if isinstance(data, dict) else []
+        return [to_dict(i) for i in rows]

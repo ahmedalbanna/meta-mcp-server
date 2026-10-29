@@ -10,7 +10,7 @@ import logging
 import threading
 from datetime import datetime, timezone
 
-from src.config import REPORT_DIR
+from src.core.config import REPORT_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -62,11 +62,11 @@ def load_saved_events(limit: int = 50) -> list[dict]:
     return events
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register webhook integration tools."""
 
-    from src.helpers import json_dumps
     from src.throttle import concurrency_limit
+    from src.utils import json_dumps
 
     @mcp.tool()
     @concurrency_limit()
@@ -78,7 +78,8 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.events_service import EventsService
-            svc = EventsService(services) if services is not None else EventsService(Services.default())
+
+            svc = EventsService(services)
             return json_dumps(svc.get_webhook_events(limit, source))
         except Exception as e:
             return json_dumps({"error": str(e)})
@@ -93,7 +94,8 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.events_service import EventsService
-            svc = EventsService(services) if services is not None else EventsService(Services.default())
+
+            svc = EventsService(services)
             return json_dumps(svc.pop_webhook_events(limit))
         except Exception as e:
             return json_dumps({"error": str(e)})
@@ -105,7 +107,8 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.events_service import EventsService
-            svc = EventsService(services) if services is not None else EventsService(Services.default())
+
+            svc = EventsService(services)
             return json_dumps(svc.get_event_count())
         except Exception as e:
             return json_dumps({"error": str(e)})
@@ -117,7 +120,7 @@ def register(mcp, services=None):
             # Lightweight per-module overview (calls existing list tool pattern)
             return json_dumps({"module": "events", "resource": "events://overview", "hint": "نظرة عامة على الأحداث"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "events://overview"))
 
@@ -132,7 +135,7 @@ def register(mcp, services=None):
         try:
             return json_dumps({"module": "events", "resource": "events://templates", "hint": "قوالب الأحداث"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "events://templates"))
 

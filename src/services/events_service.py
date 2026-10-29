@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from src.core.services import Services
@@ -30,8 +31,8 @@ class EventsService:
         return {"events": events, "count": len(events)}
 
     def get_event_count(self) -> dict[str, Any]:
-        from src.config import REPORT_DIR
         queue_count = len(_event_queue)
-        webhook_dir = REPORT_DIR / "webhooks"
+        report_dir = self.config.report_dir or Path("reports")
+        webhook_dir = report_dir / "webhooks"
         file_count = len(list(webhook_dir.glob("event_*.json"))) if webhook_dir.exists() else 0
         return {"queued": queue_count, "saved_files": file_count, "total": queue_count + file_count}

@@ -4,11 +4,9 @@ import asyncio
 import logging
 import time
 
-from src.config import PAGE_ID
-
 logger = logging.getLogger(__name__)
-from src.helpers import get_page_api, handle_error, json_dumps, to_dict, write_guard
 from src.throttle import concurrency_limit
+from src.utils import handle_error, json_dumps, write_guard
 
 LEAD_FORM_FIELDS = [
     "id",
@@ -36,22 +34,18 @@ LEAD_FIELDS = [
 ]
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register lead ads & forms tools (page-scoped token)."""
 
-    from facebook_business.adobjects.page import Page
-
-    def _page(node_id: str = "") -> Page:
-        return Page(node_id or PAGE_ID, api=get_page_api())
 
     @mcp.tool()
     @concurrency_limit()
     def list_lead_gen_forms(page_id: str = "", limit: int = 25) -> str:
         """قائمة نماذج جذب العملاء (Lead Gen Forms) على الصفحة."""
         try:
-            from src.core.services import Services
             from src.services.leads_service import LeadsService
-            svc = LeadsService(services) if services is not None else LeadsService(Services.default())
+
+            svc = LeadsService(services)
             data = svc.list_lead_gen_forms(page_id, limit)
             return json_dumps(data)
         except Exception as e:
@@ -62,9 +56,9 @@ def register(mcp, services=None):
     def get_lead_gen_form(form_id: str) -> str:
         """تفاصيل نموذج جذب عملاء واحد (الأسئلة، الإخلاء القانوني، الصفحة...)."""
         try:
-            from src.core.services import Services
             from src.services.leads_service import LeadsService
-            svc = LeadsService(services) if services is not None else LeadsService(Services.default())
+
+            svc = LeadsService(services)
             data = svc.get_lead_gen_form(form_id)
             return json_dumps(data)
         except Exception as e:
@@ -75,9 +69,9 @@ def register(mcp, services=None):
     def get_form_leads(form_id: str, limit: int = 25) -> str:
         """الرصاصات (Leads) المسجّلة عبر نموذج جذب عملاء معيّن."""
         try:
-            from src.core.services import Services
             from src.services.leads_service import LeadsService
-            svc = LeadsService(services) if services is not None else LeadsService(Services.default())
+
+            svc = LeadsService(services)
             data = svc.get_form_leads(form_id, limit)
             return json_dumps(data)
         except Exception as e:
@@ -88,9 +82,9 @@ def register(mcp, services=None):
     def get_lead(lead_id: str) -> str:
         """تفاصيل رصاصة واحدة (إجابات الحقول: الاسم، الهاتف، البريد...)."""
         try:
-            from src.core.services import Services
             from src.services.leads_service import LeadsService
-            svc = LeadsService(services) if services is not None else LeadsService(Services.default())
+
+            svc = LeadsService(services)
             data = svc.get_lead(lead_id)
             return json_dumps(data)
         except Exception as e:
@@ -115,11 +109,18 @@ def register(mcp, services=None):
         locale: مثال ar_AR أو en_US.
         """
         try:
-            from src.core.services import Services
             from src.services.leads_service import LeadsService
-            svc = LeadsService(services) if services is not None else LeadsService(Services.default())
-            data = svc.create_lead_gen_form(name, privacy_policy_url, question_page_headline, page_id,
-                                            thankyou_page_headline, thankyou_page_body, locale)
+
+            svc = LeadsService(services)
+            data = svc.create_lead_gen_form(
+                name,
+                privacy_policy_url,
+                question_page_headline,
+                page_id,
+                thankyou_page_headline,
+                thankyou_page_body,
+                locale,
+            )
             return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "create_lead_gen_form"))
@@ -130,9 +131,9 @@ def register(mcp, services=None):
     def subscribe_leadgen_webhook(page_id: str = "", subscribed_fields: str = "leadgen") -> str:
         """اشتراك الصفحة في Webhook الرصاص (leadgen). يتطلب صلاحيات pages_manage_metadata."""
         try:
-            from src.core.services import Services
             from src.services.leads_service import LeadsService
-            svc = LeadsService(services) if services is not None else LeadsService(Services.default())
+
+            svc = LeadsService(services)
             return json_dumps(svc.subscribe_leadgen_webhook(page_id, subscribed_fields))
         except Exception as e:
             return json_dumps(handle_error(e, "subscribe_leadgen_webhook"))
@@ -142,9 +143,9 @@ def register(mcp, services=None):
     def get_lead_field_mapping(lead_id: str) -> str:
         """تحويل field_data لرصاصة إلى قاموس مسطح {field_name: values} لتسهيل المعالجة."""
         try:
-            from src.core.services import Services
             from src.services.leads_service import LeadsService
-            svc = LeadsService(services) if services is not None else LeadsService(Services.default())
+
+            svc = LeadsService(services)
             return json_dumps(svc.get_lead_field_mapping(lead_id))
         except Exception as e:
             return json_dumps(handle_error(e, "get_lead_field_mapping"))
@@ -156,7 +157,7 @@ def register(mcp, services=None):
             # Lightweight per-module overview (calls existing list tool pattern)
             return json_dumps({"module": "leads", "resource": "leads://overview", "hint": "نظرة عامة على الرصاص"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "leads://overview"))
 
@@ -169,22 +170,20 @@ def register(mcp, services=None):
     async def recent_leads_resource() -> str:
         """آخر الرصاصات (Leads) من النماذج."""
         try:
-            from facebook_business.adobjects.page import Page
-
-            from src.config import PAGE_ID
-            from src.helpers import get_page_api
 
             def _fetch():
-                page = Page(PAGE_ID, api=get_page_api())
-                forms = page.get_lead_gen_forms(params={"fields": ["id"], "limit": 3})
+                page_id = services.config.page_id
+                data = services.api.page_get(f"{page_id}/leadgenforms", {"fields": ["id"], "limit": 3})
+                forms = data.get("data", []) if isinstance(data, dict) else []
                 out = []
-                for f in list(forms)[:2]:
-                    fid = f.get("id") if isinstance(f, dict) else f.export_all_data().get("id")
+                for f in forms[:2]:
+                    fid = f.get("id") if isinstance(f, dict) else None
+                    if not fid:
+                        continue
                     try:
-                        from facebook_business.adobjects.leadgenform import LeadgenForm
-
-                        leads = LeadgenForm(fid, api=get_page_api()).get_leads(params={"limit": 5})
-                        out.extend([to_dict(lead) for lead in leads])
+                        lead_data = services.api.page_get(f"{fid}/leads", {"limit": 5})
+                        lead_rows = lead_data.get("data", []) if isinstance(lead_data, dict) else []
+                        out.extend(lead_rows)
                     except Exception:
                         continue
                 return out
@@ -195,7 +194,7 @@ def register(mcp, services=None):
             logger.info("leads://recent fetched %d leads in %.2fs", len(rows), elapsed)
             return json_dumps(rows)
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             logger.exception("leads://recent failed")
             return json_dumps(handle_error(e, "leads://recent"))

@@ -4,14 +4,13 @@ import logging
 logger = logging.getLogger(__name__)
 import time
 
-from src.config import AD_ACCOUNT_ID
-from src.helpers import handle_error, json_dumps, to_dict, write_guard
 from src.throttle import concurrency_limit
+from src.utils import handle_error, json_dumps, to_dict, write_guard
 
 SECONDS_PER_DAY = 86400
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register automated rules (ad rules) tools."""
 
     from facebook_business.adobjects.adaccount import AdAccount
@@ -23,7 +22,8 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.automation_service import AutomationService
-            svc = AutomationService(services) if services is not None else AutomationService(Services.default())
+
+            svc = AutomationService(services)
             data = svc.list_auto_rules(limit)
             return json_dumps(data)
         except Exception as e:
@@ -50,7 +50,8 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.automation_service import AutomationService
-            svc = AutomationService(services) if services is not None else AutomationService(Services.default())
+
+            svc = AutomationService(services)
             data = svc.create_auto_rule(name, evaluation_spec, execution_spec, schedule_spec, status)
             return json_dumps(data)
         except Exception as e:
@@ -79,7 +80,8 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.automation_service import AutomationService
-            svc = AutomationService(services) if services is not None else AutomationService(Services.default())
+
+            svc = AutomationService(services)
             data = svc.create_simple_auto_rule(name, object_type, field, operator, value, action, time_zone, status)
             return json_dumps(data)
         except Exception as e:
@@ -93,7 +95,8 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.automation_service import AutomationService
-            svc = AutomationService(services) if services is not None else AutomationService(Services.default())
+
+            svc = AutomationService(services)
             data = svc.delete_auto_rule(rule_id)
             return json_dumps(data)
         except Exception as e:
@@ -106,7 +109,8 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.automation_service import AutomationService
-            svc = AutomationService(services) if services is not None else AutomationService(Services.default())
+
+            svc = AutomationService(services)
             data = svc.get_history(days)
             return json_dumps(data)
         except Exception as e:
@@ -121,7 +125,7 @@ def register(mcp, services=None):
                 {"module": "automation", "resource": "automation://overview", "hint": "نظرة عامة على القواعد"}
             )
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "automation://overview"))
 
@@ -144,7 +148,7 @@ def register(mcp, services=None):
         try:
             return json_dumps({"module": "automation", "resource": "automation://templates", "hint": "قوالب الأتمتة"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "automation://templates"))
 

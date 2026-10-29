@@ -24,9 +24,9 @@ from pathlib import Path
 
 import requests  # type: ignore[import-untyped]
 
-from src.config import INSTAGRAM_BUSINESS_ID
-from src.helpers import api_call, handle_error, json_dumps
+from src.core.config import INSTAGRAM_BUSINESS_ID
 from src.throttle import concurrency_limit
+from src.utils import api_call, handle_error, json_dumps
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +112,7 @@ def download_image(url: str, target: Path) -> int:
     return 0
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register competitor-content tools."""
 
     @mcp.tool()
@@ -128,9 +128,8 @@ def register(mcp, services=None):
         try:
             if not url or "instagram.com" not in url:
                 return json_dumps({"error": "أدخل رابط إنستغرام صالحاً (يحتوي instagram.com)"})
-            from src.core.services import Services
             from src.services.competitor_content_service import CompetitorContentService
-            svc = CompetitorContentService(services) if services is not None else CompetitorContentService(Services.default())
+            svc = CompetitorContentService(services)
             data = svc.resolve_post_url(url)
             return json_dumps(data)
         except Exception as e:
@@ -162,9 +161,8 @@ def register(mcp, services=None):
                 return json_dumps({"error": "days و top_n يجب أن تكون أكبر من صفر"})
             if top_n > 25:
                 return json_dumps({"error": "الحد الأقصى 25 منشور للتنزيل الواحد"})
-            from src.core.services import Services
             from src.services.competitor_content_service import CompetitorContentService
-            svc = CompetitorContentService(services) if services is not None else CompetitorContentService(Services.default())
+            svc = CompetitorContentService(services)
             data = svc.download_top_posts(handle, days, top_n, out_dir)
             return json_dumps(data)
         except Exception as e:
@@ -183,9 +181,8 @@ def register(mcp, services=None):
         محتوى — لكشف ما يعمل فعلاً (مثلاً: صورة مفردة vs كاروسيل vs فيديو).
         """
         try:
-            from src.core.services import Services
             from src.services.competitor_content_service import CompetitorContentService
-            svc = CompetitorContentService(services) if services is not None else CompetitorContentService(Services.default())
+            svc = CompetitorContentService(services)
             data = svc.analyze_cadence(handle, days, pages)
             return json_dumps(data)
         except Exception as e:

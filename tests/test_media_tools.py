@@ -4,12 +4,12 @@ import json
 from unittest import mock
 
 from src import media_tools
-from tests.conftest import Recorder
+from tests.conftest import TEST_SERVICES, Recorder
 
 
 def test_list_local_media_returns_files(tmp_path):
     recorder = Recorder()
-    media_tools.register(recorder)
+    media_tools.register(recorder, TEST_SERVICES)
     # set up a small media tree
     root = tmp_path / "media"
     root.mkdir()
@@ -26,7 +26,7 @@ def test_list_local_media_returns_files(tmp_path):
 
 def test_list_local_media_rejects_path_traversal(tmp_path):
     recorder = Recorder()
-    media_tools.register(recorder)
+    media_tools.register(recorder, TEST_SERVICES)
     root = tmp_path / "media"
     root.mkdir()
     with mock.patch.object(media_tools, "MEDIA_ROOT", root):
@@ -36,14 +36,14 @@ def test_list_local_media_rejects_path_traversal(tmp_path):
 
 def test_host_image_url_requires_path():
     recorder = Recorder()
-    media_tools.register(recorder)
+    media_tools.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["host_image_url"](file_path=""))
     assert "error" in out
 
 
 def test_module_registers_tools_resources_prompts():
     recorder = Recorder()
-    media_tools.register(recorder)
+    media_tools.register(recorder, TEST_SERVICES)
     assert set(recorder.tools) == {"host_image_url", "host_video_url", "host_many_images", "list_local_media"}
     assert len(recorder.resources) >= 2
     assert len(recorder.prompts) >= 2

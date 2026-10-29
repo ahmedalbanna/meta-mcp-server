@@ -1,10 +1,9 @@
 """Tests for src.persistence (SQLite analytics store)."""
 
-
 import pytest
 
-from src import config as cfg
 from src import persistence as p
+from src.core import config as cfg
 
 
 @pytest.fixture
@@ -13,6 +12,7 @@ def tmp_db(monkeypatch, tmp_path):
     monkeypatch.setenv("FB_ANALYTICS_DB_URL", f"sqlite:///{db}")
     # reload module-level constants by re-importing persistence fresh
     import importlib
+
     importlib.reload(cfg)
     importlib.reload(p)
     p.init_db()

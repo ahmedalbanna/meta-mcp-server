@@ -6,11 +6,11 @@ import os
 from typing import Any
 from urllib.parse import quote
 
-from src.config import FB_PHONE_COUNTRY_CODE
+from src.core.config import FB_PHONE_COUNTRY_CODE as _DEFAULT_CC
 from src.core.services import Services
 
 
-def normalize_phone(phone: str, country_code: str = FB_PHONE_COUNTRY_CODE) -> str | None:
+def normalize_phone(phone: str, country_code: str = _DEFAULT_CC) -> str | None:
     if not phone:
         return None
     p = phone.strip().replace(" ", "").replace("-", "")
@@ -41,8 +41,13 @@ class PageBuilderService:
         norm = normalize_phone(phone, cc)
         if norm is None:
             return {"valid": False, "phone": phone, "country_code": cc, "error": "رقم غير صالح"}
-        return {"valid": True, "phone": phone, "normalized": norm, "country_code": cc,
-                "whatsapp_link": f"https://wa.me/{norm.lstrip('+')}?text=مرحبا"}
+        return {
+            "valid": True,
+            "phone": phone,
+            "normalized": norm,
+            "country_code": cc,
+            "whatsapp_link": f"https://wa.me/{norm.lstrip('+')}?text=مرحبا",
+        }
 
     def whatsapp_link(self, phone: str, message: str = "مرحباً، أود الاستفسار عن منتجاتكم") -> dict[str, Any]:
         norm = normalize_phone(phone, self.config.phone_country_code)
@@ -55,7 +60,9 @@ class PageBuilderService:
         if not pid:
             return {"error": "page_id غير مضبوط (FB_PAGE_ID)"}
         try:
-            info = self.api.page_get(pid, {"fields": "name,about,category,cover,picture,location,hours,website,phone,emails"})
+            info = self.api.page_get(
+                pid, {"fields": "name,about,category,cover,picture,location,hours,website,phone,emails"}
+            )
             data = info if isinstance(info, dict) else {}
             checks = {
                 "cover_photo": bool(data.get("cover")),
@@ -87,21 +94,39 @@ class PageBuilderService:
         res = self.api.page_post(pid, {"about": about})
         return {"page_id": pid, "about": about, "result": res if isinstance(res, dict) else {}}
 
-    def update_cta_whatsapp(self, phone: str, page_id: str = "", welcome_message: str = "مرحباً، أود الاستفسار") -> dict[str, Any]:
+    def update_cta_whatsapp(
+        self, phone: str, page_id: str = "", welcome_message: str = "مرحباً، أود الاستفسار"
+    ) -> dict[str, Any]:
         norm = normalize_phone(phone, self.config.phone_country_code)
         if norm is None:
             return {"error": "رقم هاتف غير صالح", "phone": phone}
         pid = page_id or self.config.page_id
         link = f"https://wa.me/{norm.lstrip('+')}?text={quote(welcome_message)}"
         if os.getenv("FB_ENABLE_WRITES", "false").lower() not in ("1", "true", "yes", "on"):
-            return {"page_id": pid, "cta_type": "MESSAGE_PAGE (WhatsApp)", "phone": norm, "link": link, "result": {"dry_run": True}}
+            return {
+                "page_id": pid,
+                "cta_type": "MESSAGE_PAGE (WhatsApp)",
+                "phone": norm,
+                "link": link,
+                "result": {"dry_run": True},
+            }
         res = self.api.page_post(pid + "/call_to_actions", {"type": "MESSAGE_PAGE", "link": link})
-        return {"page_id": pid, "cta_type": "MESSAGE_PAGE (WhatsApp)", "phone": norm, "link": link,
-                "result": res if isinstance(res, dict) else {}}
+        return {
+            "page_id": pid,
+            "cta_type": "MESSAGE_PAGE (WhatsApp)",
+            "phone": norm,
+            "link": link,
+            "result": res if isinstance(res, dict) else {},
+        }
 
-    def build_from_competitor(self, competitor_handle: str, our_page_id: str = "",
-                              cta_phone: str = "", about_override: str = "",
-                              sections: str = "about,cta,checklist") -> dict[str, Any]:
+    def build_from_competitor(
+        self,
+        competitor_handle: str,
+        our_page_id: str = "",
+        cta_phone: str = "",
+        about_override: str = "",
+        sections: str = "about,cta,checklist",
+    ) -> dict[str, Any]:
         pid = our_page_id or self.config.page_id
         if not pid:
             return {"error": "our_page_id / FB_PAGE_ID مطلوب"}
@@ -113,13 +138,16 @@ class PageBuilderService:
         ig_id = self.config.instagram_business_id
         if ig_id:
             try:
-                ig = self.api.get(ig_id, {
-                    "fields": (
-                        f"business_discovery.username({handle})"
-                        "{username,name,biography,followers_count,media_count,"
-                        "media.limit(12){caption,timestamp,like_count,comments_count,media_type,permalink}}"
-                    ),
-                })
+                ig = self.api.get(
+                    ig_id,
+                    {
+                        "fields": (
+                            f"business_discovery.username({handle})"
+                            "{username,name,biography,followers_count,media_count,"
+                            "media.limit(12){caption,timestamp,like_count,comments_count,media_type,permalink}}"
+                        ),
+                    },
+                )
                 biz = ig.get("business_discovery") or {}
                 media = (biz.get("media") or {}).get("data", [])
                 likes = [m.get("like_count") or 0 for m in media]
@@ -130,6 +158,7 @@ class PageBuilderService:
                         if tok.startswith("#"):
                             hashtags.append(tok)
                 from collections import Counter
+
                 top_tags = [t for t, _ in Counter(hashtags).most_common(8)]
                 comp_data = {
                     "handle": handle,
@@ -180,14 +209,18 @@ class PageBuilderService:
             try:
                 info = self.api.page_get(pid, {"fields": "name,about,cover,picture,location,hours,website,phone"})
                 data = info if isinstance(info, dict) else {}
-                checks = {k: bool(data.get(k)) for k in ("cover", "picture", "about", "location", "hours", "website", "phone")}
+                checks = {
+                    k: bool(data.get(k)) for k in ("cover", "picture", "about", "location", "hours", "website", "phone")
+                }
                 results["checklist"] = {"checks": checks, "score": round(sum(checks.values()) / len(checks) * 100)}
                 if comp_data.get("top_hashtags"):
                     results["recommendations"].append(
                         "استخدم هاشتاقات المنافس: " + ", ".join(comp_data["top_hashtags"])
                     )
                 if comp_data.get("avg_likes"):
-                    results["recommendations"].append(f"متوسط إعجابات المنافس: {comp_data['avg_likes']} — اهدف للتغلب عليه")
+                    results["recommendations"].append(
+                        f"متوسط إعجابات المنافس: {comp_data['avg_likes']} — اهدف للتغلب عليه"
+                    )
                 if not data.get("about"):
                     results["recommendations"].append("أضف نبذة (about) — حالياً فارغة")
                 if not data.get("cover"):

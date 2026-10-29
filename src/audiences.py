@@ -2,8 +2,6 @@ import asyncio
 import logging
 import time
 
-from src.config import AD_ACCOUNT_ID
-
 logger = logging.getLogger(__name__)
 from src.utils import normalize_pii
 
@@ -11,14 +9,11 @@ LOOKALIKE_TYPES = ["SIMILARITY", "REACH", "CUSTOM_RATIO"]
 RETENTION_SECONDS_90D = 7776000
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register custom audience tools."""
 
-    from facebook_business.adobjects.adaccount import AdAccount
-    from facebook_business.adobjects.customaudience import CustomAudience
-
-    from src.helpers import handle_error, json_dumps, sanitize_path, to_dict, write_guard
     from src.throttle import concurrency_limit
+    from src.utils import handle_error, json_dumps, sanitize_path, to_dict, write_guard
 
     def _split(items: str) -> list:
         return [i.strip() for i in (items or "").split(",") if i.strip()]
@@ -53,9 +48,9 @@ def register(mcp, services=None):
     def list_custom_audiences(limit: int = 25, ad_account_id: str = "") -> str:
         """قائمة الجماهير المخصصة في الحساب."""
         try:
-            from src.core.services import Services
             from src.services.audiences_service import AudiencesService
-            svc = AudiencesService(services) if services is not None else AudiencesService(Services.default())
+
+            svc = AudiencesService(services)
             data = svc.list_custom_audiences(limit, ad_account_id)
             return json_dumps(data)
         except Exception as e:
@@ -72,9 +67,9 @@ def register(mcp, services=None):
     ) -> str:
         """إنشاء جمهور مخصص جديد."""
         try:
-            from src.core.services import Services
             from src.services.audiences_service import AudiencesService
-            svc = AudiencesService(services) if services is not None else AudiencesService(Services.default())
+
+            svc = AudiencesService(services)
             return json_dumps(svc.create_custom_audience(name, description, customer_file_source, ad_account_id))
         except Exception as e:
             return json_dumps(handle_error(e, "create_custom_audience"))
@@ -95,9 +90,9 @@ def register(mcp, services=None):
         hash_pii=true (الافتراضي): تُشفر البريد والهاتف SHA-256 قبل الإرسال (مواصفة Meta).
         """
         try:
-            from src.core.services import Services
             from src.services.audiences_service import AudiencesService
-            svc = AudiencesService(services) if services is not None else AudiencesService(Services.default())
+
+            svc = AudiencesService(services)
             return json_dumps(svc.add_users(audience_id, emails, phone_numbers, user_ids, hash_pii))
         except Exception as e:
             return json_dumps(handle_error(e, "add_users_to_custom_audience"))
@@ -114,9 +109,9 @@ def register(mcp, services=None):
     ) -> str:
         """إزالة مستخدمين من جمهور مخصص (نفس صيغة الإضافة)."""
         try:
-            from src.core.services import Services
             from src.services.audiences_service import AudiencesService
-            svc = AudiencesService(services) if services is not None else AudiencesService(Services.default())
+
+            svc = AudiencesService(services)
             return json_dumps(svc.remove_users(audience_id, emails, phone_numbers, user_ids, hash_pii))
         except Exception as e:
             return json_dumps(handle_error(e, "remove_users_from_custom_audience"))
@@ -139,10 +134,8 @@ def register(mcp, services=None):
         try:
             import csv as _csv
 
-            from src.config import BASE_DIR
-
-            # Scope CSV reads to BASE_DIR (and subdirs) to prevent traversal outside project
-            path = sanitize_path(csv_path, BASE_DIR)
+            # Scope CSV reads to base_dir (and subdirs) to prevent traversal outside project
+            path = sanitize_path(csv_path, services.config.base_dir)
             if not path.is_file():
                 return json_dumps({"error": f"الملف غير موجود: {csv_path}"})
             schema_list = [s.strip().upper() for s in _split(schema)]
@@ -184,14 +177,17 @@ def register(mcp, services=None):
                     users.extend(values)
             if not users:
                 return json_dumps({"error": "لا توجد بيانات صالحة في الملف"})
-            result = CustomAudience(audience_id).add_users(schema=api_schema, users=users)
+            data = services.api.post(
+                f"{audience_id}/users",
+                {"schema": api_schema, "users": users},
+            )
             return json_dumps(
                 {
                     "success": True,
                     "audience_id": audience_id,
                     "added": len(users),
                     "rows": len(rows),
-                    "result": to_dict(result),
+                    "result": data if isinstance(data, dict) else {},
                 }
             )
         except Exception as e:
@@ -218,8 +214,8 @@ def register(mcp, services=None):
         ratio: نسبة الحجم من 0.01 إلى 0.20.
         """
         try:
-            account = AdAccount(AD_ACCOUNT_ID)
-            seed_id = source_audience_id
+            acct = services.config.fb_ad_account_id
+            seed_id: str | None = source_audience_id or None
             if not seed_id and (source_pixel_id or source_website_url):
                 # A lookalike only accepts a Custom Audience ID as its seed
                 # (origin_audience_id). Pixel/website sources must first become a
@@ -238,10 +234,10 @@ def register(mcp, services=None):
                         }
                     }
                     seed_params = {
-                        CustomAudience.Field.name: f"{name} (Pixel Seed)",
-                        CustomAudience.Field.subtype: "WEBSITE",
-                        CustomAudience.Field.pixel_id: source_pixel_id,
-                        CustomAudience.Field.rule: json_dumps(rule),
+                        "name": f"{name} (Pixel Seed)",
+                        "subtype": "WEBSITE",
+                        "pixel_id": source_pixel_id,
+                        "rule": json_dumps(rule),
                     }
                 else:
                     rule = {
@@ -266,12 +262,12 @@ def register(mcp, services=None):
                         }
                     }
                     seed_params = {
-                        CustomAudience.Field.name: f"{name} (Website Seed)",
-                        CustomAudience.Field.subtype: "WEBSITE",
-                        CustomAudience.Field.rule: json_dumps(rule),
+                        "name": f"{name} (Website Seed)",
+                        "subtype": "WEBSITE",
+                        "rule": json_dumps(rule),
                     }
-                seed = account.create_custom_audience(params=seed_params)
-                seed_id = seed["id"]
+                seed = services.api.post(f"{acct}/customaudiences", seed_params)
+                seed_id = seed.get("id") if isinstance(seed, dict) else None
             if not seed_id:
                 return json_dumps({"error": "حدد source_audience_id أو source_pixel_id أو source_website_url"})
             if not name:
@@ -287,15 +283,16 @@ def register(mcp, services=None):
                 "country": country,
                 "type": ltype,
             }
-            audience = account.create_custom_audience(
-                params={
-                    CustomAudience.Field.name: name,
-                    CustomAudience.Field.subtype: "LOOKALIKE",
-                    CustomAudience.Field.description: description,
-                    CustomAudience.Field.lookalike_spec: json_dumps(spec),
-                }
+            audience = services.api.post(
+                f"{acct}/customaudiences",
+                {
+                    "name": name,
+                    "subtype": "LOOKALIKE",
+                    "description": description,
+                    "lookalike_spec": json_dumps(spec),
+                },
             )
-            return json_dumps(to_dict(audience))
+            return json_dumps(audience if isinstance(audience, dict) else {})
         except Exception as e:
             return json_dumps(handle_error(e, "create_lookalike_audience"))
 
@@ -304,9 +301,9 @@ def register(mcp, services=None):
     def get_custom_audience_insights(audience_id: str) -> str:
         """تفاصيل جمهور مخصص: الحجم، المصدر، الحالة، تاريخ الإنشاء."""
         try:
-            from src.core.services import Services
             from src.services.audiences_service import AudiencesService
-            svc = AudiencesService(services) if services is not None else AudiencesService(Services.default())
+
+            svc = AudiencesService(services)
             data = svc.get_custom_audience_insights(audience_id)
             return json_dumps(data)
         except Exception as e:
@@ -323,11 +320,8 @@ def register(mcp, services=None):
         try:
             # Try native overlap endpoint first
             try:
-                from src.helpers import api_call
-
-                data = api_call(
-                    "GET",
-                    f"{AD_ACCOUNT_ID}/audience_overlap",
+                data = services.api.get(
+                    f"{services.config.fb_ad_account_id}/audience_overlap",
                     {"audience_ids": f"[{audience_id_1},{audience_id_2}]"},
                 )
                 if data and "data" in data:
@@ -335,20 +329,24 @@ def register(mcp, services=None):
             except Exception:
                 pass
             # Fallback: fetch approximate counts and estimate
-            a1 = CustomAudience(audience_id_1)
-            a1.api_read(fields=["id", "name", "approximate_count"])
-            d1 = to_dict(a1)
-            a2 = CustomAudience(audience_id_2)
-            a2.api_read(fields=["id", "name", "approximate_count"])
-            d2 = to_dict(a2)
-            c1 = int(d1.get("approximate_count") or 0)
-            c2 = int(d2.get("approximate_count") or 0)
+            d1 = services.api.get(f"{audience_id_1}", {"fields": "id,name,approximate_count"})
+            d2 = services.api.get(f"{audience_id_2}", {"fields": "id,name,approximate_count"})
+            c1 = int((d1.get("approximate_count") or 0) if isinstance(d1, dict) else 0)
+            c2 = int((d2.get("approximate_count") or 0) if isinstance(d2, dict) else 0)
             # Simple heuristic: overlap ~ min(c1,c2)*0.15 (illustrative)
             est_overlap = int(min(c1, c2) * 0.15) if c1 and c2 else 0
             return json_dumps(
                 {
-                    "audience_1": {"id": audience_id_1, "name": d1.get("name"), "count": c1},
-                    "audience_2": {"id": audience_id_2, "name": d2.get("name"), "count": c2},
+                    "audience_1": {
+                        "id": audience_id_1,
+                        "name": d1.get("name") if isinstance(d1, dict) else None,
+                        "count": c1,
+                    },
+                    "audience_2": {
+                        "id": audience_id_2,
+                        "name": d2.get("name") if isinstance(d2, dict) else None,
+                        "count": c2,
+                    },
                     "estimated_overlap": est_overlap,
                     "overlap_rate": round(est_overlap / max(c1, c2), 3) if max(c1, c2) else 0,
                     "note": "تقدير محلي؛ للحصول على دقة Meta استخدم audience_overlap إن كان متاحًا للحساب",
@@ -364,9 +362,6 @@ def register(mcp, services=None):
         try:
             import json as _json
 
-            from src.config import PAGE_ID as _PID
-            from src.helpers import api_call
-
             targeting = _json.loads(targeting_json) if targeting_json else {}
             if not isinstance(targeting, dict):
                 return json_dumps({"error": "targeting_json يجب أن يكون كائن JSON"})
@@ -375,10 +370,10 @@ def register(mcp, services=None):
                 "optimization_goal": optimization_goal.strip().upper(),
             }
             # Some reach estimates require page_id
-            pid = page_id or _PID
+            pid = page_id or services.config.page_id
             if pid:
                 params["page_id"] = pid
-            data = api_call("GET", f"{AD_ACCOUNT_ID}/reachestimate", params)
+            data = services.api.get(f"{services.config.fb_ad_account_id}/reachestimate", params)
             return json_dumps(data)
         except Exception as e:
             return json_dumps(handle_error(e, "estimate_reach: تأكد من صلاحيات ads_read وصيغة targeting_spec"))
@@ -388,9 +383,8 @@ def register(mcp, services=None):
     def suggest_lookalike(source_audience_id: str, country: str = "US", ratio: float = 0.01) -> str:
         """اقتراح إعدادات Lookalike بناءً على حجم الجمهور المصدر."""
         try:
-            audience = CustomAudience(source_audience_id)
-            audience.api_read(fields=["id", "name", "approximate_count", "subtype"])
-            d = to_dict(audience)
+            d = services.api.get(f"{source_audience_id}", {"fields": "id,name,approximate_count,subtype"})
+            d = d if isinstance(d, dict) else {}
             count = int(d.get("approximate_count") or 0)
             subtype = d.get("subtype", "")
             # Heuristics per Meta best-practices: seed 1000-50000 ideal
@@ -496,7 +490,7 @@ def register(mcp, services=None):
                 {"module": "audiences", "resource": "audiences://overview", "hint": "نظرة عامة على الجماهير"}
             )
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "audiences://overview"))
 
@@ -511,20 +505,24 @@ def register(mcp, services=None):
         try:
 
             def _fetch():
-                account = AdAccount(AD_ACCOUNT_ID)
-                return account.get_custom_audiences(params={"fields": ["name", "subtype", "approximate_count", "id"]})
+                acct = services.config.fb_ad_account_id
+                return services.api.get(
+                    f"{acct}/customaudiences",
+                    params={"fields": ["name", "subtype", "approximate_count", "id"]},
+                )
 
             t0 = time.monotonic()
-            audiences = await asyncio.to_thread(_fetch)
+            data = await asyncio.to_thread(_fetch)
             elapsed = time.monotonic() - t0
+            rows = data.get("data", []) if isinstance(data, dict) else []
             logger.info(
                 "audiences://list fetched %d audiences in %.2fs",
-                len(list(audiences)),
+                len(rows),
                 elapsed,
             )
-            return json_dumps([to_dict(a) for a in audiences])
+            return json_dumps([to_dict(a) for a in rows])
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             logger.exception("audiences://list failed")
             return json_dumps(handle_error(e, "audiences://list"))

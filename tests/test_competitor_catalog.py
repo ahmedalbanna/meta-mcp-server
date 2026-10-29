@@ -7,7 +7,7 @@ from unittest import mock
 import pytest
 
 from src import competitor_catalog
-from tests.conftest import Recorder
+from tests.conftest import TEST_SERVICES, Recorder
 
 
 def _iso(days_ago: float) -> str:
@@ -64,14 +64,14 @@ def test_product_name_from_caption():
 
 def test_build_requires_handles(mock_meta_sdk_recorded):
     recorder = Recorder()
-    competitor_catalog.register(recorder)
+    competitor_catalog.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["build_competitor_catalog"](handles=""))
     assert "error" in out
 
 
 def test_build_caps_limits(mock_meta_sdk_recorded):
     recorder = Recorder()
-    competitor_catalog.register(recorder)
+    competitor_catalog.register(recorder, TEST_SERVICES)
     assert "error" in json.loads(recorder.tools["build_competitor_catalog"](handles="a", top_n=99))
     assert "error" in json.loads(recorder.tools["build_competitor_catalog"](handles="a", days=-1))
     assert "error" in json.loads(
@@ -103,7 +103,7 @@ def test_build_pipeline_creates_folders_reports_and_draft(mock_meta_sdk_recorded
     mock_meta_sdk_recorded["api_call"].side_effect = api
 
     recorder = Recorder()
-    competitor_catalog.register(recorder)
+    competitor_catalog.register(recorder, TEST_SERVICES)
 
     with (
         mock.patch.object(competitor_catalog, "MEDIA_DOWNLOAD_DIR", tmp_path / "media"),
@@ -150,7 +150,7 @@ def test_build_pipeline_creates_folders_reports_and_draft(mock_meta_sdk_recorded
 
 def test_build_pipeline_handles_store_without_data(mock_meta_sdk_recorded, tmp_path):
     recorder = Recorder()
-    competitor_catalog.register(recorder)
+    competitor_catalog.register(recorder, TEST_SERVICES)
     with (
         mock.patch.object(competitor_catalog, "MEDIA_DOWNLOAD_DIR", tmp_path / "media"),
         mock.patch.object(competitor_catalog, "fetch_business_media", return_value=[]),
@@ -168,15 +168,15 @@ def test_build_pipeline_handles_store_without_data(mock_meta_sdk_recorded, tmp_p
 
 def test_build_push_to_meta_creates_staging_products(mock_meta_sdk_recorded, tmp_path):
     import src.competitor_catalog as _cc
-    import src.config as _c
-    import src.helpers as _h
+    import src.core.config as _c
+    import src.utils as _h
 
     _h.ENABLE_WRITES = True
     _c.ENABLE_WRITES = True
     _cc.ENABLE_WRITES = True
     store = [_post(1, 200, 20, "طقم كارتير استيل 12000 ريال")]
     recorder = Recorder()
-    competitor_catalog.register(recorder)
+    competitor_catalog.register(recorder, TEST_SERVICES)
 
     created = []
 
@@ -214,8 +214,8 @@ def test_build_push_to_meta_creates_staging_products(mock_meta_sdk_recorded, tmp
 
 def test_publish_catalog_draft_updates_visibility(mock_meta_sdk_recorded):
     import src.competitor_catalog as _cc
-    import src.config as _c
-    import src.helpers as _h
+    import src.core.config as _c
+    import src.utils as _h
 
     _h.ENABLE_WRITES = True
     _c.ENABLE_WRITES = True
@@ -230,7 +230,7 @@ def test_publish_catalog_draft_updates_visibility(mock_meta_sdk_recorded):
 
     mock_meta_sdk_recorded["api_call"].side_effect = api
     recorder = Recorder()
-    competitor_catalog.register(recorder)
+    competitor_catalog.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["publish_catalog_draft"](catalog_id="cat_1"))
 
     assert out["published"] == 2
@@ -246,7 +246,7 @@ def test_list_catalog_drafts_filters_staging(mock_meta_sdk_recorded):
 
     mock_meta_sdk_recorded["api_call"].side_effect = api
     recorder = Recorder()
-    competitor_catalog.register(recorder)
+    competitor_catalog.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["list_catalog_drafts"](catalog_id="cat_1"))
     assert out["draft_count"] == 1
     assert out["products"][0]["visibility"] == "staging"
@@ -259,7 +259,7 @@ def test_list_catalog_drafts_filters_staging(mock_meta_sdk_recorded):
 
 def test_module_registers_tools_resources_prompts():
     recorder = Recorder()
-    competitor_catalog.register(recorder)
+    competitor_catalog.register(recorder, TEST_SERVICES)
     assert set(recorder.tools) == {
         "build_competitor_catalog",
         "publish_catalog_draft",

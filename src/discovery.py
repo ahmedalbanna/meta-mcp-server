@@ -6,14 +6,14 @@ Run these first to confirm object ids before wiring FB_PAGE_ID / FB_AD_ACCOUNT_I
 
 import logging
 
-from src.config import APP_ID, APP_SECRET, META_ACCESS_TOKEN
+from src.core.config import APP_ID, APP_SECRET, META_ACCESS_TOKEN
 
 logger = logging.getLogger(__name__)
-from src.helpers import api_call, handle_error, json_dumps
 from src.throttle import concurrency_limit
+from src.utils import api_call, handle_error, json_dumps
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register discovery + config tools."""
 
     @mcp.tool()
@@ -23,7 +23,7 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.discovery_service import DiscoveryService
-            svc = DiscoveryService(services) if services is not None else DiscoveryService(Services.default())
+            svc = DiscoveryService(services)
             data = svc.list_pages(limit)
             return json_dumps(data)
         except Exception as e:
@@ -36,7 +36,7 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.discovery_service import DiscoveryService
-            svc = DiscoveryService(services) if services is not None else DiscoveryService(Services.default())
+            svc = DiscoveryService(services)
             data = svc.list_ad_accounts(limit)
             return json_dumps(data)
         except Exception as e:
@@ -52,7 +52,7 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.discovery_service import DiscoveryService
-            svc = DiscoveryService(services) if services is not None else DiscoveryService(Services.default())
+            svc = DiscoveryService(services)
             data = svc.discover_ig_user(page_id)
             return json_dumps(data)
         except Exception as e:
@@ -68,7 +68,7 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.discovery_service import DiscoveryService
-            svc = DiscoveryService(services) if services is not None else DiscoveryService(Services.default())
+            svc = DiscoveryService(services)
             data = svc.debug_access_token(input_token)
             return json_dumps(data)
         except Exception as e:
@@ -78,7 +78,7 @@ def register(mcp, services=None):
     @concurrency_limit()
     def config_status() -> str:
         """حالة الإعداد الحالية (أي معرفات مملوءة في .env) بدون كشف الأسرار."""
-        from src.config import (
+        from src.core.config import (
             AD_ACCOUNT_ID,
             ADS_ALLOW_ACTIVATE,
             ANALYTICS_TZ,
@@ -96,7 +96,7 @@ def register(mcp, services=None):
             PAGE_ACCESS_TOKEN,
             PAGE_ID,
         )
-        from src.helpers import get_page_access_token
+        from src.utils import get_page_access_token
 
         page_token = ""
         try:
@@ -140,7 +140,7 @@ def register(mcp, services=None):
             # Lightweight per-module overview (calls existing list tool pattern)
             return json_dumps({"module": "discovery", "resource": "discovery://status", "hint": "حالة الاكتشاف"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "discovery://status"))
 
@@ -155,7 +155,7 @@ def register(mcp, services=None):
         try:
             return json_dumps({"module": "discovery", "resource": "discovery://templates", "hint": "قوالب الاكتشاف"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "discovery://templates"))
 

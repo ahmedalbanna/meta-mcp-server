@@ -4,11 +4,9 @@ import asyncio
 import logging
 import time
 
-from src.config import AD_ACCOUNT_ID
-
 logger = logging.getLogger(__name__)
-from src.helpers import handle_error, json_dumps, to_dict, write_guard
 from src.throttle import concurrency_limit
+from src.utils import handle_error, json_dumps, write_guard
 
 BALANCE_FIELDS = [
     "name",
@@ -24,19 +22,17 @@ BALANCE_FIELDS = [
 ]
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register wallet/finance tools."""
-
-    from facebook_business.adobjects.adaccount import AdAccount
 
     @mcp.tool()
     @concurrency_limit()
     def get_account_balance(ad_account_id: str = "") -> str:
         """رصيد الحساب الإعلاني والإنفاق وحد الإنفاق والعملة."""
         try:
-            from src.core.services import Services
             from src.services.finance_service import FinanceService
-            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+
+            svc = FinanceService(services)
             data = svc.get_account_balance(ad_account_id)
             return json_dumps(data)
         except Exception as e:
@@ -47,9 +43,9 @@ def register(mcp, services=None):
     def get_spend_cap(ad_account_id: str = "") -> str:
         """حدود الإنفاق الحالية للحساب الإعلاني."""
         try:
-            from src.core.services import Services
             from src.services.finance_service import FinanceService
-            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+
+            svc = FinanceService(services)
             data = svc.get_spend_cap(ad_account_id)
             return json_dumps(data)
         except Exception as e:
@@ -64,9 +60,9 @@ def register(mcp, services=None):
         مثال: 100000 = 1000 دولار. ضع 0 لإزالة الحد.
         """
         try:
-            from src.core.services import Services
             from src.services.finance_service import FinanceService
-            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+
+            svc = FinanceService(services)
             return json_dumps(svc.update_spend_cap(spend_cap))
         except Exception as e:
             return json_dumps(handle_error(e, "update_spend_cap"))
@@ -76,9 +72,9 @@ def register(mcp, services=None):
     def get_transactions(limit: int = 25) -> str:
         """سجل معاملات الحساب الإعلاني. ملاحظة: أزالت Meta حافة /transactions من Graph API بالكامل — الفواتير متاحة من Business Manager > Billing."""
         try:
-            from src.core.services import Services
             from src.services.finance_service import FinanceService
-            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+
+            svc = FinanceService(services)
             data = svc.get_transactions(limit)
             return json_dumps(data)
         except Exception as e:
@@ -89,9 +85,9 @@ def register(mcp, services=None):
     def get_payment_methods() -> str:
         """طرق الدفع المرتبطة بالحساب (مصدر التمويل)."""
         try:
-            from src.core.services import Services
             from src.services.finance_service import FinanceService
-            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+
+            svc = FinanceService(services)
             data = svc.get_payment_methods()
             return json_dumps(data)
         except Exception as e:
@@ -102,9 +98,9 @@ def register(mcp, services=None):
     def get_business_info(business_id: str = "") -> str:
         """معلومات Business Manager (الفوترة، اسم النشاط، الحالة)."""
         try:
-            from src.core.services import Services
             from src.services.finance_service import FinanceService
-            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+
+            svc = FinanceService(services)
             return json_dumps(svc.get_business_info(business_id))
         except Exception as e:
             return json_dumps(handle_error(e, "get_business_info"))
@@ -114,9 +110,9 @@ def register(mcp, services=None):
     def list_account_users() -> str:
         """المستخدمون المرتبطون بالحساب الإعلاني وصلاحياتهم."""
         try:
-            from src.core.services import Services
             from src.services.finance_service import FinanceService
-            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+
+            svc = FinanceService(services)
             return json_dumps(svc.list_account_users())
         except Exception as e:
             return json_dumps(handle_error(e, "list_account_users"))
@@ -130,9 +126,9 @@ def register(mcp, services=None):
         tasks مفصولة بفواصل من: ADVERTISE, ANALYZE, MANAGE, DRAFT
         """
         try:
-            from src.core.services import Services
             from src.services.finance_service import FinanceService
-            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+
+            svc = FinanceService(services)
             return json_dumps(svc.assign_user(user_id, tasks))
         except Exception as e:
             return json_dumps(handle_error(e, "assign_user_to_account"))
@@ -143,9 +139,9 @@ def register(mcp, services=None):
     def remove_user_from_account(user_id: int) -> str:
         """إزالة مستخدم من الحساب الإعلاني."""
         try:
-            from src.core.services import Services
             from src.services.finance_service import FinanceService
-            svc = FinanceService(services) if services is not None else FinanceService(Services.default())
+
+            svc = FinanceService(services)
             return json_dumps(svc.remove_user(user_id))
         except Exception as e:
             return json_dumps(handle_error(e, "remove_user_from_account"))
@@ -157,7 +153,7 @@ def register(mcp, services=None):
             # Lightweight per-module overview (calls existing list tool pattern)
             return json_dumps({"module": "finance", "resource": "finance://overview", "hint": "ملخص المحفظة"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "finance://overview"))
 
@@ -172,22 +168,26 @@ def register(mcp, services=None):
         try:
 
             def _fetch():
-                account = AdAccount(AD_ACCOUNT_ID)
-                info = account.api_get(
-                    fields=[
-                        "name",
-                        "account_status",
-                        "currency",
-                        "balance",
-                        "amount_spent",
-                        "spend_cap",
-                    ]
+                acct = services.config.fb_ad_account_id
+                info = services.api.get(
+                    acct,
+                    {
+                        "fields": [
+                            "name",
+                            "account_status",
+                            "currency",
+                            "balance",
+                            "amount_spent",
+                            "spend_cap",
+                        ]
+                    },
                 )
-                insights = account.get_insights(
-                    params={
+                insights = services.api.get(
+                    f"{acct}/insights",
+                    {
                         "date_preset": "last_30d",
-                        "fields": ["spend", "impressions", "clicks"],
-                    }
+                        "fields": "spend,impressions,clicks",
+                    },
                 )
                 return info, insights
 
@@ -195,12 +195,12 @@ def register(mcp, services=None):
             info, insights = await asyncio.to_thread(_fetch)
             elapsed = time.monotonic() - t0
             logger.info("account://summary fetched in %.2fs", elapsed)
-            data = to_dict(info)
-            if insights:
-                data["insights_30d"] = to_dict(insights[0])
+            data = info if isinstance(info, dict) else {}
+            if isinstance(insights, dict) and insights.get("data"):
+                data["insights_30d"] = insights["data"][0]
             return json_dumps(data)
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             logger.exception("account://summary failed")
             return json_dumps(handle_error(e, "account://summary"))

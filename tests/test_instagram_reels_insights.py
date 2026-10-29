@@ -1,21 +1,21 @@
 import json
 
-from tests.conftest import Recorder
+from tests.conftest import TEST_SERVICES, Recorder
 
 
 def test_reels_account_insights_requires_ig_id():
     recorder = Recorder()
     from src import instagram
 
-    instagram.register(recorder)
+    instagram.register(recorder, TEST_SERVICES)
     # simulate unconfigured
-    original = instagram.INSTAGRAM_BUSINESS_ID
-    instagram.INSTAGRAM_BUSINESS_ID = ""
+    original = TEST_SERVICES.config.instagram_business_id
+    TEST_SERVICES.config.fb_ig_user_id = ""
     try:
         out = json.loads(recorder.tools["get_instagram_reels_account_insights"]())
         assert "error" in out
     finally:
-        instagram.INSTAGRAM_BUSINESS_ID = original
+        TEST_SERVICES.config.fb_ig_user_id = original
 
 
 def test_reels_account_insights_aggregates(mock_meta_sdk_recorded):
@@ -54,7 +54,7 @@ def test_reels_account_insights_aggregates(mock_meta_sdk_recorded):
     recorder = Recorder()
     from src import instagram
 
-    instagram.register(recorder)
+    instagram.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["get_instagram_reels_account_insights"](limit=5, days=30))
     assert out["totals"]["reels_analysed"] == 1
     assert out["totals"]["plays"] == 100

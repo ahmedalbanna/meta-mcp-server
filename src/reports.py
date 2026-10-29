@@ -3,12 +3,6 @@ import logging
 from collections import Counter
 from pathlib import Path
 
-from src.config import (
-    AD_ACCOUNT_ID,
-    REPORT_DIR,
-    ensure_report_dir,
-)
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_METRICS = ["spend", "impressions", "clicks", "ctr", "cpc", "reach"]
@@ -70,25 +64,24 @@ def _summarise(rows: list[dict], metrics: list) -> dict:
     return summary
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register reports tools."""
 
-    from facebook_business.adobjects.adaccount import AdAccount
-
-    from src.helpers import handle_error, json_dumps, sanitize_filename
     from src.throttle import concurrency_limit
+    from src.utils import handle_error, json_dumps, sanitize_filename
 
-    ensure_report_dir()
+    services.config.report_dir.mkdir(parents=True, exist_ok=True)
 
     def _fetch_rows(object_id: str, preset: str, metrics: list) -> list:
-        ad_account = AdAccount(object_id)
-        insights = ad_account.get_insights(params={"date_preset": preset, "fields": ["campaign_name", *metrics]})
+        data = services.api.get(
+            f"{object_id}/insights",
+            {"date_preset": preset, "fields": "campaign_name," + ",".join(metrics)},
+        )
         rows = []
-        for item in insights:
-            data = item.export_all_data()
-            row = {"campaign_name": data.get("campaign_name", "N/A")}
+        for item in data.get("data", []) if isinstance(data, dict) else []:
+            row = {"campaign_name": item.get("campaign_name", "N/A")}
             for m in metrics:
-                row[m] = data.get(m, 0)
+                row[m] = item.get(m, 0)
             rows.append(row)
         return rows
 
@@ -107,13 +100,12 @@ def register(mcp, services=None):
         mode: overwrite | append (incremental — يلحق الصفوف بملف موجود بدلاً من الكتابة فوقه)
         """
         try:
-            ensure_report_dir()
+            services.config.report_dir.mkdir(parents=True, exist_ok=True)
             metric_list = [m.strip() for m in metrics.split(",") if m.strip()]
-            from src.core.services import Services
             from src.services.reports_service import ReportsService
 
-            _rsvc = ReportsService(services) if services is not None else ReportsService(Services.default())
-            rows = _rsvc.fetch_campaign_rows(AD_ACCOUNT_ID, date_preset, metric_list)
+            _rsvc = ReportsService(services)
+            rows = _rsvc.fetch_campaign_rows(services.config.fb_ad_account_id, date_preset, metric_list)
             base = filename or f"campaign_report_{date_preset}"
             if filename:
                 try:
@@ -123,7 +115,7 @@ def register(mcp, services=None):
             # Incremental append: merge with existing file if mode=append
             if mode == "append":
                 ext = ".xlsx" if format == "excel" else ".csv"
-                path = Path(REPORT_DIR) / f"{base}{ext}"
+                path = Path(services.config.report_dir) / f"{base}{ext}"
                 if path.exists() and format == "csv":
                     try:
                         existing = []
@@ -136,10 +128,10 @@ def register(mcp, services=None):
                     except Exception:
                         pass
             if format == "excel":
-                path = Path(REPORT_DIR) / f"{base}.xlsx"
+                path = Path(services.config.report_dir) / f"{base}.xlsx"
                 _write_excel(path, rows)
             else:
-                path = Path(REPORT_DIR) / f"{base}.csv"
+                path = Path(services.config.report_dir) / f"{base}.csv"
                 _write_csv(path, rows)
             return json_dumps(
                 {
@@ -157,10 +149,9 @@ def register(mcp, services=None):
     def account_summary(date_preset: str = "last_30d") -> str:
         """ملخص أداء الحساب الإعلاني خلال فترة."""
         try:
-            from src.core.services import Services
             from src.services.reports_service import ReportsService
 
-            svc = ReportsService(services) if services is not None else ReportsService(Services.default())
+            svc = ReportsService(services)
             out = svc.account_summary(date_preset)
             return json_dumps(out)
         except Exception as e:
@@ -179,14 +170,13 @@ def register(mcp, services=None):
         format: csv | excel. filename: اسم الملف (بدون امتداد).
         """
         try:
-            ensure_report_dir()
-            from src.helpers import init_meta_api
+            services.config.report_dir.mkdir(parents=True, exist_ok=True)
+            from src.utils import init_meta_api
 
             init_meta_api()
-            from src.core.services import Services
             from src.services.reports_service import ReportsService
 
-            _rsvc = ReportsService(services) if services is not None else ReportsService(Services.default())
+            _rsvc = ReportsService(services)
             raw_rows = _rsvc.fetch_instagram_report_rows(limit)
             rows = []
             for item in raw_rows:
@@ -204,10 +194,10 @@ def register(mcp, services=None):
                 except ValueError as e:
                     return json_dumps({"error": f"اسم ملف غير صالح: {e}"})
             if format == "excel":
-                path = Path(REPORT_DIR) / f"{base}.xlsx"
+                path = Path(services.config.report_dir) / f"{base}.xlsx"
                 _write_excel(path, rows)
             else:
-                path = Path(REPORT_DIR) / f"{base}.csv"
+                path = Path(services.config.report_dir) / f"{base}.csv"
                 _write_csv(path, rows)
 
             type_counts = Counter(r.get("media_type", "") for r in rows)
@@ -239,10 +229,9 @@ def register(mcp, services=None):
         format: csv | excel. filename: اسم الملف (بدون امتداد).
         """
         try:
-            from src.core.services import Services
             from src.services.reports_service import ReportsService
 
-            svc = ReportsService(services) if services is not None else ReportsService(Services.default())
+            svc = ReportsService(services)
             out = svc.generate_page_report(format, filename)
             return json_dumps(out)
         except Exception as e:
@@ -265,10 +254,9 @@ def register(mcp, services=None):
         يتطلب: pip install gspread google-auth
         """
         try:
-            from src.core.services import Services
             from src.services.reports_service import ReportsService
 
-            svc = ReportsService(services) if services is not None else ReportsService(Services.default())
+            svc = ReportsService(services)
             out = svc.export_report_to_google_sheets(filename, spreadsheet_id, worksheet, credentials_path)
             return json_dumps(out)
         except Exception as e:
@@ -281,7 +269,7 @@ def register(mcp, services=None):
             # Lightweight per-module overview (calls existing list tool pattern)
             return json_dumps({"module": "reports", "resource": "reports://overview", "hint": "قائمة التقارير"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "reports://overview"))
 
@@ -305,7 +293,7 @@ def register(mcp, services=None):
         try:
             return json_dumps({"module": "reports", "resource": "reports://templates", "hint": "قوالب التقارير"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "reports://templates"))
 

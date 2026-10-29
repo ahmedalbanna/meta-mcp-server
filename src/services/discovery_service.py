@@ -17,10 +17,13 @@ class DiscoveryService:
         return self.api.get("me/accounts", {"fields": "name,id,category,link,access_token", "limit": limit})
 
     def list_ad_accounts(self, limit: int = 25) -> Any:
-        return self.api.get("me/adaccounts", {
-            "fields": "name,account_id,currency,account_status,amount_spent",
-            "limit": limit,
-        })
+        return self.api.get(
+            "me/adaccounts",
+            {
+                "fields": "name,account_id,currency,account_status,amount_spent",
+                "limit": limit,
+            },
+        )
 
     def discover_ig_user(self, page_id: str = "") -> Any:
         if page_id:
@@ -39,11 +42,13 @@ class DiscoveryService:
         return out
 
     def debug_access_token(self, input_token: str = "") -> Any:
-        from src.config import APP_ID, APP_SECRET, META_ACCESS_TOKEN
-        token = input_token or META_ACCESS_TOKEN
-        if not APP_ID or not APP_SECRET:
+        token = input_token or self.config.access_token
+        if not self.config.fb_app_id or not self.config.fb_app_secret:
             raise ValueError("حدد FB_APP_ID و FB_APP_SECRET في .env")
-        return self.api.get("debug_token", {
-            "input_token": token,
-            "access_token": f"{APP_ID}|{APP_SECRET}",
-        })
+        return self.api.get(
+            "debug_token",
+            {
+                "input_token": token,
+                "access_token": f"{self.config.fb_app_id}|{self.config.fb_app_secret}",
+            },
+        )

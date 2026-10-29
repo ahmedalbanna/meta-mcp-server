@@ -4,7 +4,7 @@ import importlib
 
 import pytest
 
-from tests.conftest import TOOL_MODULES, Recorder, register_all
+from tests.conftest import TEST_SERVICES, TOOL_MODULES, Recorder, register_all
 
 
 def _import_module(name):
@@ -30,13 +30,13 @@ def test_tool_count():
 def test_every_module_registers_at_least_one_tool():
     for module_name in TOOL_MODULES:
         recorder = Recorder()
-        _import_module(module_name).register(recorder)
+        _import_module(module_name).register(recorder, TEST_SERVICES)
         assert recorder.tools, f"module {module_name} registered no tools"
 
 
 @pytest.mark.parametrize("module_name", TOOL_MODULES)
 def test_no_duplicate_tool_names(module_name):
     recorder = Recorder()
-    _import_module(module_name).register(recorder)
+    _import_module(module_name).register(recorder, TEST_SERVICES)
     names = list(recorder.tools)
     assert len(names) == len(set(names)), f"duplicate tools in {module_name}"

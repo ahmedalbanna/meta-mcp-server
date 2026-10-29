@@ -6,7 +6,7 @@ from typing import Any
 
 from src.core.services import Services
 from src.creatives import _TEMPLATES, AD_FORMATS, CTA_OPTIONS
-from src.helpers import to_dict
+from src.utils import to_dict
 
 
 class CreativesService:

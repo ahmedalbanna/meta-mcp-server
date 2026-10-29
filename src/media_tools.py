@@ -8,15 +8,15 @@ Cloudinary (permanent) with an uguu.se fallback (72h) and return the URL.
 import logging
 from pathlib import Path
 
-from src.helpers import json_dumps, sanitize_path
 from src.throttle import concurrency_limit
+from src.utils import json_dumps, sanitize_path
 
 logger = logging.getLogger(__name__)
 
 MEDIA_ROOT = Path(__file__).resolve().parent.parent / "media"
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register media-hosting tools."""
 
     @mcp.tool()
@@ -29,9 +29,8 @@ def register(mcp, services=None):
         استخدمه قبل publish_instagram_photo / publish_page_photo / create_product.
         """
         try:
-            from src.core.services import Services
             from src.services.media_tools_service import MediaToolsService
-            svc = MediaToolsService(services) if services is not None else MediaToolsService(Services.default())
+            svc = MediaToolsService(services)
             return json_dumps(svc.host_image_url(file_path))
         except Exception as e:
             return json_dumps({"error": f"host_image: {e}"})
@@ -41,9 +40,8 @@ def register(mcp, services=None):
     def host_video_url(file_path: str) -> str:
         """رفع فيديو محلي إلى استضافة عامة وإرجاع رابط URL."""
         try:
-            from src.core.services import Services
             from src.services.media_tools_service import MediaToolsService
-            svc = MediaToolsService(services) if services is not None else MediaToolsService(Services.default())
+            svc = MediaToolsService(services)
             return json_dumps(svc.host_video_url(file_path))
         except Exception as e:
             return json_dumps({"error": f"host_video: {e}"})
@@ -53,9 +51,8 @@ def register(mcp, services=None):
     def host_many_images(file_paths: str) -> str:
         """رفع عدة صور دفعة واحدة (مسارات مفصولة بفواصل) وإرجاع روابطها."""
         try:
-            from src.core.services import Services
             from src.services.media_tools_service import MediaToolsService
-            svc = MediaToolsService(services) if services is not None else MediaToolsService(Services.default())
+            svc = MediaToolsService(services)
             return json_dumps(svc.host_many_images(file_paths))
         except Exception as e:
             return json_dumps({"error": f"host_many: {e}"})

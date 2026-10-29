@@ -18,7 +18,7 @@ def test_extract_prices_disabled(monkeypatch):
     monkeypatch.setenv("FB_ENABLE_OCR", "false")
     import importlib
 
-    import src.config as cfg
+    import src.core.config as cfg
     importlib.reload(cfg)
     assert ocr.extract_text_from_image("http://example.com/x.jpg") == ""
     res = ocr.ocr_price_for_image("http://example.com/x.jpg")

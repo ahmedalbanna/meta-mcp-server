@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from src import competitors
-from tests.conftest import Recorder
+from tests.conftest import TEST_SERVICES, Recorder
 
 
 def _iso_days_ago(days: float) -> str:
@@ -78,7 +78,7 @@ def test_search_business_pages_builds_combined_query(mock_meta_sdk_recorded):
     mock_meta_sdk_recorded["api_call"].side_effect = api
 
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["search_business_pages"](query="مجوهرات", city="صنعاء", limit=10))
 
     assert calls[0]["method"] == "GET"
@@ -92,11 +92,11 @@ def test_search_business_pages_builds_combined_query(mock_meta_sdk_recorded):
 
 
 def test_search_business_pages_excludes_our_page(mock_meta_sdk_recorded):
-    ours = str(competitors.PAGE_ID)
+    ours = str(TEST_SERVICES.config.page_id)
     api = _make_fake_api(search_data={"data": [{"id": ours, "name": "Butterfly"}, {"id": "222", "name": "منافس"}]})
     mock_meta_sdk_recorded["api_call"].side_effect = api
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["search_business_pages"](query="اكسسوارات"))
     assert out["count"] == 1
     assert out["results"][0]["id"] == "222"
@@ -105,7 +105,7 @@ def test_search_business_pages_excludes_our_page(mock_meta_sdk_recorded):
 def test_search_business_pages_requires_keyword(mock_meta_sdk_recorded):
     mock_meta_sdk_recorded["api_call"].side_effect = _make_fake_api()
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["search_business_pages"](query="", city="", limit=5))
     assert "error" in out
     assert "كلمة مفتاحية" in out["error"]
@@ -116,7 +116,7 @@ def test_search_business_pages_explains_empty_results(mock_meta_sdk_recorded):
     Page Public Content Access feature — the tool must say so."""
     mock_meta_sdk_recorded["api_call"].side_effect = _make_fake_api(search_data={"data": []})
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["search_business_pages"](query="مجوهرات", city="صنعاء"))
     assert out["count"] == 0
     assert "empty_reason" in out
@@ -151,7 +151,7 @@ def test_analyze_competitor_page_computes_engagement(mock_meta_sdk_recorded):
     api = _make_fake_api(info=INFO, posts=POSTS, ratings=RATINGS, calls=calls)
     mock_meta_sdk_recorded["api_call"].side_effect = api
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
 
     out = json.loads(recorder.tools["analyze_competitor_page"](page_id="111", days=30))
 
@@ -194,7 +194,7 @@ def test_analyze_competitor_page_falls_back_when_engagement_edges_denied(mock_me
     api = _make_fake_api(info=INFO, posts=bare_posts, ratings=RATINGS, posts_error_times=1, calls=calls)
     mock_meta_sdk_recorded["api_call"].side_effect = api
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
 
     out = json.loads(recorder.tools["analyze_competitor_page"](page_id="111", days=30))
 
@@ -218,7 +218,7 @@ def test_analyze_competitor_page_falls_back_when_engagement_edges_denied(mock_me
 def test_analyze_competitor_page_validates_args(mock_meta_sdk_recorded):
     mock_meta_sdk_recorded["api_call"].side_effect = _make_fake_api()
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
     assert "error" in json.loads(recorder.tools["analyze_competitor_page"](page_id="", days=10))
     assert "error" in json.loads(recorder.tools["analyze_competitor_page"](page_id="111", days=0))
 
@@ -226,12 +226,12 @@ def test_analyze_competitor_page_validates_args(mock_meta_sdk_recorded):
 def test_analyze_our_own_page_uses_page_scoped_token(mock_meta_sdk_recorded):
     """Our page is read with the page token (full data); the user token is not
     touched for it (it would fail with #210 'page access token required')."""
-    ours = str(competitors.PAGE_ID)
+    ours = str(TEST_SERVICES.config.page_id)
     api = _make_fake_api(info={"name": "Butterfly-ye", "fan_count": 2950}, posts=POSTS, ratings=RATINGS)
     mock_meta_sdk_recorded["api_call"].side_effect = api
     mock_meta_sdk_recorded["page_api_call"].side_effect = api
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
 
     out = json.loads(recorder.tools["analyze_competitor_page"](page_id=ours, days=30))
 
@@ -248,7 +248,7 @@ def test_analyze_our_own_page_uses_page_scoped_token(mock_meta_sdk_recorded):
 
 
 def test_compare_competitors_appends_our_page_and_sorts(mock_meta_sdk_recorded):
-    ours = str(competitors.PAGE_ID)
+    ours = str(TEST_SERVICES.config.page_id)
     calls: list = []
 
     def api(method, path, params=None):
@@ -270,7 +270,7 @@ def test_compare_competitors_appends_our_page_and_sorts(mock_meta_sdk_recorded):
     mock_meta_sdk_recorded["api_call"].side_effect = api
     mock_meta_sdk_recorded["page_api_call"].side_effect = api  # our page uses the page token
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
 
     out = json.loads(recorder.tools["compare_competitors"](page_ids="111,222", days=30))
 
@@ -283,7 +283,7 @@ def test_compare_competitors_appends_our_page_and_sorts(mock_meta_sdk_recorded):
 def test_compare_competitors_caps_ids(mock_meta_sdk_recorded):
     mock_meta_sdk_recorded["api_call"].side_effect = _make_fake_api()
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["compare_competitors"](page_ids=",".join(str(i) for i in range(30)), days=30))
     assert "error" in out
     assert "15" in out["error"]
@@ -302,7 +302,7 @@ def test_compare_competitors_collects_per_page_errors(mock_meta_sdk_recorded):
 
     mock_meta_sdk_recorded["api_call"].side_effect = api
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["compare_competitors"](page_ids="111,222", include_ours=False))
     assert out["compared"] == 2
     assert all(row["partial"] for row in out["table"])
@@ -318,7 +318,7 @@ def test_compare_competitors_errors_when_profile_call_raises(mock_meta_sdk_recor
     mock_meta_sdk_recorded["api_call"].side_effect = api
     mock_meta_sdk_recorded["page_api_call"].side_effect = api
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["compare_competitors"](page_ids="111", include_ours=False))
     assert out["compared"] == 1
     assert out["table"][0]["partial"] is True
@@ -369,7 +369,7 @@ def test_discover_instagram_business_computes_average_engagement(mock_meta_sdk_r
     api = _make_fake_api(biz=BIZ, calls=calls)
     mock_meta_sdk_recorded["api_call"].side_effect = api
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
 
     out = json.loads(recorder.tools["discover_instagram_business"](username="@jewels.sanaa", media_limit=12))
 
@@ -387,22 +387,22 @@ def test_discover_instagram_business_computes_average_engagement(mock_meta_sdk_r
 
 def test_discover_instagram_business_requires_our_ig_id():
     competitor_tools = Recorder()
-    competitors.register(competitor_tools)
+    competitors.register(competitor_tools, TEST_SERVICES)
     # simulate unconfigured FB_IG_USER_ID
-    original = competitors.INSTAGRAM_BUSINESS_ID
-    competitors.INSTAGRAM_BUSINESS_ID = ""
+    original = TEST_SERVICES.config.instagram_business_id
+    TEST_SERVICES.config.fb_ig_user_id = ""
     try:
         out = json.loads(competitor_tools.tools["discover_instagram_business"](username="x"))
         assert "error" in out
         assert "FB_IG_USER_ID" in out["error"]
     finally:
-        competitors.INSTAGRAM_BUSINESS_ID = original
+        TEST_SERVICES.config.fb_ig_user_id = original
 
 
 def test_discover_instagram_business_missing_account(mock_meta_sdk_recorded):
     mock_meta_sdk_recorded["api_call"].side_effect = _make_fake_api(biz={})
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["discover_instagram_business"](username="does_not_exist"))
     assert "error" in out
     assert "does_not_exist" in out["error"]
@@ -429,7 +429,7 @@ def test_check_discovery_permissions_reports_blocked_paths(mock_meta_sdk_recorde
 
     mock_meta_sdk_recorded["api_call"].side_effect = api
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
 
     out = json.loads(recorder.tools["check_discovery_permissions"]())
     endpoints = {r["endpoint"]: r for r in out["results"]}
@@ -450,7 +450,7 @@ def test_check_discovery_permissions_reports_available_path(mock_meta_sdk_record
 
     mock_meta_sdk_recorded["api_call"].side_effect = api
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["check_discovery_permissions"]())
     # page search returns rows + ig probe raises nothing → 2 available of 3
     assert out["available_count"] == 2
@@ -505,7 +505,7 @@ def _report_response(handle: str):
 def test_competitor_report_consolidates_everything(mock_meta_sdk_recorded):
     mock_meta_sdk_recorded["api_call"].side_effect = lambda *a, **k: _report_response("elegant.po1")
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
 
     out = json.loads(recorder.tools["competitor_report"](handle="@elegant.po1", days=30))
 
@@ -532,7 +532,7 @@ def test_competitor_report_consolidates_everything(mock_meta_sdk_recorded):
 
 def test_competitor_report_requires_handle(mock_meta_sdk_recorded):
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["competitor_report"](handle=""))
     assert "error" in out
 
@@ -540,7 +540,7 @@ def test_competitor_report_requires_handle(mock_meta_sdk_recorded):
 def test_competitor_report_survives_ig_failure(mock_meta_sdk_recorded):
     mock_meta_sdk_recorded["api_call"].side_effect = Exception("token expired")
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["competitor_report"](handle="ghost.store", days=30))
     assert "error" in out["instagram"]
     assert out["recommendations"] == ["لا توصيات محددة — راجع التفاصيل"]
@@ -548,7 +548,7 @@ def test_competitor_report_survives_ig_failure(mock_meta_sdk_recorded):
 
 def test_module_registers_tools_resources_prompts():
     recorder = Recorder()
-    competitors.register(recorder)
+    competitors.register(recorder, TEST_SERVICES)
     assert set(recorder.tools) == {
         "search_business_pages",
         "check_discovery_permissions",

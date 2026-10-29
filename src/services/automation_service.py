@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Any
 
-from facebook_business.adobjects.adaccount import AdAccount
-
-from src.config import AD_ACCOUNT_ID
 from src.core.services import Services
-from src.helpers import to_dict
+from src.utils import to_dict
 
 SECONDS_PER_DAY = 86400
 
@@ -19,15 +17,18 @@ class AutomationService:
         self.services = services
         self.config = services.config
 
-    def list_auto_rules(self, limit: int = 25) -> Any:
-        account = AdAccount(AD_ACCOUNT_ID)
-        rules = account.get_ad_rules_library(params={"limit": limit})
-        return [to_dict(r) for r in rules]
+    def _acct(self) -> str:
+        return self.config.fb_ad_account_id
 
-    def create_auto_rule(self, name: str, evaluation_spec: str, execution_spec: str,
-                          schedule_spec: str = "", status: str = "ACTIVE") -> Any:
-        account = AdAccount(AD_ACCOUNT_ID)
-        params = {
+    def list_auto_rules(self, limit: int = 25) -> Any:
+        data = self.services.api.get(f"{self._acct()}/ad_rules_library", {"limit": limit})
+        rows = data.get("data", []) if isinstance(data, dict) else []
+        return [to_dict(r) for r in rows]
+
+    def create_auto_rule(
+        self, name: str, evaluation_spec: str, execution_spec: str, schedule_spec: str = "", status: str = "ACTIVE"
+    ) -> Any:
+        params: dict[str, Any] = {
             "name": name,
             "evaluation_spec": evaluation_spec,
             "execution_spec": execution_spec,
@@ -35,15 +36,20 @@ class AutomationService:
         }
         if schedule_spec:
             params["schedule_spec"] = schedule_spec
-        rule = account.create_ad_rules_library(params=params)
-        return to_dict(rule)
+        data = self.services.api.post(f"{self._acct()}/ad_rules_library", params)
+        return to_dict(data)
 
-    def create_simple_auto_rule(self, name: str, object_type: str = "campaign", field: str = "spend",
-                                operator: str = "GREATER_THAN", value: float = 100.0,
-                                action: str = "pause", time_zone: str = "America/New_York",
-                                status: str = "ACTIVE") -> Any:
-        import json
-        account = AdAccount(AD_ACCOUNT_ID)
+    def create_simple_auto_rule(
+        self,
+        name: str,
+        object_type: str = "campaign",
+        field: str = "spend",
+        operator: str = "GREATER_THAN",
+        value: float = 100.0,
+        action: str = "pause",
+        time_zone: str = "America/New_York",
+        status: str = "ACTIVE",
+    ) -> Any:
         execution_options = [
             {"field": "STATUS", "operator": "EQUAL", "value": "PAUSED" if action == "PAUSE" else "ACTIVE"}
         ]
@@ -58,17 +64,18 @@ class AutomationService:
             "execution_spec": json.dumps({"execution_type": "value", "execution_options": execution_options}),
             "status": status,
         }
-        rule = account.create_ad_rules_library(params=params)
-        return to_dict(rule)
+        data = self.services.api.post(f"{self._acct()}/ad_rules_library", params)
+        return to_dict(data)
 
     def delete_auto_rule(self, rule_id: str) -> dict[str, Any]:
-        from facebook_business.adobjects.adrule import AdRule
-        rule = AdRule(rule_id)
-        rule.api_delete()
+        self.services.api.delete(f"{rule_id}")
         return {"success": True, "rule_id": rule_id}
 
     def get_history(self, days: int = 7) -> Any:
-        account = AdAccount(AD_ACCOUNT_ID)
         since = int(time.time()) - days * SECONDS_PER_DAY
-        history = account.get_ad_rules_history(params={"start_time": since, "end_time": int(time.time())})
-        return [to_dict(h) for h in history]
+        data = self.services.api.get(
+            f"{self._acct()}/ad_rules_history",
+            {"start_time": since, "end_time": int(time.time())},
+        )
+        rows = data.get("data", []) if isinstance(data, dict) else []
+        return [to_dict(h) for h in rows]

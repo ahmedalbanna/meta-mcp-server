@@ -2,12 +2,9 @@
 
 import logging
 
-from src.config import BUSINESS_ID
-
 logger = logging.getLogger(__name__)
-from src.helpers import handle_error, json_dumps, to_dict, write_guard
 from src.throttle import concurrency_limit
-from src.utils import paginate
+from src.utils import handle_error, json_dumps, paginate, to_dict, write_guard
 
 USER_ROLES = [
     "ADMIN",
@@ -30,14 +27,14 @@ USER_FIELDS = [
 ]
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register Business Manager user tools."""
 
     from facebook_business.adobjects.business import Business
     from facebook_business.adobjects.businessuser import BusinessUser
 
     def _require_business_id(business_id: str) -> str:
-        return business_id or BUSINESS_ID
+        return business_id or services.config.business_id
 
     def _validate_role(role: str) -> str:
         r = role.strip().upper()
@@ -52,7 +49,8 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.business_service import BusinessService
-            svc = BusinessService(services) if services is not None else BusinessService(Services.default())
+
+            svc = BusinessService(services)
             rows = svc.list_users(business_id, limit)
             return json_dumps(rows)
         except Exception as e:
@@ -65,7 +63,8 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.business_service import BusinessService
-            svc = BusinessService(services) if services is not None else BusinessService(Services.default())
+
+            svc = BusinessService(services)
             info = svc.get_user(user_id)
             return json_dumps(info)
         except Exception as e:
@@ -82,7 +81,8 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.business_service import BusinessService
-            svc = BusinessService(services) if services is not None else BusinessService(Services.default())
+
+            svc = BusinessService(services)
             user = svc.invite_user(email, role, name, business_id)
             return json_dumps(user)
         except Exception as e:
@@ -96,7 +96,8 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.business_service import BusinessService
-            svc = BusinessService(services) if services is not None else BusinessService(Services.default())
+
+            svc = BusinessService(services)
             result = svc.update_role(user_id, role)
             return json_dumps(result)
         except Exception as e:
@@ -110,7 +111,8 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.business_service import BusinessService
-            svc = BusinessService(services) if services is not None else BusinessService(Services.default())
+
+            svc = BusinessService(services)
             result = svc.delete_user(user_id)
             return json_dumps(result)
         except Exception as e:
@@ -125,7 +127,7 @@ def register(mcp, services=None):
                 {"module": "business", "resource": "business://overview", "hint": "نظرة عامة على الأعمال"}
             )
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "business://overview"))
 
@@ -140,7 +142,7 @@ def register(mcp, services=None):
         try:
             return json_dumps({"module": "business", "resource": "business://templates", "hint": "قوالب الأعمال"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "business://templates"))
 

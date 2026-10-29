@@ -35,7 +35,7 @@ def is_available() -> bool:
 
 
 def _enabled() -> bool:
-    from src.config import FB_ENABLE_OCR
+    from src.core.config import FB_ENABLE_OCR
     return bool(FB_ENABLE_OCR) and is_available()
 
 

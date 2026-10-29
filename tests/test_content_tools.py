@@ -7,13 +7,13 @@ from unittest import mock
 import pytest
 
 from src import content_tools
-from tests.conftest import Recorder
+from tests.conftest import TEST_SERVICES, Recorder
 
 
 @pytest.fixture
 def recorder():
     r = Recorder()
-    content_tools.register(r)
+    content_tools.register(r, TEST_SERVICES)
     return r
 
 

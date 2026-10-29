@@ -18,7 +18,7 @@ def _register():
 
 
 def test_sanitize_filename_strips_path_components():
-    from src.helpers import sanitize_filename
+    from src.utils import sanitize_filename
 
     assert sanitize_filename("../../../etc/passwd") == "passwd"
     assert sanitize_filename("good.txt") == "good.txt"
@@ -28,7 +28,7 @@ def test_sanitize_filename_strips_path_components():
 def test_sanitize_filename_rejects_empty():
     import pytest
 
-    from src.helpers import sanitize_filename
+    from src.utils import sanitize_filename
 
     with pytest.raises(ValueError):
         sanitize_filename("")
@@ -37,14 +37,14 @@ def test_sanitize_filename_rejects_empty():
 def test_sanitize_filename_rejects_special_chars():
     import pytest
 
-    from src.helpers import sanitize_filename
+    from src.utils import sanitize_filename
 
     with pytest.raises(ValueError):
         sanitize_filename("file:name")
 
 
 def test_sanitize_path_stays_inside_root(tmp_path):
-    from src.helpers import sanitize_path
+    from src.utils import sanitize_path
 
     (tmp_path / "sub").mkdir()
     result = sanitize_path("sub/file.txt", tmp_path)
@@ -54,7 +54,7 @@ def test_sanitize_path_stays_inside_root(tmp_path):
 def test_sanitize_path_rejects_escape(tmp_path):
     import pytest
 
-    from src.helpers import sanitize_path
+    from src.utils import sanitize_path
 
     with pytest.raises(ValueError):
         sanitize_path("../../etc/passwd", tmp_path)
@@ -65,21 +65,18 @@ def test_sanitize_path_rejects_escape(tmp_path):
 
 def test_send_messenger_message_rejects_long_text(mock_meta_sdk):
     recorder = _register()
-    result = recorder.tools["send_messenger_message"](
-        recipient_id="123", text="x" * 2001
-    )
+    result = recorder.tools["send_messenger_message"](recipient_id="123", text="x" * 2001)
     data = json.loads(result)
     assert "error" in data
 
 
 def test_send_messenger_message_accepts_short_text(mock_meta_sdk):
-    from src import helpers as _h
+    import src.utils as _h
+
     _h.ENABLE_WRITES = True
     try:
         recorder = _register()
-        result = recorder.tools["send_messenger_message"](
-            recipient_id="123", text="hello"
-        )
+        result = recorder.tools["send_messenger_message"](recipient_id="123", text="hello")
         data = json.loads(result)
         assert "error" not in data
     finally:
@@ -88,21 +85,18 @@ def test_send_messenger_message_accepts_short_text(mock_meta_sdk):
 
 def test_send_whatsapp_text_message_rejects_long_text(mock_meta_sdk):
     recorder = _register()
-    result = recorder.tools["send_whatsapp_text_message"](
-        to="123", text="x" * 4097
-    )
+    result = recorder.tools["send_whatsapp_text_message"](to="123", text="x" * 4097)
     data = json.loads(result)
     assert "error" in data
 
 
 def test_send_whatsapp_text_message_accepts_short_text(mock_meta_sdk):
-    from src import helpers as _h
+    import src.utils as _h
+
     _h.ENABLE_WRITES = True
     try:
         recorder = _register()
-        result = recorder.tools["send_whatsapp_text_message"](
-            to="123", text="hi"
-        )
+        result = recorder.tools["send_whatsapp_text_message"](to="123", text="hi")
         data = json.loads(result)
         assert "error" not in data
     finally:
@@ -115,9 +109,7 @@ def test_send_whatsapp_text_message_accepts_short_text(mock_meta_sdk):
 def test_create_ad_missing_creative_params_returns_error(mock_meta_sdk):
     """create_ad requires creative_name + page_id + message."""
     recorder = _register()
-    result = recorder.tools["create_ad"](
-        adset_id="123", name="test", creative_name="", page_id="", message=""
-    )
+    result = recorder.tools["create_ad"](adset_id="123", name="test", creative_name="", page_id="", message="")
     data = json.loads(result)
     assert "error" in data
 
@@ -157,9 +149,7 @@ def test_generate_instagram_report_empty(mock_meta_sdk):
 
 def test_update_instagram_media_caption(mock_meta_sdk):
     recorder = _register()
-    result = recorder.tools["update_instagram_media_caption"](
-        media_id="123", caption="new caption"
-    )
+    result = recorder.tools["update_instagram_media_caption"](media_id="123", caption="new caption")
     data = json.loads(result)
     assert "success" in data or "error" in data
 
@@ -169,9 +159,7 @@ def test_update_instagram_media_caption(mock_meta_sdk):
 
 def test_update_adset_targeting_invalid_json(mock_meta_sdk):
     recorder = _register()
-    result = recorder.tools["update_adset_targeting"](
-        adset_id="123", targeting="not json"
-    )
+    result = recorder.tools["update_adset_targeting"](adset_id="123", targeting="not json")
     data = json.loads(result)
     assert "error" in data
 
@@ -179,8 +167,6 @@ def test_update_adset_targeting_invalid_json(mock_meta_sdk):
 def test_update_adset_targeting_valid_json(mock_meta_sdk):
     recorder = _register()
     targeting = json.dumps({"geo_locations": {"countries": ["US"]}})
-    result = recorder.tools["update_adset_targeting"](
-        adset_id="123", targeting=targeting
-    )
+    result = recorder.tools["update_adset_targeting"](adset_id="123", targeting=targeting)
     data = json.loads(result)
     assert "success" in data or "error" in data

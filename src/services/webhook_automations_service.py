@@ -6,9 +6,8 @@ import json
 import uuid
 from typing import Any
 
-import src.helpers as _helpers
-from src.config import PAGE_ID
 from src.core.services import Services
+from src.utils import normalize_pii
 from src.webhook_automations import (
     ACTION_TYPES,
     AUTOMATIONS_FILE,
@@ -119,7 +118,7 @@ class WebhookAutomationsService:
                     comment_id = event.get("comment_id") or event.get("id") or params.get("comment_id") or ""
                     message = params.get("message") or "شكرًا لتعليقك!"
                     if comment_id:
-                        _helpers.api_call("POST", f"{comment_id}/comments", {"message": message})
+                        self.services.api.post(f"{comment_id}/comments", {"message": message})
                         results.append({"rule_id": rule["id"], "action": act, "status": "executed"})
                     else:
                         results.append(
@@ -128,7 +127,7 @@ class WebhookAutomationsService:
                 elif act == "hide_comment":
                     comment_id = event.get("comment_id") or event.get("id") or params.get("comment_id") or ""
                     if comment_id:
-                        _helpers.api_call("POST", f"{comment_id}", {"hide": "true"})
+                        self.services.api.post(f"{comment_id}", {"hide": "true"})
                         results.append({"rule_id": rule["id"], "action": act, "status": "executed"})
                     else:
                         results.append({"rule_id": rule["id"], "action": act, "status": "skipped"})
@@ -136,8 +135,9 @@ class WebhookAutomationsService:
                     recipient = params.get("recipient_id") or (event.get("sender") or {}).get("id") or ""
                     text = params.get("message") or "أهلاً!"
                     if recipient:
-                        _helpers.page_api_call(
-                            "POST", f"{PAGE_ID}/messages", {"recipient": {"id": recipient}, "message": {"text": text}}
+                        self.services.api.page_post(
+                            f"{self.config.page_id}/messages",
+                            {"recipient": {"id": recipient}, "message": {"text": text}},
                         )
                         results.append({"rule_id": rule["id"], "action": act, "status": "executed"})
                     else:
@@ -146,12 +146,11 @@ class WebhookAutomationsService:
                     audience_id = params.get("audience_id") or ""
                     email = event.get("email") or params.get("email") or ""
                     if audience_id and email:
-                        from facebook_business.adobjects.customaudience import CustomAudience
-
-                        from src.utils import normalize_pii
-
                         hashed = normalize_pii([email], "email")
-                        CustomAudience(audience_id).add_users(schema=["EMAIL_SHA256"], users=hashed)
+                        self.services.api.post(
+                            f"{audience_id}/users",
+                            {"schema": ["EMAIL_SHA256"], "users": hashed},
+                        )
                         results.append({"rule_id": rule["id"], "action": act, "status": "executed"})
                     else:
                         results.append({"rule_id": rule["id"], "action": act, "status": "skipped"})

@@ -8,10 +8,10 @@ analyze which hashtags actually perform for our own account.
 import logging
 from datetime import datetime, timezone
 
-from src.config import PAGE_ID
-from src.helpers import handle_error, json_dumps, page_api_call
+from src.core.config import PAGE_ID
 from src.llm import call_llm
 from src.throttle import concurrency_limit
+from src.utils import handle_error, json_dumps, page_api_call
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def _post_engagement(post_id: str) -> int:
         return 0
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register content-creation & optimization tools."""
 
     @mcp.tool()
@@ -73,7 +73,7 @@ def register(mcp, services=None):
             from src.core.services import Services
             from src.services.content_tools_service import ContentToolsService
 
-            svc = ContentToolsService(services) if services is not None else ContentToolsService(Services.default())
+            svc = ContentToolsService(services)
             out = svc.generate_post_caption(
                 product, price, old_price, warranty, style, language, include_hashtags, product_type
             )
@@ -89,7 +89,7 @@ def register(mcp, services=None):
             from src.core.services import Services
             from src.services.content_tools_service import ContentToolsService
 
-            svc = ContentToolsService(services) if services is not None else ContentToolsService(Services.default())
+            svc = ContentToolsService(services)
             data = svc.best_posting_time(days, metric)
             return json_dumps(data)
         except Exception as e:
@@ -103,7 +103,7 @@ def register(mcp, services=None):
             from src.core.services import Services
             from src.services.content_tools_service import ContentToolsService
 
-            svc = ContentToolsService(services) if services is not None else ContentToolsService(Services.default())
+            svc = ContentToolsService(services)
             out = svc.hashtag_analyzer(days)
             return json_dumps(out)
         except Exception as e:
@@ -117,7 +117,7 @@ def register(mcp, services=None):
             from src.core.services import Services
             from src.services.content_tools_service import ContentToolsService
 
-            svc = ContentToolsService(services) if services is not None else ContentToolsService(Services.default())
+            svc = ContentToolsService(services)
             out = svc.content_calendar(week_start, posts_per_week, include_stories)
             return json_dumps(out)
         except Exception as e:
@@ -136,7 +136,7 @@ def register(mcp, services=None):
             from src.core.services import Services
             from src.services.content_tools_service import ContentToolsService
 
-            svc = ContentToolsService(services) if services is not None else ContentToolsService(Services.default())
+            svc = ContentToolsService(services)
             out = svc.auto_reply_comments(keyword, reply, page_id, enabled)
             return json_dumps(out)
         except Exception as e:

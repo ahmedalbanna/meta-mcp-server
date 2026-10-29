@@ -1,39 +1,30 @@
 import logging
 from datetime import datetime, timezone
 
-from src.config import INSTAGRAM_BUSINESS_ID, PAGE_ID
-
 logger = logging.getLogger(__name__)
-from src.helpers import (
-    api_call,
-    get_page_api,
+from src.throttle import concurrency_limit
+from src.utils import (
     handle_error,
     json_dumps,
-    page_api_call,
+    paginate,
     to_dict,
     write_guard,
 )
-from src.throttle import concurrency_limit
 
 SECONDS_PER_DAY = 86400
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register Facebook Page tools (all use the page-scoped token)."""
-
-    from facebook_business.adobjects.page import Page
-
-    def _page(node_id: str = "") -> Page:
-        return Page(node_id or PAGE_ID, api=get_page_api())
 
     @mcp.tool()
     @concurrency_limit()
     def get_page_info(page_id: str = "") -> str:
         """معلومات صفحة فيسبوك (الاسم، عدد المتابعين، التصنيف)."""
         try:
-            from src.core.services import Services
             from src.services.pages_service import PagesService
-            svc = PagesService(services) if services is not None else PagesService(Services.default())
+
+            svc = PagesService(services)
             data = svc.get_page_info(page_id)
             return json_dumps(data)
         except Exception as e:
@@ -44,9 +35,9 @@ def register(mcp, services=None):
     def list_page_posts(page_id: str = "", limit: int = 25) -> str:
         """منشورات صفحة فيسبوك."""
         try:
-            from src.core.services import Services
             from src.services.pages_service import PagesService
-            svc = PagesService(services) if services is not None else PagesService(Services.default())
+
+            svc = PagesService(services)
             data = svc.list_posts(page_id, limit)
             return json_dumps(data)
         except Exception as e:
@@ -58,9 +49,9 @@ def register(mcp, services=None):
     def publish_page_post(message: str, page_id: str = "") -> str:
         """نشر منشور نصي على صفحة فيسبوك."""
         try:
-            from src.core.services import Services
             from src.services.pages_service import PagesService
-            svc = PagesService(services) if services is not None else PagesService(Services.default())
+
+            svc = PagesService(services)
             return json_dumps(svc.publish_post(message, page_id))
         except Exception as e:
             return json_dumps(handle_error(e, "publish_page_post"))
@@ -71,9 +62,9 @@ def register(mcp, services=None):
     def publish_page_photo(image_url: str, message: str = "", page_id: str = "") -> str:
         """نشر صورة على صفحة فيسبوك (مع نص اختياري)."""
         try:
-            from src.core.services import Services
             from src.services.pages_service import PagesService
-            svc = PagesService(services) if services is not None else PagesService(Services.default())
+
+            svc = PagesService(services)
             return json_dumps(svc.publish_photo(image_url, message, page_id))
         except Exception as e:
             return json_dumps(handle_error(e, "publish_page_photo"))
@@ -103,8 +94,8 @@ def register(mcp, services=None):
                 data = r.json()
                 if not data.get("success") or not data.get("files"):
                     raise RuntimeError(f"فشل الرفع: {data}") from None
-                url = data["files"][0]["url"]
-                return url.replace("http://", "https://")  # type: ignore[no-any-return]
+            url = data["files"][0]["url"]
+            return str(url).replace("http://", "https://")
 
     @mcp.tool()
     @concurrency_limit()
@@ -120,9 +111,9 @@ def register(mcp, services=None):
         يتطلب FB_ENABLE_WRITES=true. الحد 2-10 صور.
         """
         try:
-            from src.core.services import Services
             from src.services.pages_service import PagesService
-            svc = PagesService(services) if services is not None else PagesService(Services.default())
+
+            svc = PagesService(services)
             return json_dumps(svc.publish_album(image_urls, message, page_id, product_ids))
         except Exception as e:
             return json_dumps(handle_error(e, "publish_page_album"))
@@ -130,7 +121,9 @@ def register(mcp, services=None):
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def publish_page_album_from_media(message: str, media_dir: str = "media", page_id: str = "", product_ids: str = "") -> str:
+    def publish_page_album_from_media(
+        message: str, media_dir: str = "media", page_id: str = "", product_ids: str = ""
+    ) -> str:
         """نشر ألبوم مباشرة من مجلد محلي (media/*.jpeg) بدون رابط عام — يدعم Product Tagging.
 
         message: نص المنشور
@@ -142,8 +135,7 @@ def register(mcp, services=None):
         try:
             from pathlib import Path
 
-
-            pid = page_id or PAGE_ID
+            pid = page_id or services.config.page_id
             base = Path(__file__).resolve().parent.parent / media_dir
             # sanitize
             if not base.exists():
@@ -173,14 +165,16 @@ def register(mcp, services=None):
         scheduled_time: طابع زمني Unix (ثوانٍ) في المستقبل.
         """
         try:
-            post = _page(page_id).create_feed(
-                params={
+            pid = page_id or services.config.page_id
+            data = services.api.post(
+                f"{pid}/feed",
+                {
                     "message": message,
                     "published": False,
                     "scheduled_publish_time": scheduled_time,
-                }
+                },
             )
-            return json_dumps(to_dict(post))
+            return json_dumps(data if isinstance(data, dict) else {})
         except Exception as e:
             return json_dumps(handle_error(e, "schedule_page_post"))
 
@@ -193,9 +187,9 @@ def register(mcp, services=None):
         post_id: معرّف المنشور (مثال 1838820466244084_123456789).
         """
         try:
-            from src.core.services import Services
             from src.services.pages_service import PagesService
-            svc = PagesService(services) if services is not None else PagesService(Services.default())
+
+            svc = PagesService(services)
             return json_dumps(svc.update_post_caption(post_id, message))
         except Exception as e:
             return json_dumps(handle_error(e, "update_page_post_caption"))
@@ -206,9 +200,9 @@ def register(mcp, services=None):
     def delete_page_post(post_id: str) -> str:
         """حذف منشور من صفحة فيسبوك."""
         try:
-            from src.core.services import Services
             from src.services.pages_service import PagesService
-            svc = PagesService(services) if services is not None else PagesService(Services.default())
+
+            svc = PagesService(services)
             return json_dumps(svc.delete_post(post_id))
         except Exception as e:
             return json_dumps(handle_error(e, "delete_page_post"))
@@ -221,9 +215,9 @@ def register(mcp, services=None):
     ) -> str:
         """تحليلات منشور صفحة فيسبوك واحد (تفاعل، انطباعات، ردود فعل)."""
         try:
-            from src.core.services import Services
             from src.services.pages_service import PagesService
-            svc = PagesService(services) if services is not None else PagesService(Services.default())
+
+            svc = PagesService(services)
             return json_dumps(svc.get_post_insights(post_id, metrics))
         except Exception as e:
             return json_dumps(handle_error(e, "get_page_post_insights"))
@@ -233,10 +227,11 @@ def register(mcp, services=None):
     def list_page_post_comments(post_id: str, limit: int = 25) -> str:
         """التعليقات على منشور صفحة فيسبوك."""
         try:
-            from facebook_business.adobjects.post import Post
-
-            comments = Post(post_id, api=get_page_api()).get_comments(params={"limit": limit})
-            return json_dumps([to_dict(c) for c in comments])
+            data = services.api.get(
+                f"{post_id}/comments", {"limit": limit, "fields": "id,message,created_time,from,like_count"}
+            )
+            rows = data.get("data", []) if isinstance(data, dict) else []
+            return json_dumps(rows)
         except Exception as e:
             return json_dumps(handle_error(e, "list_page_post_comments"))
 
@@ -246,11 +241,8 @@ def register(mcp, services=None):
     def reply_to_page_comment(comment_id: str, message: str) -> str:
         """الرد على تعليق صفحة فيسبوك."""
         try:
-            from facebook_business.adobjects.comment import Comment
-
-            comment = Comment(comment_id, api=get_page_api())
-            reply = comment.create_comment(params={"message": message})
-            return json_dumps(to_dict(reply))
+            data = services.api.post(f"{comment_id}/comments", {"message": message})
+            return json_dumps(data if isinstance(data, dict) else {})
         except Exception as e:
             return json_dumps(handle_error(e, "reply_to_page_comment"))
 
@@ -260,10 +252,8 @@ def register(mcp, services=None):
     def delete_page_comment(comment_id: str) -> str:
         """حذف تعليق من صفحة فيسبوك."""
         try:
-            from facebook_business.adobjects.comment import Comment
-
-            result = Comment(comment_id, api=get_page_api()).api_delete()
-            return json_dumps({"id": comment_id, "deleted": True, "result": result})
+            services.api.delete(comment_id)
+            return json_dumps({"id": comment_id, "deleted": True, "result": {}})
         except Exception as e:
             return json_dumps(handle_error(e, "delete_page_comment"))
 
@@ -272,13 +262,13 @@ def register(mcp, services=None):
     def list_page_albums(page_id: str = "", limit: int = 25) -> str:
         """ألبومات الصور على صفحة فيسبوك."""
         try:
-            albums = _page(page_id).get_albums(
-                params={
-                    "fields": ["id", "name", "count", "created_time"],
-                    "limit": limit,
-                }
+            pid = page_id or services.config.page_id
+            data = services.api.get(
+                f"{pid}/albums",
+                {"fields": ["id", "name", "count", "created_time"], "limit": limit},
             )
-            return json_dumps([to_dict(a) for a in albums])
+            rows = data.get("data", []) if isinstance(data, dict) else []
+            return json_dumps([to_dict(a) for a in rows])
         except Exception as e:
             return json_dumps(handle_error(e, "list_page_albums"))
 
@@ -287,15 +277,12 @@ def register(mcp, services=None):
     def get_album_photos(album_id: str, limit: int = 25) -> str:
         """صور ألبوم معيّن في صفحة فيسبوك."""
         try:
-            from facebook_business.adobjects.album import Album
-
-            photos = Album(album_id, api=get_page_api()).get_photos(
-                params={
-                    "fields": ["id", "name", "picture", "source", "created_time"],
-                    "limit": limit,
-                }
+            data = services.api.get(
+                f"{album_id}/photos",
+                {"fields": ["id", "name", "picture", "source", "created_time"], "limit": limit},
             )
-            return json_dumps([to_dict(p) for p in photos])
+            rows = data.get("data", []) if isinstance(data, dict) else []
+            return json_dumps(rows)
         except Exception as e:
             return json_dumps(handle_error(e, "get_album_photos"))
 
@@ -305,13 +292,13 @@ def register(mcp, services=None):
     def update_page_cover(photo_id: str, page_id: str = "") -> str:
         """تعيين صورة غلاف الصفحة من صورة موجودة في ألبوم."""
         try:
-            from src.core.services import Services
             from src.services.pages_service import PagesService
-            svc = PagesService(services) if services is not None else PagesService(Services.default())
+
+            svc = PagesService(services)
             result = svc.update_page_cover(photo_id, page_id)
             return json_dumps(
                 {
-                    "page_id": page_id or PAGE_ID,
+                    "page_id": page_id or services.config.page_id,
                     "cover_photo_id": photo_id,
                     "result": result,
                 }
@@ -329,9 +316,9 @@ def register(mcp, services=None):
     ) -> str:
         """تحليلات صفحة فيسبوك (مشاهدات، تفاعل، تفاعلات المنشورات). ملاحظة: مقاييس impressions/page_fans أُوقفت من Meta في 2025-11."""
         try:
-            from src.core.services import Services
             from src.services.pages_service import PagesService
-            svc = PagesService(services) if services is not None else PagesService(Services.default())
+
+            svc = PagesService(services)
             data = svc.get_page_insights(page_id, period, days, metrics)
             return json_dumps(data)
         except Exception as e:
@@ -358,41 +345,42 @@ def register(mcp, services=None):
 
             # 1. Facebook page info
             try:
-                info = _page().api_get(
-                    fields=[
-                        Page.Field.name,
-                        Page.Field.fan_count,
-                        Page.Field.link,
-                        Page.Field.category,
-                        Page.Field.phone,
-                        Page.Field.website,
-                    ]
+                pid = services.config.page_id
+                fb_info = services.api.get(
+                    pid,
+                    {
+                        "fields": "name,fan_count,link,category,phone,website",
+                    },
                 )
-                fb_info = to_dict(info)
+                fb_info = fb_info if isinstance(fb_info, dict) else {}
             except Exception as e:
                 fb_info = {"error": str(e)[:120]}
 
             # 2. FB page insights (last 7 days)
             try:
-                insights = _page().get_insights(
-                    params={
-                        "metric": ["page_views_total", "page_post_engagements", "page_actions_post_reactions_total"],
+                pid = services.config.page_id
+                ins_data = services.api.get(
+                    f"{pid}/insights",
+                    {
+                        "metric": "page_views_total,page_post_engagements,page_actions_post_reactions_total",
                         "period": "day",
                         "since": int(time.time()) - 7 * SECONDS_PER_DAY,
-                    }
+                    },
                 )
-                fb_insights = [to_dict(i) for i in insights]
+                fb_insights = ins_data.get("data", []) if isinstance(ins_data, dict) else []
             except Exception as e:
-                fb_insights = {"error": str(e)[:120]}  # type: ignore[assignment]
+                fb_insights = {"error": str(e)[:120]}
 
             # 3. recent posts
             try:
-                posts = _page().get_posts(
-                    params={"fields": ["message", "created_time", "permalink_url", "id"], "limit": 10}
+                pid = services.config.page_id
+                posts_data = services.api.get(
+                    f"{pid}/posts",
+                    {"fields": "message,created_time,permalink_url,id", "limit": 10},
                 )
-                fb_posts = [to_dict(p) for p in posts]
+                fb_posts = posts_data.get("data", []) if isinstance(posts_data, dict) else []
             except Exception as e:
-                fb_posts = {"error": str(e)[:120]}  # type: ignore[assignment]
+                fb_posts = {"error": str(e)[:120]}
 
             fb_days_since = None
             if isinstance(fb_posts, list) and fb_posts:
@@ -411,20 +399,21 @@ def register(mcp, services=None):
             # 4. Instagram
             ig_info = None
             ig_insights = None
-            if include_instagram and INSTAGRAM_BUSINESS_ID:
+            if include_instagram and services.config.instagram_business_id:
                 try:
-                    ig_info = api_call(
-                        "GET",
-                        INSTAGRAM_BUSINESS_ID,
+                    ig_id = services.config.instagram_business_id
+                    ig_info = services.api.get(
+                        ig_id,
                         {"fields": "id,username,media_count,followers_count,biography"},
                     )
                 except Exception as e:
                     ig_info = {"error": str(e)[:120]}
                 try:
-                    ig_insights = api_call(
-                        "GET",
-                        INSTAGRAM_BUSINESS_ID,
-                        {"fields": "insights.metric(reach,follower_count,profile_views,accounts_engaged,total_interactions).period(days_28)"},
+                    ig_insights = services.api.get(
+                        ig_id,
+                        {
+                            "fields": "insights.metric(reach,follower_count,profile_views,accounts_engaged,total_interactions).period(days_28)"
+                        },
                     )
                 except Exception as e:
                     ig_insights = {"error": str(e)[:120]}
@@ -491,7 +480,9 @@ def register(mcp, services=None):
                     "instagram": {
                         "account": ig_info if isinstance(ig_info, dict) else None,
                         "insights_last_28d": ig_insights,
-                    } if include_instagram else None,
+                    }
+                    if include_instagram
+                    else None,
                     "health": {
                         "score": score,
                         "level": level,
@@ -517,10 +508,9 @@ def register(mcp, services=None):
     def list_page_events(page_id: str = "", limit: int = 25) -> str:
         """الأحداث المرتبطة بصفحة فيسبوك."""
         try:
-
-            from src.core.services import Services
             from src.services.pages_service import PagesService
-            svc = PagesService(services) if services is not None else PagesService(Services.default())
+
+            svc = PagesService(services)
             return json_dumps(svc.list_events(page_id, limit))
         except Exception as e:
             return json_dumps(handle_error(e, "list_page_events"))
@@ -530,23 +520,13 @@ def register(mcp, services=None):
     def get_page_event(event_id: str) -> str:
         """تفاصيل حدث واحد على الصفحة."""
         try:
-            from facebook_business.adobjects.event import Event
-
-            info = Event(event_id, api=get_page_api()).api_get(
-                fields=[
-                    "id",
-                    "name",
-                    "description",
-                    "start_time",
-                    "end_time",
-                    "place",
-                    "ticket_uri",
-                    "cover",
-                    "is_canceled",
-                    "guest_list_enabled",
-                ]
+            data = services.api.get(
+                event_id,
+                {
+                    "fields": "id,name,description,start_time,end_time,place,ticket_uri,cover,is_canceled,guest_list_enabled",
+                },
             )
-            return json_dumps(to_dict(info))
+            return json_dumps(data if isinstance(data, dict) else {})
         except Exception as e:
             return json_dumps(handle_error(e, "get_page_event"))
 
@@ -567,6 +547,7 @@ def register(mcp, services=None):
         start_time / end_time بصيغة ISO (مثال 2026-09-01T18:00:00+0300).
         """
         try:
+            pid = page_id or services.config.page_id
             params = {"name": name, "start_time": start_time}
             if end_time:
                 params["end_time"] = end_time
@@ -576,8 +557,8 @@ def register(mcp, services=None):
                 params["ticket_uri"] = ticket_uri
             if place:
                 params["place"] = place
-            result = page_api_call("POST", (page_id or PAGE_ID) + "/events", params)
-            return json_dumps(to_dict(result))
+            result = services.api.post(f"{pid}/events", params)
+            return json_dumps(result if isinstance(result, dict) else {})
         except Exception as e:
             return json_dumps(handle_error(e, "create_page_event"))
 
@@ -590,10 +571,9 @@ def register(mcp, services=None):
     def list_page_ratings(page_id: str = "", limit: int = 25) -> str:
         """تقييمات ومراجعات صفحة فيسبوك."""
         try:
-            from src.utils import paginate
-
+            pid = page_id or services.config.page_id
             rows = paginate(
-                lambda params: _page(page_id).get_ratings(params=params),
+                lambda params: services.api.get(f"{pid}/ratings", params),
                 fields=[
                     "id",
                     "rating",
@@ -618,10 +598,9 @@ def register(mcp, services=None):
     def list_page_roles(page_id: str = "", limit: int = 25) -> str:
         """الأشخاص الذين يديرون الصفحة وأدوارهم ومهامهم."""
         try:
-            from src.utils import paginate
-
+            pid = page_id or services.config.page_id
             rows = paginate(
-                lambda params: _page(page_id).get_roles(params=params),
+                lambda params: services.api.get(f"{pid}/roles", params),
                 fields=["id", "name", "admin_notes", "business_persona", "permitted_tasks"],
                 limit=limit,
             )
@@ -638,9 +617,9 @@ def register(mcp, services=None):
     def get_page_cta(page_id: str = "") -> str:
         """زر الدعوة لاتخاذ إجراء الحالي على الصفحة."""
         try:
-            from src.core.services import Services
             from src.services.pages_service import PagesService
-            svc = PagesService(services) if services is not None else PagesService(Services.default())
+
+            svc = PagesService(services)
             data = svc.get_page_cta(page_id)
             return json_dumps(data)
         except Exception as e:
@@ -656,13 +635,13 @@ def register(mcp, services=None):
         cta_link: الرابط أو معرف Messenger المرتبط بالزر.
         """
         try:
-            from src.core.services import Services
             from src.services.pages_service import PagesService
-            svc = PagesService(services) if services is not None else PagesService(Services.default())
+
+            svc = PagesService(services)
             result = svc.update_page_cta(cta_type, cta_link, page_id)
             return json_dumps(
                 {
-                    "page_id": page_id or PAGE_ID,
+                    "page_id": page_id or services.config.page_id,
                     "cta_type": cta_type,
                     "result": result,
                 }
@@ -680,22 +659,23 @@ def register(mcp, services=None):
     def publish_page_reel(video_url: str, description: str = "", page_id: str = "") -> str:
         """نشر ريلز على صفحة فيسبوك (Page Reel)."""
         try:
-            pid = page_id or PAGE_ID
+            pid = page_id or services.config.page_id
             if not video_url:
                 return json_dumps({"error": "video_url مطلوب"})
-            result = page_api_call(
-                "POST",
+            result = services.api.post(
                 f"{pid}/video_reels",
                 {"file_url": video_url, "description": description},
             )
-            return json_dumps({"page_id": pid, "result": to_dict(result)})
+            return json_dumps({"page_id": pid, "result": result if isinstance(result, dict) else {}})
         except Exception as e:
             return json_dumps(handle_error(e, "publish_page_reel"))
 
     @mcp.tool()
     @concurrency_limit()
     @write_guard
-    def publish_page_reel_from_media(description: str = "", video_path: str = "media/reel.mp4", page_id: str = "") -> str:
+    def publish_page_reel_from_media(
+        description: str = "", video_path: str = "media/reel.mp4", page_id: str = ""
+    ) -> str:
         """نشر ريلز فيسبوك من ملف فيديو محلي (media/*.mp4) — يرفع تلقائيا لاستضافة دائمة ثم ينشر.
 
         video_path: مسار ملف الفيديو المحلي (مثال "media/video.mp4") — أو مجلد "media" سيختار أول .mp4
@@ -708,7 +688,7 @@ def register(mcp, services=None):
 
             from src.media_hosting import host_video
 
-            pid = page_id or PAGE_ID
+            pid = page_id or services.config.page_id
             p = Path(video_path)
             if p.is_dir():
                 vids = sorted([x for x in p.iterdir() if x.suffix.lower() in {".mp4", ".mov", ".avi", ".mkv"}])
@@ -722,8 +702,15 @@ def register(mcp, services=None):
                 else:
                     return json_dumps({"error": f"ملف الفيديو غير موجود: {video_path}"})
             video_url = host_video(str(p))
-            result = page_api_call("POST", f"{pid}/video_reels", {"file_url": video_url, "description": description})
-            return json_dumps({"success": True, "page_id": pid, "video_url": video_url, "result": to_dict(result)})
+            result = services.api.post(f"{pid}/video_reels", {"file_url": video_url, "description": description})
+            return json_dumps(
+                {
+                    "success": True,
+                    "page_id": pid,
+                    "video_url": video_url,
+                    "result": result if isinstance(result, dict) else {},
+                }
+            )
         except Exception as e:
             return json_dumps(handle_error(e, "publish_page_reel_from_media"))
 
@@ -734,10 +721,12 @@ def register(mcp, services=None):
     ) -> str:
         """تحليلات فيديو صفحة فيسبوك (views, completes, avg watch)."""
         try:
-            from facebook_business.adobjects.post import Post
-
-            insights = Post(video_id, api=get_page_api()).get_insights(params={"metric": metrics})
-            return json_dumps([to_dict(i) for i in insights])
+            data = services.api.get(
+                f"{video_id}/insights",
+                {"metric": metrics},
+            )
+            rows = data.get("data", []) if isinstance(data, dict) else []
+            return json_dumps([to_dict(i) for i in rows])
         except Exception as e:
             return json_dumps(handle_error(e, "get_page_video_insights"))
 
@@ -746,20 +735,19 @@ def register(mcp, services=None):
     def list_page_post_reactions(post_id: str, limit: int = 25) -> str:
         """قائمة تفاعلات (Reactions) على منشور صفحة."""
         try:
-            from facebook_business.adobjects.post import Post
-
-            from src.utils import paginate
-
-            rows = paginate(
-                lambda params: Post(post_id, api=get_page_api()).get_reactions(params=params),
-                fields=["id", "name", "type", "pic"],
-                limit=limit,
+            data = services.api.get(
+                f"{post_id}/reactions",
+                {"limit": limit, "fields": "id,name,type"},
             )
+            rows = data.get("data", []) if isinstance(data, dict) else []
             return json_dumps({"post_id": post_id, "reactions": rows, "count": len(rows)})
         except Exception as e:
             # Fallback to raw api_call if SDK edge not available
             try:
-                data = page_api_call("GET", f"{post_id}/reactions", {"limit": limit, "fields": "id,name,type"})
+                data = services.api.get(
+                    f"{post_id}/reactions",
+                    {"limit": limit, "fields": "id,name,type"},
+                )
                 return json_dumps(data)
             except Exception:
                 return json_dumps(handle_error(e, "list_page_post_reactions"))
@@ -771,7 +759,7 @@ def register(mcp, services=None):
             # Lightweight per-module overview (calls existing list tool pattern)
             return json_dumps({"module": "pages", "resource": "pages://overview", "hint": "نظرة عامة الصفحات"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "pages://overview"))
 
@@ -786,7 +774,7 @@ def register(mcp, services=None):
         try:
             return json_dumps({"module": "pages", "resource": "pages://templates", "hint": "قوالب الصفحات"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "pages://templates"))
 

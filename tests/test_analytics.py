@@ -33,23 +33,27 @@ def test_invalid_preset_raises():
 
 
 def test_build_monthly_report_empty(mock_meta_sdk):
-    from tests.conftest import Recorder
+    from tests.conftest import TEST_SERVICES, Recorder
+
     rec = Recorder()
-    a.register(rec)
+    a.register(rec, TEST_SERVICES)
     fn = rec.tools["build_monthly_report"]
     res = fn(year=2026, month=10, account_id="act_empty_xyz")
     import json
+
     data = json.loads(res)
     assert "entities" in data
     assert data["count"] == 0
 
 
 def test_zero_fill_check_tool(mock_meta_sdk):
-    from tests.conftest import Recorder
+    from tests.conftest import TEST_SERVICES, Recorder
+
     rec = Recorder()
-    a.register(rec)
+    a.register(rec, TEST_SERVICES)
     fn = rec.tools["zero_fill_check"]
     res = fn(start_date="2026-10-01", end_date="2026-10-03", account_id="act_empty_xyz")
     import json
+
     data = json.loads(res)
     assert data["days"] == 3

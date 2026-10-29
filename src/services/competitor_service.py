@@ -17,6 +17,7 @@ class CompetitorService:
 
     def _extract_price(self, caption: str) -> float | None:
         import re
+
         text = (caption or "").translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
         m = re.search(r"(\d[\d.,]*)\s*(?:الف|ألف)", text)
         if m:
@@ -43,15 +44,19 @@ class CompetitorService:
             if not self.config.instagram_business_id:
                 raise ValueError("FB_IG_USER_ID غير مضبوط")
             import re as _re
+
             if not _re.match(r"^[A-Za-z0-9._]{1,30}$", handle):
                 raise ValueError(f"handle غير صالح: {handle!r}")
-            ig = self.api.get(self.config.instagram_business_id, {
-                "fields": (
-                    f"business_discovery.username({handle})"
-                    "{username,name,biography,followers_count,media_count,"
-                    "media.limit(12){id,caption,permalink,timestamp,like_count,comments_count,media_type}}"
-                ),
-            })
+            ig = self.api.get(
+                self.config.instagram_business_id,
+                {
+                    "fields": (
+                        f"business_discovery.username({handle})"
+                        "{username,name,biography,followers_count,media_count,"
+                        "media.limit(12){id,caption,permalink,timestamp,like_count,comments_count,media_type}}"
+                    ),
+                },
+            )
             biz = ig.get("business_discovery") or {}
             media = (biz.get("media") or {}).get("data", [])
             likes = [m.get("like_count") or 0 for m in media]
@@ -115,20 +120,23 @@ class CompetitorService:
             "price_max_change": num_diff(latest.get("price_max"), prev.get("price_max")),
         }
 
-    def search_business_pages(self, query: str, city: str = "", limit: int = 25,
-                              exclude_our_page: bool = True) -> dict[str, Any]:
-        from src.config import PAGE_ID
+    def search_business_pages(
+        self, query: str, city: str = "", limit: int = 25, exclude_our_page: bool = True
+    ) -> dict[str, Any]:
         parts = [p.strip() for p in (query, city) if p and p.strip()]
         q = " ".join(parts)
         if not q:
             raise ValueError("حدد كلمة مفتاحية (query) على الأقل")
-        data = self.api.get("search", {
-            "q": q,
-            "type": "page",
-            "fields": "name,id,fan_count,category,link,verification_status",
-            "limit": max(1, min(limit, 50)),
-        })
+        data = self.api.get(
+            "search",
+            {
+                "q": q,
+                "type": "page",
+                "fields": "name,id,fan_count,category,link,verification_status",
+                "limit": max(1, min(limit, 50)),
+            },
+        )
         rows = data.get("data", []) if isinstance(data, dict) else []
-        if exclude_our_page and PAGE_ID:
-            rows = [r for r in rows if str(r.get("id")) != str(PAGE_ID)]
+        if exclude_our_page and self.config.page_id:
+            rows = [r for r in rows if str(r.get("id")) != str(self.config.page_id)]
         return {"query": q, "count": len(rows), "results": rows}

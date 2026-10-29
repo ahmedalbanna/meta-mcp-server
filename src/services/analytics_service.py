@@ -18,9 +18,7 @@ class AnalyticsService:
 
     def ingest_daily(self, account_id: str, level: str, entity_id: str, metric_date: str,
                      metrics: str) -> dict[str, Any]:
-        from src.config import ANALYTICS_TZ, FB_CURRENCY_DEFAULT, resolve_ad_account_id
-
-        acct = resolve_ad_account_id(account_id) if account_id else self.config.fb_ad_account_id
+        acct = self.config.resolve_ad_account_id(account_id) if account_id else self.config.fb_ad_account_id
         if not acct:
             raise ValueError("no ad account id")
         metric_list = [m.strip() for m in metrics.split(",") if m.strip()]
@@ -39,7 +37,7 @@ class AnalyticsService:
             for m in metric_list:
                 if m in ADDITIVE_METRICS:
                     self.storage.upsert_daily_fact(acct, level, entity_id or acct, metric_date, m, 0.0,
-                                                   currency=FB_CURRENCY_DEFAULT, tz=ANALYTICS_TZ)
+                                                   currency=self.config.currency_default, tz=self.config.tz_name)
             return {"ingested": 0, "date": metric_date, "note": "no insights returned; zero-filled additive metrics"}
 
         row = rows[0]
@@ -51,15 +49,13 @@ class AnalyticsService:
                 except (TypeError, ValueError):
                     continue
                 self.storage.upsert_daily_fact(acct, level, ent, metric_date, m, val,
-                                               currency=row.get("account_currency") or FB_CURRENCY_DEFAULT,
-                                               tz=ANALYTICS_TZ)
+                                               currency=row.get("account_currency") or self.config.currency_default,
+                                               tz=self.config.tz_name)
         return {"ingested": len(metric_list), "date": metric_date, "entity": ent, "level": level}
 
     def build_monthly(self, year: int, month: int, account_id: str, level: str, entity_id: str,
                       metrics: str) -> dict[str, Any]:
-        from src.config import resolve_ad_account_id
-
-        acct = resolve_ad_account_id(account_id) if account_id else self.config.fb_ad_account_id
+        acct = self.config.resolve_ad_account_id(account_id) if account_id else self.config.fb_ad_account_id
         if not acct:
             raise ValueError("no ad account id")
         if month < 1 or month > 12:

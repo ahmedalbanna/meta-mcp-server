@@ -9,6 +9,10 @@ from unittest import mock
 
 import pytest
 
+from src.core.services import Services
+
+TEST_SERVICES = Services.default()
+
 # Classes that tools instantiate inside register() — replaced with MagicMock.
 SDK_CLASSES = [
     "facebook_business.adobjects.adaccount.AdAccount",
@@ -49,7 +53,7 @@ def _fake_to_dict(obj):
 
 # Paths that need to_dict patched (each module imports to_dict independently).
 _TO_DICT_PATHS = [
-    "src.helpers",
+    "src.utils",
     "src.automation",
     "src.finance",
     "src.pages",
@@ -87,11 +91,11 @@ def mock_meta_sdk():
                 get_default_api=mock.DEFAULT,
             )
         )
-        stack.enter_context(mock.patch("src.helpers.api_call", return_value={"data": [], "paging": {}}))
-        stack.enter_context(mock.patch("src.helpers.page_api_call", return_value={"data": []}))
+        stack.enter_context(mock.patch("src.utils.api_call", return_value={"data": [], "paging": {}}))
+        stack.enter_context(mock.patch("src.utils.page_api_call", return_value={"data": []}))
         for mod_path in _TO_DICT_PATHS:
             stack.enter_context(mock.patch(f"{mod_path}.to_dict", new=_fake_to_dict, create=True))
-        stack.enter_context(mock.patch("src.helpers.get_page_api"))
+        stack.enter_context(mock.patch("src.utils.get_page_api"))
         stack.enter_context(mock.patch("src.instagram.requests"))
         for path in SDK_CLASSES:
             stack.enter_context(mock.patch(path))
@@ -103,7 +107,7 @@ def mock_meta_sdk_recorded():
     """Like mock_meta_sdk but api_call/page_api_call record their calls.
 
     Patches the helper references at the module level (where each tool module
-    imported them via `from src.helpers import ...`), so the recorded calls
+    imported them via `from src.utils import ...`), so the recorded calls
     reflect the real request params/URLs the tools build.
     """
     api_call = mock.MagicMock(return_value={"data": [], "paging": {}})
@@ -111,17 +115,13 @@ def mock_meta_sdk_recorded():
 
     # Modules that import api_call and/or page_api_call at module level.
     api_call_patches = [
-        "src.helpers.api_call",
-        "src.instagram.api_call",
+        "src.utils.api_call",
         "src.discovery.api_call",
-        "src.competitors.api_call",
         "src.competitor_content.api_call",
         "src.competitor_catalog.api_call",
     ]
     page_api_call_patches = [
-        "src.helpers.page_api_call",
-        "src.competitors.page_api_call",
-        "src.pages.page_api_call",
+        "src.utils.page_api_call",
     ]
 
     with ExitStack() as stack:
@@ -138,7 +138,7 @@ def mock_meta_sdk_recorded():
             stack.enter_context(mock.patch(p, new=page_api_call))
         for mod_path in _TO_DICT_PATHS:
             stack.enter_context(mock.patch(f"{mod_path}.to_dict", new=_fake_to_dict, create=True))
-        stack.enter_context(mock.patch("src.helpers.get_page_api"))
+        stack.enter_context(mock.patch("src.utils.get_page_api"))
         stack.enter_context(mock.patch("src.instagram.requests"))
         for path in SDK_CLASSES:
             stack.enter_context(mock.patch(path))
@@ -211,8 +211,10 @@ ALL_MODULES = (
 TOOL_MODULES = ALL_MODULES
 
 
-def register_all(recorder):
+def register_all(recorder, services=None):
     """Register every module onto the recorder and return the tool dict."""
+    if services is None:
+        services = TEST_SERVICES
     from src import (
         ads,
         adsets,
@@ -281,5 +283,5 @@ def register_all(recorder):
         "competitor_content": competitor_content,
     }
     for name in ALL_MODULES:
-        module_map[name].register(recorder)
+        module_map[name].register(recorder, services)
     return recorder

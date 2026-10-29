@@ -1,7 +1,5 @@
 import logging
 
-from src.config import AD_ACCOUNT_ID, resolve_ad_account_id
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_METRICS = [
@@ -31,17 +29,11 @@ DATE_PRESETS = [
 ]
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register insights tools."""
 
-    from facebook_business.adobjects.ad import Ad
-    from facebook_business.adobjects.adaccount import AdAccount
-    from facebook_business.adobjects.adset import AdSet
-    from facebook_business.adobjects.campaign import Campaign
-
-    from src.helpers import handle_error, json_dumps, to_dict
     from src.throttle import concurrency_limit
-    from src.utils import cached
+    from src.utils import cached, handle_error, json_dumps, to_dict
 
     def _validate(preset: str, metrics: str) -> list:
         if preset not in DATE_PRESETS:
@@ -65,7 +57,8 @@ def register(mcp, services=None):
             _validate(date_preset, metrics)
             from src.core.services import Services
             from src.services.insights_service import InsightsService
-            svc = InsightsService(services) if services is not None else InsightsService(Services.default())
+
+            svc = InsightsService(services)
             insights = svc.get_account_insights(ad_account_id, date_preset, metrics)
             return _respond(insights)
         except Exception as e:
@@ -84,7 +77,8 @@ def register(mcp, services=None):
             _validate(date_preset, metrics)
             from src.core.services import Services
             from src.services.insights_service import InsightsService
-            svc = InsightsService(services) if services is not None else InsightsService(Services.default())
+
+            svc = InsightsService(services)
             insights = svc.get_campaign_insights(campaign_id, date_preset, metrics)
             return _respond(insights)
         except Exception as e:
@@ -103,7 +97,8 @@ def register(mcp, services=None):
             _validate(date_preset, metrics)
             from src.core.services import Services
             from src.services.insights_service import InsightsService
-            svc = InsightsService(services) if services is not None else InsightsService(Services.default())
+
+            svc = InsightsService(services)
             insights = svc.get_adset_insights(adset_id, date_preset, metrics)
             return _respond(insights)
         except Exception as e:
@@ -122,7 +117,8 @@ def register(mcp, services=None):
             _validate(date_preset, metrics)
             from src.core.services import Services
             from src.services.insights_service import InsightsService
-            svc = InsightsService(services) if services is not None else InsightsService(Services.default())
+
+            svc = InsightsService(services)
             insights = svc.get_ad_insights(ad_id, date_preset, metrics)
             return _respond(insights)
         except Exception as e:
@@ -144,20 +140,18 @@ def register(mcp, services=None):
         """
         try:
             fields = _validate(date_preset, metrics)
-            account = AdAccount(
-                resolve_ad_account_id("")
-                if "ad_account_id" not in locals()
-                else resolve_ad_account_id(ad_account_id)
-                if "ad_account_id" in dir()
-                else AdAccount(AD_ACCOUNT_ID)
+            acct = (
+                services.config.resolve_ad_account_id(ad_account_id)
+                if ad_account_id
+                else services.config.fb_ad_account_id
             )
             params = {
                 "date_preset": date_preset,
                 "fields": fields,
                 "time_increment": time_increment,
             }
-            insights = account.get_insights(params=params)
-            rows = [to_dict(i) for i in insights]
+            data = services.api.get(f"{acct}/insights", params)
+            rows = data.get("data", []) if isinstance(data, dict) else []
             if not rows:
                 return json_dumps({"data": [], "count": 0, "message": "لا توجد بيانات"})
             return json_dumps(
@@ -186,11 +180,11 @@ def register(mcp, services=None):
         """
         try:
             fields = _validate(date_preset_current, metrics)
-            account = AdAccount(AD_ACCOUNT_ID)
-            cur = account.get_insights(params={"date_preset": date_preset_current, "fields": fields})
-            cur_rows = [to_dict(i) for i in cur]
-            prev = account.get_insights(params={"date_preset": date_preset_previous, "fields": fields})
-            prev_rows = [to_dict(i) for i in prev]
+            acct = services.config.fb_ad_account_id
+            cur = services.api.get(f"{acct}/insights", {"date_preset": date_preset_current, "fields": fields})
+            cur_rows = cur.get("data", []) if isinstance(cur, dict) else []
+            prev = services.api.get(f"{acct}/insights", {"date_preset": date_preset_previous, "fields": fields})
+            prev_rows = prev.get("data", []) if isinstance(prev, dict) else []
 
             def avg(m, rows):
                 vals = []
@@ -210,10 +204,8 @@ def register(mcp, services=None):
                 change = ((c - p) / p) * 100
                 is_anomaly = False
                 if (
-                    (m == "ctr"
-                    and change < -threshold)
-                    or (m == "cpc"
-                    and change > threshold)
+                    (m == "ctr" and change < -threshold)
+                    or (m == "cpc" and change > threshold)
                     or ((m == "cpm" and change > threshold) or abs(change) > threshold * 1.5)
                 ):
                     is_anomaly = True
@@ -253,7 +245,7 @@ def register(mcp, services=None):
             # Lightweight per-module overview (calls existing list tool pattern)
             return json_dumps({"module": "insights", "resource": "insights://overview", "hint": "قوالب التحليلات"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "insights://overview"))
 
@@ -276,7 +268,7 @@ def register(mcp, services=None):
         try:
             return json_dumps({"module": "insights", "resource": "insights://templates", "hint": "قوالب الرؤى"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "insights://templates"))
 

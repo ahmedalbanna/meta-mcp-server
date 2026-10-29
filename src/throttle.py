@@ -93,7 +93,7 @@ def _is_rate_limit(e: FacebookRequestError) -> bool:
 _COOLDOWN_UNTIL = 0.0
 # Use config ADAPTIVE_THROTTLE if available, else env
 try:
-    from src.config import ADAPTIVE_THROTTLE as _ADAPTIVE_CFG
+    from src.core.config import ADAPTIVE_THROTTLE as _ADAPTIVE_CFG
 
     _ADAPTIVE = bool(_ADAPTIVE_CFG)
 except Exception:

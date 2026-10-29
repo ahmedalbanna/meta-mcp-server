@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 from src import competitor_content
-from tests.conftest import Recorder
+from tests.conftest import TEST_SERVICES, Recorder
 
 
 def _iso(days_ago: float) -> str:
@@ -73,7 +73,7 @@ POST_HTML = """<html><head>
 def test_resolve_post_url_merges_oembed_and_html():
     """oEmbed provides identity/caption; the HTML page adds likes/comments."""
     recorder = Recorder()
-    competitor_content.register(recorder)
+    competitor_content.register(recorder, TEST_SERVICES)
     with mock.patch.object(competitor_content.requests, "get") as mget:
         mget.side_effect = [
             mock.Mock(status_code=200, json=lambda: _oembed_payload()),
@@ -96,7 +96,7 @@ def test_resolve_post_url_merges_oembed_and_html():
 def test_resolve_post_url_oembed_only_when_html_is_a_shell():
     """Instagram often serves a stripped shell — oEmbed alone must still work."""
     recorder = Recorder()
-    competitor_content.register(recorder)
+    competitor_content.register(recorder, TEST_SERVICES)
     shell = "<html><head><meta property='og:title' content='x' /></head></html>"
     with mock.patch.object(competitor_content.requests, "get") as mget:
         mget.side_effect = [
@@ -113,7 +113,7 @@ def test_resolve_post_url_oembed_only_when_html_is_a_shell():
 def test_resolve_post_url_html_only_when_oembed_fails():
     """If oEmbed is down, the HTML meta tags alone still identify the author."""
     recorder = Recorder()
-    competitor_content.register(recorder)
+    competitor_content.register(recorder, TEST_SERVICES)
     with mock.patch.object(competitor_content.requests, "get") as mget:
         mget.side_effect = [
             mock.Mock(status_code=500, json=lambda: {}),  # oembed fails
@@ -127,7 +127,7 @@ def test_resolve_post_url_html_only_when_oembed_fails():
 
 def test_resolve_post_url_rejects_non_instagram_url():
     recorder = Recorder()
-    competitor_content.register(recorder)
+    competitor_content.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["resolve_instagram_post_url"](url="https://example.com/x"))
     assert "error" in out
     assert "instagram.com" in out["error"]
@@ -135,7 +135,7 @@ def test_resolve_post_url_rejects_non_instagram_url():
 
 def test_resolve_post_url_handles_private_or_missing_post():
     recorder = Recorder()
-    competitor_content.register(recorder)
+    competitor_content.register(recorder, TEST_SERVICES)
     with mock.patch.object(competitor_content.requests, "get") as mget:
         mget.return_value = mock.Mock(status_code=200, text="<html><head></head></html>", json=lambda: {})
         out = json.loads(recorder.tools["resolve_instagram_post_url"](url="https://www.instagram.com/p/GONE/"))
@@ -158,7 +158,7 @@ def test_download_top_filters_ranks_and_saves(mock_meta_sdk_recorded, tmp_path):
     mock_meta_sdk_recorded["api_call"].side_effect = lambda *a, **k: _biz_response(items)
 
     recorder = Recorder()
-    competitor_content.register(recorder)
+    competitor_content.register(recorder, TEST_SERVICES)
     out_dir = str(tmp_path / "competitor_dl")
 
     with (
@@ -187,7 +187,7 @@ def test_download_top_filters_ranks_and_saves(mock_meta_sdk_recorded, tmp_path):
 def test_download_top_validates_args(mock_meta_sdk_recorded):
     mock_meta_sdk_recorded["api_call"].side_effect = lambda *a, **k: _biz_response([])
     recorder = Recorder()
-    competitor_content.register(recorder)
+    competitor_content.register(recorder, TEST_SERVICES)
     assert "error" in json.loads(recorder.tools["download_top_competitor_posts"](handle=""))
     assert "error" in json.loads(recorder.tools["download_top_competitor_posts"](handle="x", days=0))
     assert "error" in json.loads(recorder.tools["download_top_competitor_posts"](handle="x", top_n=99))
@@ -196,7 +196,7 @@ def test_download_top_validates_args(mock_meta_sdk_recorded):
 def test_download_top_reports_missing_account(mock_meta_sdk_recorded):
     mock_meta_sdk_recorded["api_call"].side_effect = lambda *a, **k: {"business_discovery": {}}
     recorder = Recorder()
-    competitor_content.register(recorder)
+    competitor_content.register(recorder, TEST_SERVICES)
     out = json.loads(recorder.tools["download_top_competitor_posts"](handle="nope"))
     assert "error" in out
     assert "nope" in out["error"]
@@ -217,7 +217,7 @@ def test_cadence_analysis_groups_by_day_and_type(mock_meta_sdk_recorded):
     ]
     mock_meta_sdk_recorded["api_call"].side_effect = lambda *a, **k: _biz_response(items)
     recorder = Recorder()
-    competitor_content.register(recorder)
+    competitor_content.register(recorder, TEST_SERVICES)
 
     out = json.loads(recorder.tools["analyze_competitor_cadence"](handle="elegant.po1", days=30))
 
@@ -234,7 +234,7 @@ def test_cadence_analysis_groups_by_day_and_type(mock_meta_sdk_recorded):
 
 def test_cadence_analysis_requires_handle(mock_meta_sdk_recorded):
     recorder = Recorder()
-    competitor_content.register(recorder)
+    competitor_content.register(recorder, TEST_SERVICES)
     assert "error" in json.loads(recorder.tools["analyze_competitor_cadence"](handle=""))
 
 
@@ -245,7 +245,7 @@ def test_cadence_analysis_requires_handle(mock_meta_sdk_recorded):
 
 def test_module_registers_tools_resources_prompts():
     recorder = Recorder()
-    competitor_content.register(recorder)
+    competitor_content.register(recorder, TEST_SERVICES)
     assert set(recorder.tools) == {
         "resolve_instagram_post_url",
         "download_top_competitor_posts",

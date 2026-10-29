@@ -3,11 +3,11 @@
 يلبي متطلبات Butterfly-ye: صور محلية في media/, سعر YER, عرض 3 أيام, تسليم فوري, ديور/كارتير.
 """
 
-from src.helpers import handle_error, json_dumps, write_guard
 from src.throttle import concurrency_limit
+from src.utils import handle_error, json_dumps, write_guard
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register Yemen bundle tools."""
 
     @mcp.tool()
@@ -29,10 +29,9 @@ def register(mcp, services=None):
     ) -> str:
         """نشر منتج يمني (حزمة كاملة)."""
         try:
-            from src.core.services import Services
             from src.services.yemen_bundle_service import YemenBundleService
 
-            svc = YemenBundleService(services) if services is not None else YemenBundleService(Services.default())
+            svc = YemenBundleService(services)
             out = svc.publish(
                 name,
                 description,
@@ -56,10 +55,9 @@ def register(mcp, services=None):
     def get_yemen_bundle_status(catalog_id: str = "", limit: int = 5) -> str:
         """حالة حزمة اليمن — آخر منتجات + آخر منشورات FB/IG للتحقق السريع."""
         try:
-            from src.core.services import Services
             from src.services.yemen_bundle_service import YemenBundleService
 
-            svc = YemenBundleService(services) if services is not None else YemenBundleService(Services.default())
+            svc = YemenBundleService(services)
             out = svc.get_status(catalog_id, limit)
             return json_dumps(out)
         except Exception as e:

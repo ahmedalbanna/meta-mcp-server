@@ -6,7 +6,7 @@ import importlib
 import inspect
 import json
 
-from tests.conftest import TOOL_MODULES, Recorder, register_all
+from tests.conftest import TEST_SERVICES, TOOL_MODULES, Recorder, register_all
 
 
 def _sample_args(fn):
@@ -47,7 +47,7 @@ def test_each_module_tools_callable(mock_meta_sdk):
     for module_name in TOOL_MODULES:
         module = importlib.import_module(f"src.{module_name}")
         recorder = Recorder()
-        module.register(recorder)
+        module.register(recorder, TEST_SERVICES)
         for name, fn in recorder.tools.items():
             result = fn(**_sample_args(fn))
             json.loads(result)

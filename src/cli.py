@@ -15,7 +15,7 @@ import sys
 def cmd_doctor(_args) -> int:
     """Check env, SDK, and tool registration."""
     print("== meta-mcp doctor ==")
-    from src.config import BASE_DIR, GRAPH_VERSION, REPORT_DIR
+    from src.core.config import BASE_DIR, GRAPH_VERSION, REPORT_DIR
 
     print(f"BASE_DIR: {BASE_DIR}")
     print(f"REPORT_DIR: {REPORT_DIR} exists={REPORT_DIR.exists()}")

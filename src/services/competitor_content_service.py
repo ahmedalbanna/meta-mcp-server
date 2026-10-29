@@ -7,7 +7,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from src.competitor_content import fetch_business_media, parse_ts
-from src.config import INSTAGRAM_BUSINESS_ID
 from src.core.services import Services
 
 
@@ -19,7 +18,7 @@ class CompetitorContentService:
     def analyze_cadence(self, handle: str, days: int = 30, pages: int = 3) -> dict[str, Any]:
         if not handle:
             raise ValueError("handle مطلوب")
-        if not INSTAGRAM_BUSINESS_ID:
+        if not self.config.instagram_business_id:
             raise ValueError("اضبط FB_IG_USER_ID في .env")
         media = fetch_business_media(handle.lstrip("@"), pages=max(1, min(pages, 6)))
         if not media:
@@ -42,14 +41,30 @@ class CompetitorContentService:
             return {"error": f"لا منشورات ضمن آخر {days} يوم", "handle": handle, "fetched": len(media)}
 
         day_rows = sorted(
-            ({"date": day, "posts": len(vals), "avg_engagement": round(sum(vals) / len(vals), 1),
-              "max_engagement": max(vals)} for day, vals in by_day.items()),
-            key=lambda r: r["avg_engagement"], reverse=True,
+            (
+                {
+                    "date": day,
+                    "posts": len(vals),
+                    "avg_engagement": round(sum(vals) / len(vals), 1),
+                    "max_engagement": max(vals),
+                }
+                for day, vals in by_day.items()
+            ),
+            key=lambda r: r["avg_engagement"],
+            reverse=True,
         )
         type_rows = sorted(
-            ({"media_type": t, "posts": len(vals), "avg_engagement": round(sum(vals) / len(vals), 1),
-              "max_engagement": max(vals)} for t, vals in by_type.items()),
-            key=lambda r: r["avg_engagement"], reverse=True,
+            (
+                {
+                    "media_type": t,
+                    "posts": len(vals),
+                    "avg_engagement": round(sum(vals) / len(vals), 1),
+                    "max_engagement": max(vals),
+                }
+                for t, vals in by_type.items()
+            ),
+            key=lambda r: r["avg_engagement"],
+            reverse=True,
         )
         span_days = len(by_day) or 1
         return {
@@ -79,12 +94,14 @@ class CompetitorContentService:
         import requests  # type: ignore[import-untyped]
 
         from src.competitor_content import _HEADERS
+
         if not url or "instagram.com" not in url:
             raise ValueError("أدخل رابط إنستغرام صالحاً (يحتوي instagram.com)")
         out: dict[str, Any] = {"url": url}
         try:
-            er = requests.get("https://www.instagram.com/api/v1/oembed/", params={"url": url},
-                              headers=_HEADERS, timeout=40)
+            er = requests.get(
+                "https://www.instagram.com/api/v1/oembed/", params={"url": url}, headers=_HEADERS, timeout=40
+            )
             er.raise_for_status()
             embed = er.json()
             if embed.get("author_name"):
@@ -102,7 +119,9 @@ class CompetitorContentService:
             r = requests.get(url, headers=_HEADERS, timeout=40)
             r.raise_for_status()
             page = r.text
-            m = _re.search(r'<meta property="og:url" content="https://www\.instagram\.com/([^/]+)/(p|reel)/([^/]+)/', page)
+            m = _re.search(
+                r'<meta property="og:url" content="https://www\.instagram\.com/([^/]+)/(p|reel)/([^/]+)/', page
+            )
             if m:
                 out["username"] = out.get("username") or m.group(1)
                 out["shortcode"] = m.group(3)
@@ -114,7 +133,8 @@ class CompetitorContentService:
                 out["owner_user_id"] = m.group(1)
             m = _re.search(
                 r'name="description" content="(\d[\d,]*) likes?, (\d[\d,]*) comments? - ([^ ]+) on ([^:]+): &quot;(.*?)&quot;',
-                page, _re.S,
+                page,
+                _re.S,
             )
             if m:
                 out["likes"] = int(m.group(1).replace(",", ""))
@@ -144,20 +164,22 @@ class CompetitorContentService:
             oembed_image,
             parse_ts,
         )
-        from src.config import INSTAGRAM_BUSINESS_ID
-        from src.helpers import sanitize_filename, sanitize_path
+        from src.utils import sanitize_filename, sanitize_path
+
         if not handle:
             raise ValueError("handle مطلوب")
         if days <= 0 or top_n <= 0:
             raise ValueError("days و top_n يجب أن تكون أكبر من صفر")
         if top_n > 25:
             raise ValueError("الحد الأقصى 25 منشور للتنزيل الواحد")
-        if not INSTAGRAM_BUSINESS_ID:
+        if not self.config.instagram_business_id:
             raise ValueError("اضبط FB_IG_USER_ID في .env (حسابنا يجب أن يكون Instagram Business)")
         media = fetch_business_media(handle.lstrip("@"), pages=3)
         if not media:
             raise ValueError(f"لا توجد منشورات للحساب {handle}")
-        cutoff = __import__("datetime").datetime.now(__import__("datetime").timezone.utc) - __import__("datetime").timedelta(days=days)
+        cutoff = __import__("datetime").datetime.now(__import__("datetime").timezone.utc) - __import__(
+            "datetime"
+        ).timedelta(days=days)
         dated = []
         for m in media:
             dt = parse_ts(m.get("timestamp"))
@@ -165,9 +187,15 @@ class CompetitorContentService:
                 dated.append((dt, m))
         if not dated:
             raise ValueError(f"لا منشورات ضمن آخر {days} يوم")
-        ranked = sorted(dated, key=lambda x: (x[1].get("like_count") or 0) + (x[1].get("comments_count") or 0), reverse=True)[:top_n]
+        ranked = sorted(
+            dated, key=lambda x: (x[1].get("like_count") or 0) + (x[1].get("comments_count") or 0), reverse=True
+        )[:top_n]
         folder = f"competitors/{sanitize_filename(handle.lstrip('@'))}"
-        target = (sanitize_path(out_dir, MEDIA_DOWNLOAD_DIR.parent) if out_dir else sanitize_path(folder, MEDIA_DOWNLOAD_DIR.parent))
+        target = (
+            sanitize_path(out_dir, MEDIA_DOWNLOAD_DIR.parent)
+            if out_dir
+            else sanitize_path(folder, MEDIA_DOWNLOAD_DIR.parent)
+        )
         target.mkdir(parents=True, exist_ok=True)
         manifest = []
         downloaded = 0
@@ -175,9 +203,16 @@ class CompetitorContentService:
             shortcode = post["permalink"].rstrip("/").split("/")[-1]
             likes = post.get("like_count") or 0
             comments = post.get("comments_count") or 0
-            entry = {"rank": i, "date": dt.strftime("%Y-%m-%d"), "permalink": post.get("permalink"),
-                    "likes": likes, "comments": comments, "media_type": post.get("media_type"),
-                    "caption": (post.get("caption") or "")[:300], "file": None}
+            entry = {
+                "rank": i,
+                "date": dt.strftime("%Y-%m-%d"),
+                "permalink": post.get("permalink"),
+                "likes": likes,
+                "comments": comments,
+                "media_type": post.get("media_type"),
+                "caption": (post.get("caption") or "")[:300],
+                "file": None,
+            }
             try:
                 img = oembed_image(post["permalink"])
                 if img:
@@ -200,6 +235,15 @@ class CompetitorContentService:
             "out_dir": str(target),
             "manifest": str(target / "manifest.json"),
             "note": "reference only",
-            "top_posts": [{"rank": m["rank"], "date": m["date"], "likes": m["likes"],
-                          "comments": m["comments"], "file": m["file"], "caption": m["caption"]} for m in manifest],
+            "top_posts": [
+                {
+                    "rank": m["rank"],
+                    "date": m["date"],
+                    "likes": m["likes"],
+                    "comments": m["comments"],
+                    "file": m["file"],
+                    "caption": m["caption"],
+                }
+                for m in manifest
+            ],
         }

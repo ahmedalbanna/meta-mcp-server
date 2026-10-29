@@ -6,10 +6,9 @@ import os
 from pathlib import Path
 from typing import Any
 
-from src.config import AD_ACCOUNT_ID, PAGE_ID, REPORT_DIR, ensure_report_dir
 from src.core.services import Services
-from src.helpers import sanitize_filename, sanitize_path
 from src.reports import IG_MEDIA_METRICS, _to_numeric, _write_csv, _write_excel
+from src.utils import sanitize_filename, sanitize_path
 
 
 class ReportsService:
@@ -54,23 +53,19 @@ class ReportsService:
         return rows
 
     def account_summary(self, date_preset: str = "last_30d") -> dict[str, Any]:
-        from facebook_business.adobjects.adaccount import AdAccount
-
-        ad_account = AdAccount(AD_ACCOUNT_ID)
-        insights = ad_account.get_insights(
-            params={
+        acct = self.config.fb_ad_account_id
+        data = self.api.get(
+            f"{acct}/insights",
+            {
                 "date_preset": date_preset,
-                "fields": ["campaign_name", *["spend", "impressions", "clicks", "ctr", "cpc", "reach"]],
-            }
+                "fields": "campaign_name,spend,impressions,clicks,ctr,cpc,reach",
+            },
         )
         rows = []
-        for item in insights:
-            data = (
-                item.export_all_data() if hasattr(item, "export_all_data") else (item if isinstance(item, dict) else {})
-            )
-            row = {"campaign_name": data.get("campaign_name", "N/A")}
+        for item in data.get("data", []) if isinstance(data, dict) else []:
+            row = {"campaign_name": item.get("campaign_name", "N/A")}
             for m in ["spend", "impressions", "clicks", "ctr", "cpc", "reach"]:
-                row[m] = data.get(m, 0)
+                row[m] = item.get(m, 0)
             rows.append(row)
         if not rows:
             return {"message": "لا توجد بيانات", "date_preset": date_preset}
@@ -88,13 +83,14 @@ class ReportsService:
         return summary
 
     def generate_page_report(self, format: str = "csv", filename: str = "") -> dict[str, Any]:
-        from facebook_business.adobjects.page import Page
+        from src.utils import to_dict as _td
 
-        from src.helpers import to_dict as _td
-
-        ensure_report_dir()
-        page = Page(PAGE_ID)
-        info = page.api_get(fields=["name", "fan_count", "category", "about", "link"])
+        report_dir = self.config.report_dir or Path("reports")
+        report_dir.mkdir(parents=True, exist_ok=True)
+        info = self.api.page_get(
+            self.config.page_id,
+            {"fields": "name,fan_count,category,about,link"},
+        )
         data = _td(info)
         rows = [data]
         base = filename or "page_report"
@@ -104,10 +100,10 @@ class ReportsService:
             except ValueError as e:
                 return {"error": f"اسم ملف غير صالح: {e}"}
         if format == "excel":
-            path = Path(REPORT_DIR) / f"{base}.xlsx"
+            path = report_dir / f"{base}.xlsx"
             _write_excel(path, rows)
         else:
-            path = Path(REPORT_DIR) / f"{base}.csv"
+            path = report_dir / f"{base}.csv"
             _write_csv(path, rows)
         return {"success": True, "file": str(path), "rows": len(rows)}
 
@@ -118,12 +114,13 @@ class ReportsService:
             return {"error": "filename مطلوب"}
         if not spreadsheet_id:
             return {"error": "spreadsheet_id مطلوب"}
+        report_dir = self.config.report_dir or Path("reports")
         try:
-            csv_path = sanitize_path(filename, REPORT_DIR)
+            csv_path = sanitize_path(filename, report_dir)
         except ValueError as e:
             return {"error": f"مسار غير صالح: {e}"}
         if not csv_path.is_file():
-            alt = sanitize_path(filename + ".csv", REPORT_DIR) if not filename.endswith(".csv") else None
+            alt = sanitize_path(filename + ".csv", report_dir) if not filename.endswith(".csv") else None
             if alt and alt.is_file():
                 csv_path = alt
             else:

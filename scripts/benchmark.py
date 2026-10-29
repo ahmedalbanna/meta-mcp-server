@@ -52,9 +52,9 @@ def main() -> int:
     # Mock SDK
     with (
         mock.patch.multiple("facebook_business.api.FacebookAdsApi", init=mock.DEFAULT, get_default_api=mock.DEFAULT),
-        mock.patch("src.helpers.api_call", return_value={"data": [], "paging": {}}),
-        mock.patch("src.helpers.page_api_call", return_value={"data": []}),
-        mock.patch("src.helpers.get_page_api"),
+        mock.patch("src.utils.api_call", return_value={"data": [], "paging": {}}),
+        mock.patch("src.utils.page_api_call", return_value={"data": []}),
+        mock.patch("src.utils.get_page_api"),
         mock.patch("src.instagram.requests"),
         mock.patch("facebook_business.adobjects.adaccount.AdAccount"),
         mock.patch("facebook_business.adobjects.campaign.Campaign"),

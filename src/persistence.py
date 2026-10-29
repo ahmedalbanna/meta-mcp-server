@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from src.config import ANALYTICS_DB_URL, ANALYTICS_RETENTION_DAYS, ANALYTICS_TZ, ensure_report_dir
+from src.core.config import ANALYTICS_DB_URL, ANALYTICS_RETENTION_DAYS, ANALYTICS_TZ, ensure_report_dir
 
 logger = logging.getLogger(__name__)
 

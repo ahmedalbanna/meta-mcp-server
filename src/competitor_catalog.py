@@ -31,10 +31,10 @@ from src.competitor_content import (
     oembed_image,
     parse_ts,
 )
-from src.config import ENABLE_WRITES, FB_ENABLE_OCR, INSTAGRAM_BUSINESS_ID
-from src.helpers import api_call, handle_error, json_dumps, sanitize_filename, sanitize_path, write_guard
+from src.core.config import ENABLE_WRITES, FB_ENABLE_OCR, INSTAGRAM_BUSINESS_ID
 from src.ocr import ocr_price_for_image
 from src.throttle import concurrency_limit
+from src.utils import api_call, handle_error, json_dumps, sanitize_filename, sanitize_path, write_guard
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +143,7 @@ def _write_catalog_draft(out_root: Path, draft: list) -> tuple[Path, Path]:
     return json_path, md_path
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register the competitor -> draft-catalog pipeline tools."""
 
     def _collect(handle: str, days: int, top_n: int, out_root: Path) -> tuple[list, dict]:
@@ -367,9 +367,8 @@ def register(mcp, services=None):
     def publish_catalog_draft(catalog_id: str, product_ids: str = "") -> str:
         """نشر مسودات الكتالوج: تحويل visibility من staging إلى published."""
         try:
-            from src.core.services import Services
             from src.services.competitor_catalog_service import CompetitorCatalogService
-            svc = CompetitorCatalogService(services) if services is not None else CompetitorCatalogService(Services.default())
+            svc = CompetitorCatalogService(services)
             return json_dumps(svc.publish_drafts(catalog_id, product_ids))
         except Exception as e:
             return json_dumps(handle_error(e, "publish_catalog_draft"))
@@ -378,9 +377,8 @@ def register(mcp, services=None):
     def list_catalog_drafts(catalog_id: str, limit: int = 50) -> str:
         """عرض منتجات المسودة (visibility=staging) في كتالوج — قبل النشر."""
         try:
-            from src.core.services import Services
             from src.services.competitor_catalog_service import CompetitorCatalogService
-            svc = CompetitorCatalogService(services) if services is not None else CompetitorCatalogService(Services.default())
+            svc = CompetitorCatalogService(services)
             return json_dumps(svc.list_drafts(catalog_id, limit))
         except Exception as e:
             return json_dumps(handle_error(e, "list_catalog_drafts"))

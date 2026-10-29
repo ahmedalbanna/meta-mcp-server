@@ -14,7 +14,7 @@ import logging
 logger = logging.getLogger(__name__)
 from typing import Any
 
-from src.config import REPORT_DIR, ensure_report_dir
+from src.core.config import REPORT_DIR, ensure_report_dir
 
 AUTOMATIONS_FILE = REPORT_DIR / "automations.json"
 TRIGGER_TYPES = ["comment_keyword", "lead_created", "message_received", "webhook_event"]
@@ -37,25 +37,20 @@ def _save_rules(rules: list[dict[str, Any]]) -> None:
     AUTOMATIONS_FILE.write_text(json.dumps(rules, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register webhook automation tools."""
 
-    from src.helpers import handle_error, json_dumps, write_guard
     from src.throttle import concurrency_limit
+    from src.utils import handle_error, json_dumps, write_guard
 
     @mcp.tool()
     @concurrency_limit()
     def list_webhook_automations() -> str:
         """قائمة قواعد الأتمتة المحلية (webhook automations) المخزنة في reports/automations.json."""
         try:
-            from src.core.services import Services
             from src.services.webhook_automations_service import WebhookAutomationsService
 
-            svc = (
-                WebhookAutomationsService(services)
-                if services is not None
-                else WebhookAutomationsService(Services.default())
-            )
+            svc = WebhookAutomationsService(services)
             return json_dumps(svc.list())
         except Exception as e:
             return json_dumps(handle_error(e, "list_webhook_automations"))
@@ -79,14 +74,9 @@ def register(mcp, services=None):
         action_params_json: JSON للبراميترات، مثال {"message":"أهلاً"} أو {"audience_id":"123"}
         """
         try:
-            from src.core.services import Services
             from src.services.webhook_automations_service import WebhookAutomationsService
 
-            svc = (
-                WebhookAutomationsService(services)
-                if services is not None
-                else WebhookAutomationsService(Services.default())
-            )
+            svc = WebhookAutomationsService(services)
             return json_dumps(svc.create(name, trigger, keyword, action_type, action_params_json, enabled))
         except Exception as e:
             return json_dumps(handle_error(e, "create_webhook_automation"))
@@ -97,14 +87,9 @@ def register(mcp, services=None):
     def delete_webhook_automation(rule_id: str) -> str:
         """حذف قاعدة أتمتة محلية حسب المعرف."""
         try:
-            from src.core.services import Services
             from src.services.webhook_automations_service import WebhookAutomationsService
 
-            svc = (
-                WebhookAutomationsService(services)
-                if services is not None
-                else WebhookAutomationsService(Services.default())
-            )
+            svc = WebhookAutomationsService(services)
             return json_dumps(svc.delete(rule_id))
         except Exception as e:
             return json_dumps(handle_error(e, "delete_webhook_automation"))
@@ -118,14 +103,9 @@ def register(mcp, services=None):
         يُرجع القواعد التي كانت ستُطبّق بدون تنفيذ فعلي.
         """
         try:
-            from src.core.services import Services
             from src.services.webhook_automations_service import WebhookAutomationsService
 
-            svc = (
-                WebhookAutomationsService(services)
-                if services is not None
-                else WebhookAutomationsService(Services.default())
-            )
+            svc = WebhookAutomationsService(services)
             return json_dumps(svc.evaluate(event_json))
         except Exception as e:
             return json_dumps(handle_error(e, "evaluate_webhook_automations"))
@@ -140,14 +120,9 @@ def register(mcp, services=None):
         dry_run: true=محاكاة فقط، false=تنفيذ فعلي (يتطلب FB_ENABLE_WRITES)
         """
         try:
-            from src.core.services import Services
             from src.services.webhook_automations_service import WebhookAutomationsService
 
-            svc = (
-                WebhookAutomationsService(services)
-                if services is not None
-                else WebhookAutomationsService(Services.default())
-            )
+            svc = WebhookAutomationsService(services)
             out = svc.run(event_json, dry_run)
             return json_dumps(out)
         except Exception as e:
@@ -162,7 +137,7 @@ def register(mcp, services=None):
                 {"module": "webhook_automations", "resource": "webhooks://overview", "hint": "نظرة عامة الأتمتة"}
             )
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "webhooks://overview"))
 
@@ -183,7 +158,7 @@ def register(mcp, services=None):
                 }
             )
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "webhook-automations://templates"))
 

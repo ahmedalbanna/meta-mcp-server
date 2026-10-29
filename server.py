@@ -42,9 +42,9 @@ from src import (
     whatsapp,
     yemen_bundle,
 )
-from src.config import validate_config
+from src.core.config import validate_config
 from src.core.services import Services
-from src.helpers import init_meta_api
+from src.utils import init_meta_api
 from src.throttle import MAX_CONCURRENT
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

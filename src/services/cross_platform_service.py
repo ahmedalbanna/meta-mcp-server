@@ -8,7 +8,6 @@ from typing import Any
 
 import requests  # type: ignore[import-untyped]
 
-from src.config import FB_CROSS_PLATFORM_TIKTOK, FB_PHONE_COUNTRY_CODE
 from src.core.services import Services
 from src.services.page_builder_service import normalize_phone as _normalize_phone
 
@@ -36,7 +35,10 @@ class CrossPlatformService:
         self.api = services.api
 
     def tiktok_profile(self, handle: str) -> dict[str, Any]:
-        if os.getenv("FB_CROSS_PLATFORM_TIKTOK", "false").lower() not in ("1", "true", "yes", "on") and not FB_CROSS_PLATFORM_TIKTOK:
+        if (
+            os.getenv("FB_CROSS_PLATFORM_TIKTOK", "false").lower() not in ("1", "true", "yes", "on")
+            and not self.config.cross_platform_tiktok
+        ):
             return {"error": "FB_CROSS_PLATFORM_TIKTOK=false", "guard": "disabled"}
         handle = (handle or "").strip().lstrip("@")
         if not handle:
@@ -72,12 +74,16 @@ class CrossPlatformService:
         }
 
     def whatsapp_link(self, phone: str, message: str = "مرحباً، أود الاستفسار عن منتجاتكم") -> dict[str, Any]:
-        norm = _normalize_phone(phone, FB_PHONE_COUNTRY_CODE)
+        norm = _normalize_phone(phone, self.config.phone_country_code)
         if norm is None:
             return {"error": "رقم هاتف غير صالح", "phone": phone}
         from urllib.parse import quote
-        return {"phone": norm, "link": f"https://wa.me/{norm.lstrip('+')}?text={quote(message)}",
-                "note": "للتحقق من وجود حساب WhatsApp Business استخدم wa.me link (Meta لا يوفّر API عام)"}
+
+        return {
+            "phone": norm,
+            "link": f"https://wa.me/{norm.lstrip('+')}?text={quote(message)}",
+            "note": "للتحقق من وجود حساب WhatsApp Business استخدم wa.me link (Meta لا يوفّر API عام)",
+        }
 
     def competitor_360(self, handle: str, page_id: str = "", phone: str = "") -> dict[str, Any]:
         handle = (handle or "").strip().lstrip("@")
@@ -89,13 +95,16 @@ class CrossPlatformService:
         ig_id = self.config.instagram_business_id
         if ig_id:
             try:
-                ig = self.api.get(ig_id, {
-                    "fields": (
-                        f"business_discovery.username({handle})"
-                        "{username,name,followers_count,media_count,"
-                        "media.limit(5){like_count,comments_count}}"
-                    ),
-                })
+                ig = self.api.get(
+                    ig_id,
+                    {
+                        "fields": (
+                            f"business_discovery.username({handle})"
+                            "{username,name,followers_count,media_count,"
+                            "media.limit(5){like_count,comments_count}}"
+                        ),
+                    },
+                )
                 biz = ig.get("business_discovery") or {}
                 media = (biz.get("media") or {}).get("data", [])
                 likes = [m.get("like_count") or 0 for m in media]
@@ -122,7 +131,12 @@ class CrossPlatformService:
                 out["platforms"]["facebook"] = {"error": str(e)[:150]}
 
         # TikTok
-        if FB_CROSS_PLATFORM_TIKTOK or os.getenv("FB_CROSS_PLATFORM_TIKTOK", "false").lower() in ("1", "true", "yes", "on"):
+        if self.config.cross_platform_tiktok or os.getenv("FB_CROSS_PLATFORM_TIKTOK", "false").lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        ):
             try:
                 url = f"https://www.tiktok.com/@{handle}"
                 r = requests.get(url, headers=_HEADERS, timeout=20)

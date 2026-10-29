@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 import time
 from typing import Any
 
-from src.config import REPORT_DIR, SCHEDULER_DB_URL, ensure_report_dir
+from src.core.config import REPORT_DIR, SCHEDULER_DB_URL, ensure_report_dir
 
 SCHEDULE_FILE = REPORT_DIR / "schedule.json"
 SCHEDULER_DB_FILE = REPORT_DIR / "scheduler.db"
@@ -132,11 +132,11 @@ def _save_tasks(tasks: list[dict[str, Any]]) -> None:
     SCHEDULE_FILE.write_text(json.dumps(tasks, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register scheduler tools."""
 
-    from src.helpers import handle_error, json_dumps, write_guard
     from src.throttle import concurrency_limit
+    from src.utils import handle_error, json_dumps, write_guard
 
     @mcp.tool()
     @concurrency_limit()
@@ -155,10 +155,9 @@ def register(mcp, services=None):
         cron: تعبير cron اختياري (مثال "0 9 * * *") — يتطلب APScheduler إن وُجد
         """
         try:
-            from src.core.services import Services
             from src.services.scheduler_service import SchedulerService
 
-            svc = SchedulerService(services) if services is not None else SchedulerService(Services.default())
+            svc = SchedulerService(services)
             return json_dumps(svc.schedule_task(name, tool_name, params_json, run_at, cron))
         except Exception as e:
             return json_dumps(handle_error(e, "schedule_task"))
@@ -168,10 +167,9 @@ def register(mcp, services=None):
     def list_scheduled_tasks(status: str = "") -> str:
         """قائمة المهام المجدولة (اختياري فلترة بالحالة: scheduled|done|cancelled)."""
         try:
-            from src.core.services import Services
             from src.services.scheduler_service import SchedulerService
 
-            svc = SchedulerService(services) if services is not None else SchedulerService(Services.default())
+            svc = SchedulerService(services)
             return json_dumps(svc.list_scheduled_tasks(status))
         except Exception as e:
             return json_dumps(handle_error(e, "list_scheduled_tasks"))
@@ -182,10 +180,9 @@ def register(mcp, services=None):
     def cancel_scheduled_task(task_id: str) -> str:
         """إلغاء مهمة مجدولة حسب المعرف."""
         try:
-            from src.core.services import Services
             from src.services.scheduler_service import SchedulerService
 
-            svc = SchedulerService(services) if services is not None else SchedulerService(Services.default())
+            svc = SchedulerService(services)
             return json_dumps(svc.cancel_scheduled_task(task_id))
         except Exception as e:
             return json_dumps(handle_error(e, "cancel_scheduled_task"))
@@ -195,10 +192,9 @@ def register(mcp, services=None):
     def get_scheduled_task(task_id: str) -> str:
         """تفاصيل مهمة مجدولة واحدة."""
         try:
-            from src.core.services import Services
             from src.services.scheduler_service import SchedulerService
 
-            svc = SchedulerService(services) if services is not None else SchedulerService(Services.default())
+            svc = SchedulerService(services)
             task = svc.get_scheduled_task(task_id)
             if task is None:
                 return json_dumps({"error": f"المهمة {task_id} غير موجودة"})
@@ -215,10 +211,9 @@ def register(mcp, services=None):
         dry_run=false: تنفيذ فعلي عبر استدعاء الأداة (يتطلب FB_ENABLE_WRITES)
         """
         try:
-            from src.core.services import Services
             from src.services.scheduler_service import SchedulerService
 
-            svc = SchedulerService(services) if services is not None else SchedulerService(Services.default())
+            svc = SchedulerService(services)
             out = svc.run_due_tasks(dry_run)
             return json_dumps(out)
         except Exception as e:
@@ -231,7 +226,7 @@ def register(mcp, services=None):
             # Lightweight per-module overview (calls existing list tool pattern)
             return json_dumps({"module": "scheduler", "resource": "scheduler://overview", "hint": "نظرة عامة المجدولة"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "scheduler://overview"))
 
@@ -255,7 +250,7 @@ def register(mcp, services=None):
             logger.info("scheduler://tasks fetched %d tasks in %.2fs", len(tasks), elapsed)
             return json_dumps({"tasks": tasks, "count": len(tasks)})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             logger.exception("scheduler://tasks failed")
             return json_dumps(handle_error(e, "scheduler://tasks"))

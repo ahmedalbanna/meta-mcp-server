@@ -5,11 +5,11 @@ Raw Graph API calls using the system/business access token.
 
 import logging
 
-from src.config import WABA_ID, WHATSAPP_PHONE_NUMBER_ID
+from src.core.config import WABA_ID, WHATSAPP_PHONE_NUMBER_ID
 
 logger = logging.getLogger(__name__)
-from src.helpers import handle_error, json_dumps, write_guard
 from src.throttle import concurrency_limit
+from src.utils import handle_error, json_dumps, write_guard
 
 WHATSAPP_MAX_TEXT_LENGTH = 4096
 
@@ -18,7 +18,7 @@ TEMPLATE_FIELDS = "id,name,status,language,components,category"
 TEMPLATE_CATEGORIES = ["MARKETING", "UTILITY", "AUTHENTICATION"]
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register WhatsApp Business tools (raw Graph API)."""
 
 
@@ -33,9 +33,8 @@ def register(mcp, services=None):
     def list_whatsapp_phone_numbers(waba_id: str = "", limit: int = 25) -> str:
         """أرقام الهواتف المسجّلة في حساب واتساب للأعمال (WABA)."""
         try:
-            from src.core.services import Services
             from src.services.whatsapp_service import WhatsAppService
-            svc = WhatsAppService(services) if services is not None else WhatsAppService(Services.default())
+            svc = WhatsAppService(services)
             data = svc.list_phone_numbers(waba_id, limit)
             return json_dumps(data)
         except Exception as e:
@@ -46,9 +45,8 @@ def register(mcp, services=None):
     def get_whatsapp_phone_number(phone_number_id: str = "") -> str:
         """تفاصيل رقم هاتف واتساب واحد."""
         try:
-            from src.core.services import Services
             from src.services.whatsapp_service import WhatsAppService
-            svc = WhatsAppService(services) if services is not None else WhatsAppService(Services.default())
+            svc = WhatsAppService(services)
             data = svc.get_phone_number(phone_number_id)
             return json_dumps(data)
         except Exception as e:
@@ -59,9 +57,8 @@ def register(mcp, services=None):
     def list_whatsapp_message_templates(waba_id: str = "", limit: int = 25) -> str:
         """قوالب الرسائل المعتمدة في حساب واتساب للأعمال."""
         try:
-            from src.core.services import Services
             from src.services.whatsapp_service import WhatsAppService
-            svc = WhatsAppService(services) if services is not None else WhatsAppService(Services.default())
+            svc = WhatsAppService(services)
             data = svc.list_templates(waba_id, limit)
             return json_dumps(data)
         except Exception as e:
@@ -80,9 +77,8 @@ def register(mcp, services=None):
     ) -> str:
         """إنشاء قالب رسالة واتساب جديد (يتطلب موافقة ميتا)."""
         try:
-            from src.core.services import Services
             from src.services.whatsapp_service import WhatsAppService
-            svc = WhatsAppService(services) if services is not None else WhatsAppService(Services.default())
+            svc = WhatsAppService(services)
             return json_dumps(svc.create_template(name, language, category, body_text, header_text, waba_id))
         except Exception as e:
             return json_dumps(handle_error(e, "create_whatsapp_message_template"))
@@ -93,9 +89,8 @@ def register(mcp, services=None):
     def send_whatsapp_text_message(to: str, text: str, phone_number_id: str = "") -> str:
         """إرسال رسالة نصية واتساب (رقم المستخدم يجب أن يكون بدأ محادثة)."""
         try:
-            from src.core.services import Services
             from src.services.whatsapp_service import WhatsAppService
-            svc = WhatsAppService(services) if services is not None else WhatsAppService(Services.default())
+            svc = WhatsAppService(services)
             return json_dumps(svc.send_text(to, text, phone_number_id))
         except Exception as e:
             return json_dumps(handle_error(e, "send_whatsapp_text_message"))
@@ -112,9 +107,8 @@ def register(mcp, services=None):
     ) -> str:
         """إرسال قالب رسالة واتساب معتمد. body_params_json: مصفوفة JSON من النصوص."""
         try:
-            from src.core.services import Services
             from src.services.whatsapp_service import WhatsAppService
-            svc = WhatsAppService(services) if services is not None else WhatsAppService(Services.default())
+            svc = WhatsAppService(services)
             return json_dumps(svc.send_template(to, template_name, language, phone_number_id, body_params_json))
         except Exception as e:
             return json_dumps(handle_error(e, "send_whatsapp_template_message"))
@@ -126,7 +120,7 @@ def register(mcp, services=None):
             # Lightweight per-module overview (calls existing list tool pattern)
             return json_dumps({"module": "whatsapp", "resource": "whatsapp://overview", "hint": "نظرة عامة واتساب"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "whatsapp://overview"))
 
@@ -150,7 +144,7 @@ def register(mcp, services=None):
         try:
             return json_dumps({"module": "whatsapp", "resource": "whatsapp://templates", "hint": "قوالب واتساب"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "whatsapp://templates"))
 

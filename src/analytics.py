@@ -9,19 +9,13 @@ from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from src.config import (
-    AD_ACCOUNT_ID,
-    ANALYTICS_TZ,
-    FB_CURRENCY_DEFAULT,
-    resolve_ad_account_id,
-)
-from src.helpers import handle_error, json_dumps, to_dict
 from src.persistence import (
     init_db,
     query_daily_facts,
     upsert_daily_fact,
 )
 from src.throttle import concurrency_limit
+from src.utils import handle_error, json_dumps, to_dict
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +24,7 @@ NON_ADDITIVE = {"ctr", "cpc", "cpm"}  # derived; recompute from additive
 
 
 def _tz(name: str | None = None) -> ZoneInfo:
-    return ZoneInfo(name or ANALYTICS_TZ)
+    return ZoneInfo(name or "Asia/Aden")
 
 
 def normalize_date_range(preset: str, tz_name: str | None = None) -> tuple[str, str]:
@@ -88,15 +82,9 @@ def _date_range(start: str, end: str) -> list[str]:
     return out
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register analytics tools."""
-    if services is None:
-        from src.core.services import Services
-        services = Services.default()
     init_db()
-
-    from facebook_business.adobjects.adaccount import AdAccount
-
 
     @mcp.tool()
     @concurrency_limit()
@@ -113,9 +101,9 @@ def register(mcp, services=None):
         level: account|campaign|adset|ad
         """
         try:
-            from src.core.services import Services
             from src.services.analytics_service import AnalyticsService
-            svc = AnalyticsService(services) if services is not None else AnalyticsService(Services.default())
+
+            svc = AnalyticsService(services)
             result = svc.ingest_daily(account_id, level, entity_id, metric_date, metrics)
             return json_dumps(result)
         except Exception as e:
@@ -133,21 +121,20 @@ def register(mcp, services=None):
     ) -> str:
         """Ingest a range of days (YYYY-MM-DD) into SQLite."""
         try:
-            acct = resolve_ad_account_id(account_id) if account_id else AD_ACCOUNT_ID
+            acct = services.config.resolve_ad_account_id(account_id) if account_id else services.config.fb_ad_account_id
             if not acct:
                 return json_dumps({"error": "no ad account id"})
             if not start_date or not end_date:
                 return json_dumps({"error": "start_date and end_date required (YYYY-MM-DD)"})
             metric_list = [m.strip() for m in metrics.split(",") if m.strip()]
-            acc = AdAccount(acct)
             params = {
                 "time_range": {"since": start_date, "until": end_date},
-                "fields": metric_list,
+                "fields": ",".join(metric_list),
                 "level": level if level != "account" else "account",
                 "time_increment": 1,
             }
-            insights = acc.get_insights(params=params)
-            rows = [to_dict(i) for i in insights]
+            data = services.api.get(f"{acct}/insights", params)
+            rows = [to_dict(i) for i in data.get("data", [])] if isinstance(data, dict) else []
             # index by date
             by_date = {r.get("date_start"): r for r in rows if r.get("date_start")}
             ingested_days = 0
@@ -161,15 +148,30 @@ def register(mcp, services=None):
                                 val = float(row[m])
                             except (TypeError, ValueError):
                                 continue
-                            upsert_daily_fact(acct, level, ent, d, m, val,
-                                              currency=row.get("account_currency") or FB_CURRENCY_DEFAULT,
-                                              tz=ANALYTICS_TZ)
+                            upsert_daily_fact(
+                                acct,
+                                level,
+                                ent,
+                                d,
+                                m,
+                                val,
+                                currency=row.get("account_currency") or services.config.currency_default,
+                                tz=services.config.tz_name,
+                            )
                     ingested_days += 1
                 else:
                     for m in metric_list:
                         if m in ADDITIVE_METRICS:
-                            upsert_daily_fact(acct, level, ent, d, m, 0.0,
-                                              currency=FB_CURRENCY_DEFAULT, tz=ANALYTICS_TZ)
+                            upsert_daily_fact(
+                                acct,
+                                level,
+                                ent,
+                                d,
+                                m,
+                                0.0,
+                                currency=services.config.currency_default,
+                                tz=services.config.tz_name,
+                            )
                     ingested_days += 1
             return json_dumps({"ingested_days": ingested_days, "start": start_date, "end": end_date, "level": level})
         except Exception as e:
@@ -187,9 +189,9 @@ def register(mcp, services=None):
     ) -> str:
         """Build a monthly snapshot from daily_facts (additive sum; reach approximated)."""
         try:
-            from src.core.services import Services
             from src.services.analytics_service import AnalyticsService
-            svc = AnalyticsService(services) if services is not None else AnalyticsService(Services.default())
+
+            svc = AnalyticsService(services)
             result = svc.build_monthly(year, month, account_id, level, entity_id, metrics)
             return json_dumps(result)
         except Exception as e:
@@ -207,7 +209,7 @@ def register(mcp, services=None):
     ) -> str:
         """Return daily series with zero-fill for a metric over a date range."""
         try:
-            acct = resolve_ad_account_id(account_id) if account_id else AD_ACCOUNT_ID
+            acct = services.config.resolve_ad_account_id(account_id) if account_id else services.config.fb_ad_account_id
             if not acct:
                 return json_dumps({"error": "no ad account id"})
             if not start_date or not end_date:
@@ -218,8 +220,16 @@ def register(mcp, services=None):
             s = date.fromisoformat(start_date)
             e = date.fromisoformat(end_date)
             filled = zero_fill_daily(series, s, e)
-            return json_dumps({"account_id": acct, "level": level, "entity_id": ent, "metric": metric,
-                               "days": len(filled), "data": filled})
+            return json_dumps(
+                {
+                    "account_id": acct,
+                    "level": level,
+                    "entity_id": ent,
+                    "metric": metric,
+                    "days": len(filled),
+                    "data": filled,
+                }
+            )
         except Exception as e:
             return json_dumps(handle_error(e))
 
@@ -261,7 +271,8 @@ def register(mcp, services=None):
             for t in ("daily_facts", "monthly_snapshots", "competitor_snapshots"):
                 counts[t] = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
             ver = conn.execute("SELECT version FROM schema_version").fetchone()[0]
-            return json_dumps({"db_path": str(_db_path()), "schema_version": ver, "counts": counts,
-                               "tz": ANALYTICS_TZ})
+            return json_dumps(
+                {"db_path": str(_db_path()), "schema_version": ver, "counts": counts, "tz": services.config.tz_name}
+            )
         except Exception as e:
             return json_dumps(handle_error(e))

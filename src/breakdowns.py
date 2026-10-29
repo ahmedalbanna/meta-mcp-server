@@ -2,8 +2,6 @@
 
 import logging
 
-from src.config import AD_ACCOUNT_ID
-
 logger = logging.getLogger(__name__)
 from src.insights import DATE_PRESETS, DEFAULT_METRICS
 
@@ -46,7 +44,7 @@ ACTION_BREAKDOWN_VALUES = [
 ]
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register insights-breakdown tools."""
 
     from facebook_business.adobjects.ad import Ad
@@ -54,8 +52,8 @@ def register(mcp, services=None):
     from facebook_business.adobjects.adset import AdSet
     from facebook_business.adobjects.campaign import Campaign
 
-    from src.helpers import handle_error, json_dumps, to_dict
     from src.throttle import concurrency_limit
+    from src.utils import handle_error, json_dumps, to_dict
 
     def _validate(preset: str, metrics: str, breakdown: str) -> tuple:
         if preset not in DATE_PRESETS:
@@ -112,9 +110,11 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.breakdowns_service import BreakdownsService
-            svc = BreakdownsService(services) if services is not None else BreakdownsService(Services.default())
-            rows = svc.get_account_breakdown(breakdown, date_preset, metrics, time_increment,
-                                             action_attribution_windows, action_breakdowns)
+
+            svc = BreakdownsService(services)
+            rows = svc.get_account_breakdown(
+                breakdown, date_preset, metrics, time_increment, action_attribution_windows, action_breakdowns
+            )
             return _respond(rows)
         except Exception as e:
             return json_dumps(handle_error(e, "get_account_insights_breakdown"))
@@ -134,9 +134,17 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.breakdowns_service import BreakdownsService
-            svc = BreakdownsService(services) if services is not None else BreakdownsService(Services.default())
-            rows = svc.get_campaign_breakdown(campaign_id, breakdown, date_preset, metrics, time_increment,
-                                              action_attribution_windows, action_breakdowns)
+
+            svc = BreakdownsService(services)
+            rows = svc.get_campaign_breakdown(
+                campaign_id,
+                breakdown,
+                date_preset,
+                metrics,
+                time_increment,
+                action_attribution_windows,
+                action_breakdowns,
+            )
             return _respond(rows)
         except Exception as e:
             return json_dumps(handle_error(e, "get_campaign_insights_breakdown"))
@@ -156,9 +164,11 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.breakdowns_service import BreakdownsService
-            svc = BreakdownsService(services) if services is not None else BreakdownsService(Services.default())
-            rows = svc.get_adset_breakdown(adset_id, breakdown, date_preset, metrics, time_increment,
-                                           action_attribution_windows, action_breakdowns)
+
+            svc = BreakdownsService(services)
+            rows = svc.get_adset_breakdown(
+                adset_id, breakdown, date_preset, metrics, time_increment, action_attribution_windows, action_breakdowns
+            )
             return _respond(rows)
         except Exception as e:
             return json_dumps(handle_error(e, "get_adset_insights_breakdown"))
@@ -178,9 +188,11 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.breakdowns_service import BreakdownsService
-            svc = BreakdownsService(services) if services is not None else BreakdownsService(Services.default())
-            rows = svc.get_ad_breakdown(ad_id, breakdown, date_preset, metrics, time_increment,
-                                        action_attribution_windows, action_breakdowns)
+
+            svc = BreakdownsService(services)
+            rows = svc.get_ad_breakdown(
+                ad_id, breakdown, date_preset, metrics, time_increment, action_attribution_windows, action_breakdowns
+            )
             return _respond(rows)
         except Exception as e:
             return json_dumps(handle_error(e, "get_ad_insights_breakdown"))
@@ -194,7 +206,7 @@ def register(mcp, services=None):
                 {"module": "breakdowns", "resource": "breakdowns://overview", "hint": "قوالب التحليلات المجزأة"}
             )
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "breakdowns://overview"))
 
@@ -209,7 +221,7 @@ def register(mcp, services=None):
         try:
             return json_dumps({"module": "breakdowns", "resource": "breakdowns://templates", "hint": "قوالب التحليلات"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "breakdowns://templates"))
 

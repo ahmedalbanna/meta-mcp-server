@@ -4,13 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from facebook_business.adobjects.adaccount import AdAccount
-from facebook_business.adobjects.customaudience import CustomAudience
-
-from src.config import resolve_ad_account_id
 from src.core.services import Services
-from src.helpers import to_dict
-from src.utils import paginate
+from src.utils import normalize_pii, paginate, to_dict
 
 
 class AudiencesService:
@@ -18,26 +13,33 @@ class AudiencesService:
         self.services = services
         self.config = services.config
 
+    def _acct(self, ad_account_id: str = "") -> str:
+        return self.config.resolve_ad_account_id(ad_account_id)
+
     def list_custom_audiences(self, limit: int = 25, ad_account_id: str = "") -> Any:
-        fields = [CustomAudience.Field.name, CustomAudience.Field.subtype, "approximate_count", CustomAudience.Field.id]
+        fields = ["name", "subtype", "approximate_count", "id"]
         rows = paginate(
-            lambda params: AdAccount(resolve_ad_account_id(ad_account_id)).get_custom_audiences(params=params),
-            fields=fields, limit=limit,
+            lambda params: self.services.api.get(f"{self._acct(ad_account_id)}/customaudiences", params),
+            fields=fields,
+            limit=limit,
         )
         return rows
 
     def get_custom_audience_insights(self, audience_id: str) -> Any:
-        aud = CustomAudience(audience_id)
-        info = aud.api_get(fields=[CustomAudience.Field.name, CustomAudience.Field.subtype,
-                                  CustomAudience.Field.approximate_count, CustomAudience.Field.id])
-        return to_dict(info)
+        fields = [
+            "name",
+            "subtype",
+            "approximate_count",
+            "id",
+        ]
+        data = self.services.api.get(f"{audience_id}", {"fields": ",".join(fields)})
+        return to_dict(data)
 
     @staticmethod
     def _split(items: str) -> list:
         return [i.strip() for i in (items or "").split(",") if i.strip()]
 
     def _build_user_schema(self, emails: str, phone_numbers: str, user_ids: str, hash_pii: bool):
-        from src.utils import normalize_pii
         schema = []
         users = []
         if emails:
@@ -61,34 +63,49 @@ class AudiencesService:
             users.extend(self._split(user_ids))
         return schema, users
 
-    def create_custom_audience(self, name: str, description: str = "",
-                               customer_file_source: str = "BOTH_USER_AND_PARTNER_PROVIDED",
-                               ad_account_id: str = "") -> Any:
-        account = AdAccount(resolve_ad_account_id(ad_account_id))
-        audience = account.create_custom_audience(params={
-            CustomAudience.Field.name: name,
-            CustomAudience.Field.subtype: "CUSTOM",
-            CustomAudience.Field.description: description,
+    def create_custom_audience(
+        self,
+        name: str,
+        description: str = "",
+        customer_file_source: str = "BOTH_USER_AND_PARTNER_PROVIDED",
+        ad_account_id: str = "",
+    ) -> Any:
+        acct = self._acct(ad_account_id)
+        params: dict[str, Any] = {
+            "name": name,
+            "subtype": "CUSTOM",
+            "description": description,
             "customer_file_source": customer_file_source,
-        })
-        return to_dict(audience)
+        }
+        data = self.services.api.post(f"{acct}/customaudiences", params)
+        return to_dict(data)
 
-    def add_users(self, audience_id: str, emails: str = "", phone_numbers: str = "",
-                  user_ids: str = "", hash_pii: bool = True) -> dict[str, Any]:
-        audience = CustomAudience(audience_id)
+    def add_users(
+        self, audience_id: str, emails: str = "", phone_numbers: str = "", user_ids: str = "", hash_pii: bool = True
+    ) -> dict[str, Any]:
         schema, users = self._build_user_schema(emails, phone_numbers, user_ids, hash_pii)
         if not users:
             raise ValueError("قدّم بريدًا أو أرقام هواتف أو معرفات")
-        result = audience.add_users(schema=schema, users=users)
-        return {"success": True, "audience_id": audience_id, "added": len(users),
-                "hashed": hash_pii, "result": to_dict(result)}
+        result = self.services.api.post(f"{audience_id}/users", {"schema": schema, "users": users})
+        return {
+            "success": True,
+            "audience_id": audience_id,
+            "added": len(users),
+            "hashed": hash_pii,
+            "result": to_dict(result),
+        }
 
-    def remove_users(self, audience_id: str, emails: str = "", phone_numbers: str = "",
-                     user_ids: str = "", hash_pii: bool = True) -> dict[str, Any]:
-        audience = CustomAudience(audience_id)
+    def remove_users(
+        self, audience_id: str, emails: str = "", phone_numbers: str = "", user_ids: str = "", hash_pii: bool = True
+    ) -> dict[str, Any]:
         schema, users = self._build_user_schema(emails, phone_numbers, user_ids, hash_pii)
         if not users:
             raise ValueError("قدّم بريدًا أو أرقام هواتف أو معرفات")
-        result = audience.remove_users(schema=schema, users=users)
-        return {"success": True, "audience_id": audience_id, "removed": len(users),
-                "hashed": hash_pii, "result": to_dict(result)}
+        result = self.services.api.post(f"{audience_id}/users", {"schema": schema, "users": users})
+        return {
+            "success": True,
+            "audience_id": audience_id,
+            "removed": len(users),
+            "hashed": hash_pii,
+            "result": to_dict(result),
+        }

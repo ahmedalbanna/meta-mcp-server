@@ -8,8 +8,8 @@ FB_CROSS_PLATFORM_TIKTOK; treat results as indicative only.
 import logging
 import re
 
-from src.helpers import handle_error, json_dumps
 from src.throttle import concurrency_limit
+from src.utils import handle_error, json_dumps
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def _og(html: str, prop: str) -> str | None:
     return m.group(1) if m else None
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register cross-platform tools."""
 
     @mcp.tool()
@@ -42,9 +42,8 @@ def register(mcp, services=None):
         يتطلب FB_CROSS_PLATFORM_TIKTOK=true. النتائج استرشادية وقد تتعطّل.
         """
         try:
-            from src.core.services import Services
             from src.services.cross_platform_service import CrossPlatformService
-            svc = CrossPlatformService(services) if services is not None else CrossPlatformService(Services.default())
+            svc = CrossPlatformService(services)
             return json_dumps(svc.tiktok_profile(handle))
         except Exception as e:
             return json_dumps(handle_error(e, "tiktok_profile"))
@@ -54,9 +53,8 @@ def register(mcp, services=None):
     def whatsapp_business_link(phone: str, message: str = "مرحباً، أود الاستفسار عن منتجاتكم") -> str:
         """توليد رابط WhatsApp Click-to-Chat (wa.me) لرقم (Yemen +967 default)."""
         try:
-            from src.core.services import Services
             from src.services.cross_platform_service import CrossPlatformService
-            svc = CrossPlatformService(services) if services is not None else CrossPlatformService(Services.default())
+            svc = CrossPlatformService(services)
             return json_dumps(svc.whatsapp_link(phone, message))
         except Exception as e:
             return json_dumps(handle_error(e, "whatsapp_business_link"))
@@ -71,9 +69,8 @@ def register(mcp, services=None):
         phone: رقم WhatsApp (اختياري) لتوليد wa.me link
         """
         try:
-            from src.core.services import Services
             from src.services.cross_platform_service import CrossPlatformService
-            svc = CrossPlatformService(services) if services is not None else CrossPlatformService(Services.default())
+            svc = CrossPlatformService(services)
             result = svc.competitor_360(handle, page_id, phone)
             return json_dumps(result)
         except Exception as e:

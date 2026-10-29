@@ -10,7 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.config import BASE_DIR, REQUIRED_KEYS, validate_config
+from src.core.config import BASE_DIR, REQUIRED_KEYS, validate_config
 
 OPTIONAL_KEYS = {
     "FB_APP_ID": "debug_access_token",

@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 
 import requests  # type: ignore[import-untyped]
 
-from src.config import (
+from src.core.config import (
     CLOUDINARY_API_KEY,
     CLOUDINARY_API_SECRET,
     CLOUDINARY_CLOUD_NAME,

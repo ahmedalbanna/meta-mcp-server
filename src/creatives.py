@@ -81,11 +81,11 @@ _TEMPLATES = {
 }
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register creative preview & template tools."""
 
-    from src.helpers import api_call, handle_error, json_dumps, to_dict
     from src.throttle import concurrency_limit
+    from src.utils import api_call, handle_error, json_dumps, to_dict
 
     def _validate_format(ad_format: str) -> str:
         fmt = ad_format.strip().upper()
@@ -103,7 +103,7 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.creatives_service import CreativesService
-            svc = CreativesService(services) if services is not None else CreativesService(Services.default())
+            svc = CreativesService(services)
             data = svc.generate_ad_preview(ad_id, ad_format)
             return json_dumps(data)
         except Exception as e:
@@ -116,7 +116,7 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.creatives_service import CreativesService
-            svc = CreativesService(services) if services is not None else CreativesService(Services.default())
+            svc = CreativesService(services)
             data = svc.generate_creative_preview(ad_creative_id, ad_format)
             return json_dumps(data)
         except Exception as e:
@@ -139,7 +139,7 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.creatives_service import CreativesService
-            svc = CreativesService(services) if services is not None else CreativesService(Services.default())
+            svc = CreativesService(services)
             data = svc.generate_creative_template(objective, business_name, product_name, offer, audience)
             return json_dumps(data)
         except Exception as e:
@@ -358,7 +358,7 @@ def register(mcp, services=None):
             # Lightweight per-module overview (calls existing list tool pattern)
             return json_dumps({"module": "creatives", "resource": "creatives://overview", "hint": "قوالب الإبداع"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "creatives://overview"))
 
@@ -384,7 +384,7 @@ def register(mcp, services=None):
                 {"module": "creatives", "resource": "creatives://templates", "hint": "قوالب إبداعية إضافية"}
             )
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "creatives://templates"))
 

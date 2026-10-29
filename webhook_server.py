@@ -21,7 +21,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from src.config import APP_SECRET, MCP_HTTP_TOKEN, META_WEBHOOK_VERIFY_TOKEN, REPORT_DIR, WEBHOOK_PORT
+from src.core.config import APP_SECRET, MCP_HTTP_TOKEN, META_WEBHOOK_VERIFY_TOKEN, REPORT_DIR, WEBHOOK_PORT
 
 log = logging.getLogger("meta-mcp.webhook")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

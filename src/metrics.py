@@ -150,11 +150,11 @@ def metrics_tool_decorator(fn):
     return wrapper
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register metrics MCP tools (Phase 4.1)."""
 
-    from src.helpers import handle_error, json_dumps
     from src.throttle import concurrency_limit
+    from src.utils import handle_error, json_dumps
 
     @mcp.tool()
     @concurrency_limit()
@@ -163,7 +163,7 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.metrics_service import MetricsService
-            svc = MetricsService(services) if services is not None else MetricsService(Services.default())
+            svc = MetricsService(services)
             return json_dumps(svc.get_metrics(format))
         except Exception as e:
             return json_dumps(handle_error(e, "get_metrics"))
@@ -175,7 +175,7 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.metrics_service import MetricsService
-            svc = MetricsService(services) if services is not None else MetricsService(Services.default())
+            svc = MetricsService(services)
             return json_dumps(svc.get_prometheus())
         except Exception as e:
             return json_dumps({"error": str(e)})
@@ -205,7 +205,7 @@ def register(mcp, services=None):
             # Lightweight per-module overview (calls existing list tool pattern)
             return json_dumps({"module": "metrics", "resource": "metrics://overview", "hint": "نظرة عامة المقاييس"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "metrics://overview"))
 
@@ -233,7 +233,7 @@ def register(mcp, services=None):
             snap["tool_duration"] = {k: len(v) for k, v in snap.get("tool_duration", {}).items()}
             return json_dumps(snap)
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             logger.exception("metrics://snapshot failed")
             return json_dumps(handle_error(e, "metrics://snapshot"))

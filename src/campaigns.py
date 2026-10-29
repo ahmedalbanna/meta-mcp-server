@@ -2,18 +2,14 @@ import asyncio
 import logging
 import time
 
-from src.config import AD_ACCOUNT_ID
-
 logger = logging.getLogger(__name__)
 
 
-def register(mcp, services=None):
+def register(mcp, services):
     """Register campaigns tools."""
 
-    from facebook_business.adobjects.adaccount import AdAccount
-
-    from src.helpers import handle_error, json_dumps, to_dict, write_guard
     from src.throttle import concurrency_limit
+    from src.utils import handle_error, json_dumps, to_dict, write_guard
 
     @mcp.tool()
     @concurrency_limit()
@@ -24,9 +20,9 @@ def register(mcp, services=None):
         ad_account_id: معرف حساب إعلاني بديل (اختياري — افتراضي FB_AD_ACCOUNT_ID / الأول في FB_AD_ACCOUNT_IDS)
         """
         try:
-            from src.core.services import Services
             from src.services.campaigns_service import CampaignsService
-            svc = CampaignsService(services) if services is not None else CampaignsService(Services.default())
+
+            svc = CampaignsService(services)
             data = svc.list_campaigns(status, limit, ad_account_id)
             return json_dumps(data)
         except Exception as e:
@@ -37,9 +33,9 @@ def register(mcp, services=None):
     def get_campaign(campaign_id: str) -> str:
         """تفاصيل حملة واحدة."""
         try:
-            from src.core.services import Services
             from src.services.campaigns_service import CampaignsService
-            svc = CampaignsService(services) if services is not None else CampaignsService(Services.default())
+
+            svc = CampaignsService(services)
             data = svc.get_campaign(campaign_id)
             return json_dumps(data)
         except Exception as e:
@@ -77,9 +73,9 @@ def register(mcp, services=None):
         ad_account_id: معرف حساب إعلاني بديل (اختياري)
         """
         try:
-            from src.core.services import Services
             from src.services.campaigns_service import CampaignsService
-            svc = CampaignsService(services) if services is not None else CampaignsService(Services.default())
+
+            svc = CampaignsService(services)
             data = svc.create_campaign(name, objective, daily_budget, lifetime_budget, status, ad_account_id)
             return json_dumps(data)
         except Exception as e:
@@ -94,9 +90,9 @@ def register(mcp, services=None):
         status: ACTIVE, PAUSED, DELETED, ARCHIVED
         """
         try:
-            from src.core.services import Services
             from src.services.campaigns_service import CampaignsService
-            svc = CampaignsService(services) if services is not None else CampaignsService(Services.default())
+
+            svc = CampaignsService(services)
             data = svc.update_status(campaign_id, status)
             return json_dumps(data)
         except Exception as e:
@@ -108,9 +104,9 @@ def register(mcp, services=None):
     def update_campaign_budget(campaign_id: str, daily_budget: int = 0, lifetime_budget: int = 0) -> str:
         """تعديل ميزانية حملة (بالعملة الصغرى)."""
         try:
-            from src.core.services import Services
             from src.services.campaigns_service import CampaignsService
-            svc = CampaignsService(services) if services is not None else CampaignsService(Services.default())
+
+            svc = CampaignsService(services)
             data = svc.update_budget(campaign_id, daily_budget, lifetime_budget)
             return json_dumps(data)
         except Exception as e:
@@ -122,9 +118,9 @@ def register(mcp, services=None):
     def delete_campaign(campaign_id: str) -> str:
         """حذف حملة نهائيًا."""
         try:
-            from src.core.services import Services
             from src.services.campaigns_service import CampaignsService
-            svc = CampaignsService(services) if services is not None else CampaignsService(Services.default())
+
+            svc = CampaignsService(services)
             data = svc.delete(campaign_id)
             return json_dumps(data)
         except Exception as e:
@@ -143,7 +139,7 @@ def register(mcp, services=None):
                 }
             )
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "campaigns://overview"))
 
@@ -162,8 +158,9 @@ def register(mcp, services=None):
         try:
 
             def _fetch():
-                account = AdAccount(AD_ACCOUNT_ID)
-                return account.get_campaigns(
+                acct = services.config.fb_ad_account_id
+                return services.api.get(
+                    f"{acct}/campaigns",
                     params={
                         "fields": ["name", "status", "id"],
                         "filtering": json_dumps(
@@ -175,20 +172,21 @@ def register(mcp, services=None):
                                 }
                             ]
                         ),
-                    }
+                    },
                 )
 
             t0 = time.monotonic()
-            campaigns = await asyncio.to_thread(_fetch)
+            data = await asyncio.to_thread(_fetch)
             elapsed = time.monotonic() - t0
+            rows = data.get("data", []) if isinstance(data, dict) else []
             logger.info(
                 "campaigns://active fetched %d campaigns in %.2fs",
-                len(list(campaigns)),
+                len(rows),
                 elapsed,
             )
-            return json_dumps([to_dict(c) for c in campaigns])
+            return json_dumps([to_dict(c) for c in rows])
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             logger.exception("campaigns://active failed")
             return json_dumps(handle_error(e, "campaigns://active"))

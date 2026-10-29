@@ -2,8 +2,6 @@ import asyncio
 import logging
 import time
 
-from src.config import AD_ACCOUNT_ID, resolve_ad_account_id
-
 logger = logging.getLogger(__name__)
 
 
@@ -36,23 +34,21 @@ def _build_object_story_spec(
         story_key = "link_data"
     return {"page_id": page_id, story_key: {**media, "message": message}}
 
-def register(mcp, services=None):
+
+def register(mcp, services):
     """Register ads and creatives tools."""
 
-    from facebook_business.adobjects.adaccount import AdAccount
-    from facebook_business.adobjects.adcreative import AdCreative
-
-    from src.helpers import handle_error, json_dumps, to_dict, write_guard
     from src.throttle import concurrency_limit
+    from src.utils import handle_error, json_dumps, to_dict, write_guard
 
     @mcp.tool()
     @concurrency_limit()
     def list_ads(adset_id: str = "", limit: int = 25, ad_account_id: str = "") -> str:
         """قائمة الإعلانات (يمكن تحديد مجموعة إعلانية معينة)."""
         try:
-            from src.core.services import Services
             from src.services.ads_service import AdsService
-            svc = AdsService(services) if services is not None else AdsService(Services.default())
+
+            svc = AdsService(services)
             data = svc.list_ads(adset_id, limit, ad_account_id)
             return json_dumps(data)
         except Exception as e:
@@ -63,9 +59,9 @@ def register(mcp, services=None):
     def get_ad(ad_id: str) -> str:
         """تفاصيل إعلان واحد."""
         try:
-            from src.core.services import Services
             from src.services.ads_service import AdsService
-            svc = AdsService(services) if services is not None else AdsService(Services.default())
+
+            svc = AdsService(services)
             data = svc.get_ad(ad_id)
             return json_dumps(data)
         except Exception as e:
@@ -77,9 +73,9 @@ def register(mcp, services=None):
     def update_ad_status(ad_id: str, status: str) -> str:
         """تغيير حالة إعلان (ACTIVE, PAUSED, DELETED, ARCHIVED)."""
         try:
-            from src.core.services import Services
             from src.services.ads_service import AdsService
-            svc = AdsService(services) if services is not None else AdsService(Services.default())
+
+            svc = AdsService(services)
             return json_dumps(svc.update_status(ad_id, status))
         except Exception as e:
             return json_dumps(handle_error(e, "update_ad_status"))
@@ -93,9 +89,9 @@ def register(mcp, services=None):
         قدّم image_url (رابط خارجي) أو file_path (مسار محلي).
         """
         try:
-            from src.core.services import Services
             from src.services.ads_service import AdsService
-            svc = AdsService(services) if services is not None else AdsService(Services.default())
+
+            svc = AdsService(services)
             return json_dumps(svc.upload_image(name, image_url, file_path))
         except Exception as e:
             return json_dumps(handle_error(e, "upload_image"))
@@ -109,9 +105,9 @@ def register(mcp, services=None):
         قدّم file_path (مسار محلي) أو video_url (رابط مباشر).
         """
         try:
-            from src.core.services import Services
             from src.services.ads_service import AdsService
-            svc = AdsService(services) if services is not None else AdsService(Services.default())
+
+            svc = AdsService(services)
             return json_dumps(svc.upload_video(title, file_path, video_url))
         except Exception as e:
             return json_dumps(handle_error(e, "upload_video"))
@@ -136,10 +132,14 @@ def register(mcp, services=None):
         call_to_action مثل: LEARN_MORE, SHOP_NOW, BUY_NOW, SIGN_UP
         """
         try:
-            from src.core.services import Services
             from src.services.ads_service import AdsService
-            svc = AdsService(services) if services is not None else AdsService(Services.default())
-            return json_dumps(svc.create_ad_creative(name, page_id, message, image_hash, image_url, video_id, link, headline, call_to_action))
+
+            svc = AdsService(services)
+            return json_dumps(
+                svc.create_ad_creative(
+                    name, page_id, message, image_hash, image_url, video_id, link, headline, call_to_action
+                )
+            )
         except Exception as e:
             return json_dumps(handle_error(e, "create_ad_creative"))
 
@@ -165,10 +165,25 @@ def register(mcp, services=None):
         الصفحة page_id يجب أن تكون مرتبطة بالحساب الإعلاني.
         """
         try:
-            from src.core.services import Services
             from src.services.ads_service import AdsService
-            svc = AdsService(services) if services is not None else AdsService(Services.default())
-            return json_dumps(svc.create_ad(adset_id, name, creative_name, page_id, message, image_hash, image_url, video_id, link, headline, call_to_action, status))
+
+            svc = AdsService(services)
+            return json_dumps(
+                svc.create_ad(
+                    adset_id,
+                    name,
+                    creative_name,
+                    page_id,
+                    message,
+                    image_hash,
+                    image_url,
+                    video_id,
+                    link,
+                    headline,
+                    call_to_action,
+                    status,
+                )
+            )
         except Exception as e:
             return json_dumps(handle_error(e, "create_ad"))
 
@@ -177,12 +192,9 @@ def register(mcp, services=None):
     def list_ad_creatives(limit: int = 25, ad_account_id: str = "") -> str:
         """قائمة الإبداعات (Ad Creatives) في الحساب الإعلاني."""
         try:
-            from src.utils import paginate
-
-            rows = paginate(
-                lambda params: AdAccount(resolve_ad_account_id(ad_account_id)).get_ad_creatives(params=params),
-                limit=limit,
-            )
+            acct = services.config.resolve_ad_account_id(ad_account_id)
+            data = services.api.get(f"{acct}/adcreatives", {"limit": limit})
+            rows = data.get("data", []) if isinstance(data, dict) else []
             return json_dumps(rows)
         except Exception as e:
             return json_dumps(handle_error(e, "list_ad_creatives"))
@@ -192,9 +204,8 @@ def register(mcp, services=None):
     def get_ad_creative(creative_id: str) -> str:
         """تفاصيل إبداع (Ad Creative) واحد."""
         try:
-            creative = AdCreative(creative_id)
-            creative.api_read()
-            return json_dumps(to_dict(creative))
+            data = services.api.get(creative_id)
+            return json_dumps(data if isinstance(data, dict) else {})
         except Exception as e:
             return json_dumps(handle_error(e, "get_ad_creative"))
 
@@ -204,8 +215,7 @@ def register(mcp, services=None):
     def delete_ad_creative(creative_id: str) -> str:
         """حذف إبداع (Ad Creative) نهائيًا."""
         try:
-            creative = AdCreative(creative_id)
-            creative.api_delete()
+            services.api.delete(creative_id)
             return json_dumps({"success": True, "creative_id": creative_id})
         except Exception as e:
             return json_dumps(handle_error(e, "delete_ad_creative"))
@@ -217,7 +227,7 @@ def register(mcp, services=None):
             # Lightweight per-module overview (calls existing list tool pattern)
             return json_dumps({"module": "ads", "resource": "ads://overview", "hint": "نظرة عامة على الإعلانات"})
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             return json_dumps(handle_error(e, "ads://overview"))
 
@@ -232,21 +242,23 @@ def register(mcp, services=None):
         try:
 
             def _fetch():
-                account = AdAccount(AD_ACCOUNT_ID)
-                return account.get_ads(
+                acct = services.config.fb_ad_account_id
+                return services.api.get(
+                    f"{acct}/ads",
                     params={
                         "fields": ["name", "status", "creative", "id"],
                         "filtering": json_dumps([{"field": "status", "operator": "EQUAL", "value": "ACTIVE"}]),
-                    }
+                    },
                 )
 
             t0 = time.monotonic()
-            rows = await asyncio.to_thread(_fetch)
+            data = await asyncio.to_thread(_fetch)
             elapsed = time.monotonic() - t0
+            rows = data.get("data", []) if isinstance(data, dict) else []
             logger.info("ads://active fetched in %.2fs", elapsed)
             return json_dumps([to_dict(c) for c in rows])
         except Exception as e:
-            from src.helpers import handle_error
+            from src.utils import handle_error
 
             logger.exception("ads://active failed")
             return json_dumps(handle_error(e, "ads://active"))
