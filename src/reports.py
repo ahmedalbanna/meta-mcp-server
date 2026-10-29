@@ -5,7 +5,6 @@ from pathlib import Path
 
 from src.config import (
     AD_ACCOUNT_ID,
-    PAGE_ID,
     REPORT_DIR,
     ensure_report_dir,
 )
@@ -112,6 +111,7 @@ def register(mcp, services=None):
             metric_list = [m.strip() for m in metrics.split(",") if m.strip()]
             from src.core.services import Services
             from src.services.reports_service import ReportsService
+
             _rsvc = ReportsService(services) if services is not None else ReportsService(Services.default())
             rows = _rsvc.fetch_campaign_rows(AD_ACCOUNT_ID, date_preset, metric_list)
             base = filename or f"campaign_report_{date_preset}"
@@ -157,23 +157,12 @@ def register(mcp, services=None):
     def account_summary(date_preset: str = "last_30d") -> str:
         """ملخص أداء الحساب الإعلاني خلال فترة."""
         try:
-            rows = _fetch_rows(AD_ACCOUNT_ID, date_preset, DEFAULT_METRICS)
-            if not rows:
-                return json_dumps({"message": "لا توجد بيانات", "date_preset": date_preset})
-            summary: dict[str, float | int | str] = {
-                "date_preset": date_preset,
-                "campaigns": len(rows),
-            }
-            for m in DEFAULT_METRICS:
-                total = sum(_to_numeric(r.get(m, 0)) for r in rows)
-                summary[f"total_{m}"] = round(total, 4)
-            spend = float(summary.get("total_spend", 0) or 0)
-            clicks = float(summary.get("total_clicks", 0) or 0)
-            if clicks:
-                summary["avg_cpc"] = round(spend / clicks, 4)
-            best = max(rows, key=lambda r: _to_numeric(r.get("spend", 0)))
-            summary["top_campaign"] = best.get("campaign_name", "N/A")
-            return json_dumps(summary)
+            from src.core.services import Services
+            from src.services.reports_service import ReportsService
+
+            svc = ReportsService(services) if services is not None else ReportsService(Services.default())
+            out = svc.account_summary(date_preset)
+            return json_dumps(out)
         except Exception as e:
             return json_dumps(handle_error(e, "account_summary"))
 
@@ -196,6 +185,7 @@ def register(mcp, services=None):
             init_meta_api()
             from src.core.services import Services
             from src.services.reports_service import ReportsService
+
             _rsvc = ReportsService(services) if services is not None else ReportsService(Services.default())
             raw_rows = _rsvc.fetch_instagram_report_rows(limit)
             rows = []
@@ -249,36 +239,12 @@ def register(mcp, services=None):
         format: csv | excel. filename: اسم الملف (بدون امتداد).
         """
         try:
-            ensure_report_dir()
-            from facebook_business.adobjects.page import Page
+            from src.core.services import Services
+            from src.services.reports_service import ReportsService
 
-            from src.helpers import to_dict
-
-            page = Page(PAGE_ID)
-            info = page.api_get(
-                fields=[
-                    Page.Field.name,
-                    Page.Field.fan_count,
-                    Page.Field.category,
-                    Page.Field.about,
-                    Page.Field.link,
-                ]
-            )
-            data = to_dict(info)
-            rows = [data]
-            base = filename or "page_report"
-            if filename:
-                try:
-                    base = sanitize_filename(base)
-                except ValueError as e:
-                    return json_dumps({"error": f"اسم ملف غير صالح: {e}"})
-            if format == "excel":
-                path = Path(REPORT_DIR) / f"{base}.xlsx"
-                _write_excel(path, rows)
-            else:
-                path = Path(REPORT_DIR) / f"{base}.csv"
-                _write_csv(path, rows)
-            return json_dumps({"success": True, "file": str(path), "rows": len(rows)})
+            svc = ReportsService(services) if services is not None else ReportsService(Services.default())
+            out = svc.generate_page_report(format, filename)
+            return json_dumps(out)
         except Exception as e:
             return json_dumps(handle_error(e, "generate_page_report"))
 
@@ -299,75 +265,12 @@ def register(mcp, services=None):
         يتطلب: pip install gspread google-auth
         """
         try:
-            from src.helpers import sanitize_path
+            from src.core.services import Services
+            from src.services.reports_service import ReportsService
 
-            if not filename:
-                return json_dumps({"error": "filename مطلوب"})
-            if not spreadsheet_id:
-                return json_dumps({"error": "spreadsheet_id مطلوب"})
-            # Resolve CSV inside REPORT_DIR
-            try:
-                csv_path = sanitize_path(filename, REPORT_DIR)
-            except ValueError as e:
-                return json_dumps({"error": f"مسار غير صالح: {e}"})
-            if not csv_path.is_file():
-                # Try with .csv extension fallback
-                alt = sanitize_path(filename + ".csv", REPORT_DIR) if not filename.endswith(".csv") else None
-                if alt and alt.is_file():
-                    csv_path = alt
-                else:
-                    return json_dumps({"error": f"الملف غير موجود: {csv_path}"})
-            # Read CSV
-            import csv as _csv
-
-            with csv_path.open("r", encoding="utf-8", newline="") as fh:
-                reader = list(_csv.reader(fh))
-            if not reader:
-                return json_dumps({"error": "الملف فارغ"})
-
-            # Try importing gspread
-            try:
-                import gspread  # type: ignore
-                from google.oauth2.service_account import Credentials  # type: ignore
-            except ImportError:
-                return json_dumps(
-                    {
-                        "error": "gspread غير مثبت. ثبّت: pip install gspread google-auth",
-                        "hint": "أو صدّر يدويًا عبر تحميل CSV إلى Sheets",
-                        "csv_file": str(csv_path),
-                        "rows": len(reader) - 1,
-                    }
-                )
-
-            cred_path = credentials_path or __import__("os").getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
-            if not cred_path or not Path(cred_path).is_file():
-                return json_dumps(
-                    {
-                        "error": "ملف credentials غير موجود. حدد credentials_path أو اضبط GOOGLE_APPLICATION_CREDENTIALS",
-                        "hint": "أنشئ Service Account في Google Cloud > APIs & Services > Credentials",
-                    }
-                )
-
-            creds = Credentials.from_service_account_file(
-                cred_path, scopes=["https://www.googleapis.com/auth/spreadsheets"]
-            )
-            client = gspread.authorize(creds)
-            sh = client.open_by_key(spreadsheet_id)
-            try:
-                ws = sh.worksheet(worksheet)
-                ws.clear()
-            except Exception:
-                ws = sh.add_worksheet(title=worksheet, rows=len(reader) + 10, cols=len(reader[0]) + 5)
-            ws.update(reader)
-            return json_dumps(
-                {
-                    "success": True,
-                    "spreadsheet_id": spreadsheet_id,
-                    "worksheet": worksheet,
-                    "rows": len(reader) - 1,
-                    "csv_source": str(csv_path),
-                }
-            )
+            svc = ReportsService(services) if services is not None else ReportsService(Services.default())
+            out = svc.export_report_to_google_sheets(filename, spreadsheet_id, worksheet, credentials_path)
+            return json_dumps(out)
         except Exception as e:
             return json_dumps(handle_error(e, "export_report_to_google_sheets"))
 

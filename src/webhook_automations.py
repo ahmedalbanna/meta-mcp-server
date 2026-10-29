@@ -50,7 +50,12 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.webhook_automations_service import WebhookAutomationsService
-            svc = WebhookAutomationsService(services) if services is not None else WebhookAutomationsService(Services.default())
+
+            svc = (
+                WebhookAutomationsService(services)
+                if services is not None
+                else WebhookAutomationsService(Services.default())
+            )
             return json_dumps(svc.list())
         except Exception as e:
             return json_dumps(handle_error(e, "list_webhook_automations"))
@@ -76,7 +81,12 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.webhook_automations_service import WebhookAutomationsService
-            svc = WebhookAutomationsService(services) if services is not None else WebhookAutomationsService(Services.default())
+
+            svc = (
+                WebhookAutomationsService(services)
+                if services is not None
+                else WebhookAutomationsService(Services.default())
+            )
             return json_dumps(svc.create(name, trigger, keyword, action_type, action_params_json, enabled))
         except Exception as e:
             return json_dumps(handle_error(e, "create_webhook_automation"))
@@ -89,7 +99,12 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.webhook_automations_service import WebhookAutomationsService
-            svc = WebhookAutomationsService(services) if services is not None else WebhookAutomationsService(Services.default())
+
+            svc = (
+                WebhookAutomationsService(services)
+                if services is not None
+                else WebhookAutomationsService(Services.default())
+            )
             return json_dumps(svc.delete(rule_id))
         except Exception as e:
             return json_dumps(handle_error(e, "delete_webhook_automation"))
@@ -105,7 +120,12 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.webhook_automations_service import WebhookAutomationsService
-            svc = WebhookAutomationsService(services) if services is not None else WebhookAutomationsService(Services.default())
+
+            svc = (
+                WebhookAutomationsService(services)
+                if services is not None
+                else WebhookAutomationsService(Services.default())
+            )
             return json_dumps(svc.evaluate(event_json))
         except Exception as e:
             return json_dumps(handle_error(e, "evaluate_webhook_automations"))
@@ -120,90 +140,16 @@ def register(mcp, services=None):
         dry_run: true=محاكاة فقط، false=تنفيذ فعلي (يتطلب FB_ENABLE_WRITES)
         """
         try:
-            try:
-                event = json.loads(event_json)
-            except Exception:
-                return json_dumps({"error": "event_json ليس JSON صالح"})
-            # Reuse evaluate logic
-            eval_raw = json.loads(evaluate_webhook_automations(event_json))
-            matched = eval_raw.get("matched", [])
-            if not matched:
-                return json_dumps({"matched": 0, "executed": 0, "message": "لا توجد قواعد مطابقة"})
-            if dry_run:
-                return json_dumps({"matched": len(matched), "dry_run": True, "would_execute": matched})
+            from src.core.services import Services
+            from src.services.webhook_automations_service import WebhookAutomationsService
 
-            # Execute each matched rule
-            results = []
-            for rule in matched:
-                act = rule.get("action_type")
-                params = rule.get("action_params", {})
-                try:
-                    if act == "reply_comment":
-                        # expects comment_id in event, message in params
-                        comment_id = event.get("comment_id") or event.get("id") or params.get("comment_id") or ""
-                        message = params.get("message") or "شكرًا لتعليقك!"
-                        if comment_id:
-                            from src.helpers import api_call
-
-                            api_call("POST", f"{comment_id}/comments", {"message": message})
-                            results.append({"rule_id": rule["id"], "action": act, "status": "executed"})
-                        else:
-                            results.append(
-                                {
-                                    "rule_id": rule["id"],
-                                    "action": act,
-                                    "status": "skipped",
-                                    "reason": "comment_id missing",
-                                }
-                            )
-                    elif act == "hide_comment":
-                        comment_id = event.get("comment_id") or event.get("id") or params.get("comment_id") or ""
-                        if comment_id:
-                            from src.helpers import api_call
-
-                            api_call("POST", f"{comment_id}", {"hide": "true"})
-                            results.append({"rule_id": rule["id"], "action": act, "status": "executed"})
-                        else:
-                            results.append({"rule_id": rule["id"], "action": act, "status": "skipped"})
-                    elif act == "send_message":
-                        recipient = params.get("recipient_id") or event.get("sender", {}).get("id") or ""
-                        text = params.get("message") or "أهلاً!"
-                        if recipient:
-                            from src.config import PAGE_ID
-                            from src.helpers import page_api_call
-
-                            page_api_call(
-                                "POST",
-                                f"{PAGE_ID}/messages",
-                                {"recipient": {"id": recipient}, "message": {"text": text}},
-                            )
-                            results.append({"rule_id": rule["id"], "action": act, "status": "executed"})
-                        else:
-                            results.append({"rule_id": rule["id"], "action": act, "status": "skipped"})
-                    elif act == "add_to_audience":
-                        audience_id = params.get("audience_id") or ""
-                        email = event.get("email") or params.get("email") or ""
-                        if audience_id and email:
-                            from facebook_business.adobjects.customaudience import CustomAudience
-
-                            from src.utils import normalize_pii
-
-                            hashed = normalize_pii([email], "email")
-                            CustomAudience(audience_id).add_users(schema=["EMAIL_SHA256"], users=hashed)
-                            results.append({"rule_id": rule["id"], "action": act, "status": "executed"})
-                        else:
-                            results.append({"rule_id": rule["id"], "action": act, "status": "skipped"})
-                    else:
-                        results.append({"rule_id": rule["id"], "action": act, "status": "unsupported"})
-                except Exception as ex:
-                    results.append({"rule_id": rule["id"], "action": act, "status": "failed", "error": str(ex)})
-            return json_dumps(
-                {
-                    "matched": len(matched),
-                    "executed": len([r for r in results if r["status"] == "executed"]),
-                    "results": results,
-                }
+            svc = (
+                WebhookAutomationsService(services)
+                if services is not None
+                else WebhookAutomationsService(Services.default())
             )
+            out = svc.run(event_json, dry_run)
+            return json_dumps(out)
         except Exception as e:
             return json_dumps(handle_error(e, "run_webhook_automations"))
 

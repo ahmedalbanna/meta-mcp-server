@@ -55,16 +55,19 @@ class _Recorder:
         def decorator(fn):
             self.tools[fn.__name__] = fn
             return fn
+
         return decorator
 
     def resource(self, *args, **kwargs):
         def decorator(fn):
             return fn
+
         return decorator
 
     def prompt(self, *args, **kwargs):
         def decorator(fn):
             return fn
+
         return decorator
 
     def __init__(self):
@@ -154,6 +157,7 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.scheduler_service import SchedulerService
+
             svc = SchedulerService(services) if services is not None else SchedulerService(Services.default())
             return json_dumps(svc.schedule_task(name, tool_name, params_json, run_at, cron))
         except Exception as e:
@@ -166,6 +170,7 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.scheduler_service import SchedulerService
+
             svc = SchedulerService(services) if services is not None else SchedulerService(Services.default())
             return json_dumps(svc.list_scheduled_tasks(status))
         except Exception as e:
@@ -179,6 +184,7 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.scheduler_service import SchedulerService
+
             svc = SchedulerService(services) if services is not None else SchedulerService(Services.default())
             return json_dumps(svc.cancel_scheduled_task(task_id))
         except Exception as e:
@@ -191,6 +197,7 @@ def register(mcp, services=None):
         try:
             from src.core.services import Services
             from src.services.scheduler_service import SchedulerService
+
             svc = SchedulerService(services) if services is not None else SchedulerService(Services.default())
             task = svc.get_scheduled_task(task_id)
             if task is None:
@@ -208,30 +215,12 @@ def register(mcp, services=None):
         dry_run=false: تنفيذ فعلي عبر استدعاء الأداة (يتطلب FB_ENABLE_WRITES)
         """
         try:
-            tasks = _load_tasks()
-            now = int(time.time())
-            due = [t for t in tasks if t.get("status") == "scheduled" and int(t.get("run_at", 0)) <= now]
-            if not due:
-                return json_dumps({"due": 0, "message": "لا توجد مهام مستحقة"})
-            results = []
-            for task in due:
-                tool_name = task.get("tool_name") or ""
-                params = task.get("params") or {}
-                if dry_run:
-                    results.append({"task_id": task["id"], "tool": tool_name, "status": "would_run", "params": params})
-                else:
-                    try:
-                        _dispatch_tool(tool_name, params)
-                        task["status"] = "done"
-                        task["executed_at"] = now
-                        results.append({"task_id": task["id"], "tool": tool_name, "status": "executed", "params": params})
-                    except Exception as e:
-                        task["status"] = "failed"
-                        task["error"] = str(e)
-                        results.append({"task_id": task["id"], "tool": tool_name, "status": "error", "error": str(e)})
-            if not dry_run:
-                _save_tasks(tasks)
-            return json_dumps({"due": len(due), "dry_run": dry_run, "results": results})
+            from src.core.services import Services
+            from src.services.scheduler_service import SchedulerService
+
+            svc = SchedulerService(services) if services is not None else SchedulerService(Services.default())
+            out = svc.run_due_tasks(dry_run)
+            return json_dumps(out)
         except Exception as e:
             return json_dumps(handle_error(e, "run_due_tasks"))
 
