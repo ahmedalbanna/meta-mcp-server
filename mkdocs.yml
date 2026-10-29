@@ -25,6 +25,12 @@ nav:
   - Home: index.md
   - Getting Started: getting-started.md
   - Tools Reference: tools.md
+  - Analytics: analytics.md
+  - Persistence: persistence.md
+  - OCR: ocr.md
+  - Page Builder: page_builder.md
+  - Cross-Platform: cross_platform.md
+  - Services Layer: services.md
   - Webhooks: webhooks.md
   - Metrics & Dashboard: metrics.md
   - Contributing: contributing.md
